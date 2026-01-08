@@ -21,4 +21,12 @@ export default [
       "no-console": "off",
     },
   },
+  {
+    files: ["src/public/**/*.js"],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+      },
+    },
+  },
 ];

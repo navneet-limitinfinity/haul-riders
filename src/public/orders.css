@@ -1,0 +1,247 @@
+/* Minimal, readable table UI (no inline styles so Helmet CSP is happy). */
+
+:root {
+  color-scheme: light dark;
+  --bg: #0b1220;
+  --card: #101a2f;
+  --text: #e6edf7;
+  --muted: #9fb0cc;
+  --border: rgba(255, 255, 255, 0.12);
+  --accent: #6aa6ff;
+  --ok: #4ade80;
+  --error: #fb7185;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f5f7fb;
+    --card: #ffffff;
+    --text: #0f172a;
+    --muted: #475569;
+    --border: rgba(15, 23, 42, 0.12);
+    --accent: #2563eb;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial,
+    "Apple Color Emoji", "Segoe UI Emoji";
+  background: var(--bg);
+  color: var(--text);
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: 0.2px;
+}
+
+.controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.field input {
+  width: 96px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+}
+
+button {
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--accent);
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  overflow: hidden;
+}
+
+.status {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.status[data-kind="ok"] {
+  color: var(--ok);
+}
+
+.status[data-kind="error"] {
+  color: var(--error);
+}
+
+.tableWrap {
+  overflow: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1050px;
+}
+
+.table th,
+.table td {
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.table th.colCheck,
+.table td.colCheck {
+  width: 44px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.table td.colCheck {
+  vertical-align: middle;
+}
+
+.table input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.table td.colAddress {
+  max-width: 340px;
+}
+
+.addrCell {
+  position: relative;
+  padding-right: 58px;
+}
+
+.addrText {
+  white-space: pre-line;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  line-clamp: 3;
+}
+
+.addrPopover {
+  display: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -8px;
+  transform: translateY(-100%);
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.35);
+  white-space: pre-line;
+  z-index: 10;
+}
+
+.copyBtn {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.copyBtn:hover {
+  border-color: var(--accent);
+}
+
+.copyIcon {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+@media (prefers-color-scheme: light) {
+  .copyBtn {
+    background: rgba(15, 23, 42, 0.06);
+  }
+}
+
+.addrCell:hover .copyBtn,
+.addrCell:focus-within .copyBtn {
+  opacity: 1;
+}
+
+.addrCell:hover .addrPopover,
+.addrCell:focus-within .addrPopover {
+  display: block;
+}
+
+.table th {
+  position: sticky;
+  top: 0;
+  background: var(--card);
+  color: var(--muted);
+  font-weight: 600;
+  z-index: 1;
+}
+
+.table tr:hover td {
+  background: rgba(255, 255, 255, 0.03);
+}

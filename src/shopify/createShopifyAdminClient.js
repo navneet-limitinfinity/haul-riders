@@ -8,9 +8,24 @@ export function createShopifyAdminClient({ storeDomain, accessToken, apiVersion 
 
   const baseUrl = `https://${storeDomain}/admin/api/${apiVersion}`;
 
-  const requestJson = async (path) => {
-    const response = await fetch(`${baseUrl}${path}`, {
-      method: "GET",
+  const buildUrlWithQuery = (path, query) => {
+    const url = new URL(`${baseUrl}${path}`);
+
+    if (query && typeof query === "object") {
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(query)) {
+        if (value === undefined || value === null || value === "") continue;
+        params.set(key, String(value));
+      }
+      url.search = params.toString();
+    }
+
+    return url.toString();
+  };
+
+  const requestJson = async ({ path, method = "GET", query }) => {
+    const response = await fetch(buildUrlWithQuery(path, query), {
+      method,
       headers: {
         "X-Shopify-Access-Token": accessToken,
         "Content-Type": "application/json",
@@ -29,10 +44,27 @@ export function createShopifyAdminClient({ storeDomain, accessToken, apiVersion 
   };
 
   const getShop = async () => {
-    const data = await requestJson("/shop.json");
+    const data = await requestJson({ path: "/shop.json" });
     return data.shop;
   };
 
-  return { getShop };
-}
+  const getLatestOrders = async ({ limit = 10 } = {}) => {
+    // Note:
+    // - `status=any` includes open/closed/cancelled (latest is by created_at desc)
+    // - `fields` keeps payload small, but still includes fulfillment tracking data
+    const data = await requestJson({
+      path: "/orders.json",
+      query: {
+        limit,
+        status: "any",
+        order: "created_at desc",
+        fields:
+          "id,name,total_price,shipping_address,phone,fulfillment_status,fulfillments",
+      },
+    });
 
+    return data.orders ?? [];
+  };
+
+  return { getShop, getLatestOrders };
+}

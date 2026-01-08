@@ -49,6 +49,12 @@ Server will listen on `http://localhost:3000` by default (configurable via `PORT
 - `GET /api/shopify/shop` → fetches shop details from Shopify Admin REST API
 - `GET /` → service info (quick sanity check)
 
+## Terminal scripts
+Fetch latest 10 orders and print to terminal:
+```bash
+npm run orders:latest
+```
+
 ## Environment variables
 - `PORT` (default `3000`) and `HOST` (default `0.0.0.0`)
 - `LOG_LEVEL` one of `debug | info | warn | error` (default `info`)

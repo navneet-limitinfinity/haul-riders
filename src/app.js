@@ -1,6 +1,8 @@
 import express from "express";
 import helmet from "helmet";
 import morgan from "morgan";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 import { buildRoutes } from "./routes/buildRoutes.js";
 
 /**
@@ -9,12 +11,18 @@ import { buildRoutes } from "./routes/buildRoutes.js";
 export function createApp({ env, logger }) {
   const app = express();
 
+  const publicDir = path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "public"
+  );
+
   // Needed for correct client IP / protocol when running behind Nginx/Apache.
   if (env.trustProxy) app.set("trust proxy", 1);
 
   app.disable("x-powered-by");
   app.use(helmet());
   app.use(express.json({ limit: "1mb" }));
+  app.use("/static", express.static(publicDir, { etag: true, maxAge: "5m" }));
 
   // HTTP access logs (short + useful). The logger is used instead of console.
   app.use(
