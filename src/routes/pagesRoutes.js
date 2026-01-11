@@ -20,14 +20,44 @@ export function createPagesRouter() {
   <body>
     <main class="container">
       <header class="header">
-        <h1>Latest Shopify Orders</h1>
-        <div class="controls">
-          <label class="field">
-            <span>Limit</span>
-            <input id="limit" type="number" min="1" max="250" value="10" />
-          </label>
-          <button id="refresh" type="button">Refresh</button>
-          <button id="exportCsv" type="button">Export CSV</button>
+        <div class="titleBlock">
+          <h1>Latest Shopify Orders</h1>
+          <div class="storeLine">
+            <span class="storeLabel">Store</span>
+            <span id="storeName" class="storeName">Loading…</span>
+          </div>
+        </div>
+
+        <div class="rightBlock">
+          <div class="companyName">Haul Riders Courier</div>
+          <div class="controls">
+            <label class="field">
+              <span>Fulfillment</span>
+              <select id="fulfillmentFilter">
+                <option value="all" selected>All</option>
+                <option value="fulfilled">Fulfilled</option>
+                <option value="unfulfilled">Unfulfilled</option>
+                <option value="partial">Partial</option>
+                <option value="null">Unknown</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Tracking</span>
+              <select id="trackingFilter">
+                <option value="any" selected>Any</option>
+                <option value="assigned">Assigned</option>
+                <option value="unassigned">Not assigned</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Limit</span>
+              <input id="limit" type="number" min="1" max="250" value="10" />
+            </label>
+            <button id="refresh" class="btn btnPrimary" type="button">Refresh</button>
+            <button id="exportCsv" class="btn btnSecondary" type="button">Export CSV</button>
+          </div>
         </div>
       </header>
 
@@ -41,15 +71,23 @@ export function createPagesRouter() {
                   <input id="selectAll" type="checkbox" aria-label="Select all" />
                 </th>
                 <th>#</th>
-                <th>Order Name</th>
+                <th class="colSortable" data-sort-key="orderName">
+                  Order Name <span class="sortIndicator" aria-hidden="true"></span>
+                </th>
                 <th>Order ID</th>
-                <th>Shipping Address</th>
+                <th>Full Name</th>
+                <th>Address 1</th>
+                <th>Address 2</th>
+                <th>City</th>
+                <th>State</th>
+                <th>PIN Code</th>
+                <th>Phone Number</th>
                 <th>Total Price</th>
-                <th>Fulfillment Status</th>
-                <th>Tracking Number</th>
+                <th class="colSortable" data-sort-key="fulfillmentStatus">
+                  Fulfillment Status <span class="sortIndicator" aria-hidden="true"></span>
+                </th>
                 <th>Tracking Numbers</th>
                 <th>Tracking Company</th>
-                <th>Phone</th>
               </tr>
             </thead>
             <tbody id="rows"></tbody>

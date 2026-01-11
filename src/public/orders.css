@@ -54,10 +54,58 @@ body {
   margin-bottom: 16px;
 }
 
+.titleBlock {
+  display: grid;
+  gap: 8px;
+  min-width: 260px;
+}
+
 .header h1 {
   margin: 0;
   font-size: 22px;
   letter-spacing: 0.2px;
+}
+
+.storeLine {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.storeLabel {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.storeName {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.storeNameMain {
+  font-size: 16px;
+  font-weight: 750;
+  color: var(--accent);
+}
+
+.storeNameDomain {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.rightBlock {
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+}
+
+.companyName {
+  font-size: 14px;
+  letter-spacing: 0.2px;
+  font-weight: 700;
+  color: var(--text);
 }
 
 .controls {
@@ -96,6 +144,68 @@ button:hover {
   border-color: var(--accent);
 }
 
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 650;
+  letter-spacing: 0.15px;
+  transition: transform 80ms ease, box-shadow 120ms ease, border-color 120ms ease,
+    background 120ms ease;
+  user-select: none;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn:focus-visible {
+  outline: 2px solid rgba(106, 166, 255, 0.6);
+  outline-offset: 2px;
+}
+
+.btnPrimary {
+  border-color: rgba(106, 166, 255, 0.45);
+  background: rgba(106, 166, 255, 0.14);
+}
+
+.btnPrimary:hover {
+  background: rgba(106, 166, 255, 0.2);
+  border-color: rgba(106, 166, 255, 0.7);
+}
+
+.btnSecondary {
+  border-color: var(--border);
+  background: transparent;
+}
+
+select {
+  width: 160px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+}
+
+.colSortable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.colSortable:hover {
+  color: var(--text);
+}
+
+.sortIndicator {
+  display: inline-block;
+  width: 14px;
+  text-align: center;
+  color: var(--muted);
+}
+
 .card {
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -125,7 +235,7 @@ button:hover {
 .table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 1050px;
+  min-width: 1600px;
 }
 
 .table th,

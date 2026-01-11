@@ -112,7 +112,7 @@ export function createShopifyAdminClient({ storeDomain, accessToken, apiVersion 
         fulfillment_status: "any",
         order: "created_at desc",
         fields:
-          "id,name,total_price,shipping_address,phone,fulfillment_status,fulfillments",
+          "id,admin_graphql_api_id,name,total_price,shipping_address,phone,fulfillment_status,fulfillments",
       },
     });
 
