@@ -25,6 +25,11 @@ export const projectOrderRow = ({ order, index }) => {
   const shippingAddress = getBestShippingAddress(order);
   const firstFulfillment = getFirstFulfillment(order);
 
+  const phoneNumbers = uniqueStrings([
+    shippingAddress?.phone,
+    order?.phone ? String(order.phone) : "",
+  ]);
+
   const shipping = {
     fullName: shippingAddress?.name ?? "",
     address1: shippingAddress?.address1 ?? "",
@@ -32,8 +37,8 @@ export const projectOrderRow = ({ order, index }) => {
     city: shippingAddress?.city ?? "",
     state: shippingAddress?.province ?? "",
     pinCode: shippingAddress?.zip ?? "",
-    phoneNumber:
-      shippingAddress?.phone ?? (order?.phone ? String(order.phone) : ""),
+    phoneNumbers,
+    phoneNumbersText: phoneNumbers.join(", "),
   };
 
   const trackingNumbers = uniqueStrings([

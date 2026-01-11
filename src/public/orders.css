@@ -1,25 +1,34 @@
-/* Minimal, readable table UI (no inline styles so Helmet CSP is happy). */
+/* Lightweight dashboard styles (no external fonts/images). */
 
 :root {
   color-scheme: light dark;
   --bg: #0b1220;
-  --card: #101a2f;
+  --bg2: #0a0f1c;
+  --panel: rgba(255, 255, 255, 0.04);
+  --panel2: rgba(255, 255, 255, 0.02);
   --text: #e6edf7;
   --muted: #9fb0cc;
   --border: rgba(255, 255, 255, 0.12);
   --accent: #6aa6ff;
   --ok: #4ade80;
+  --warn: #fbbf24;
   --error: #fb7185;
+  --shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  --shadow2: 0 10px 26px rgba(0, 0, 0, 0.22);
 }
 
 @media (prefers-color-scheme: light) {
   :root {
-    --bg: #f5f7fb;
-    --card: #ffffff;
+    --bg: #f4f7fb;
+    --bg2: #eef3ff;
+    --panel: rgba(255, 255, 255, 0.72);
+    --panel2: rgba(255, 255, 255, 0.86);
     --text: #0f172a;
     --muted: #475569;
     --border: rgba(15, 23, 42, 0.12);
     --accent: #2563eb;
+    --shadow: 0 12px 40px rgba(15, 23, 42, 0.12);
+    --shadow2: 0 10px 26px rgba(15, 23, 42, 0.08);
   }
 }
 
@@ -36,45 +45,82 @@ body {
   margin: 0;
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial,
     "Apple Color Emoji", "Segoe UI Emoji";
-  background: var(--bg);
+  background: radial-gradient(
+      1000px 600px at 20% 0%,
+      rgba(106, 166, 255, 0.18),
+      transparent 60%
+    ),
+    radial-gradient(
+      900px 560px at 80% 10%,
+      rgba(74, 222, 128, 0.12),
+      transparent 60%
+    ),
+    linear-gradient(180deg, var(--bg2), var(--bg));
   color: var(--text);
 }
 
-.container {
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(14px);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+@media (prefers-color-scheme: light) {
+  .topbar {
+    background: rgba(255, 255, 255, 0.7);
+  }
+}
+
+.topbarInner {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 24px;
-}
-
-.header {
+  padding: 14px 24px;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: 18px;
 }
 
-.titleBlock {
-  display: grid;
-  gap: 8px;
-  min-width: 260px;
-}
-
-.header h1 {
-  margin: 0;
-  font-size: 22px;
+.brandTitle {
+  font-size: 16px;
+  font-weight: 850;
   letter-spacing: 0.2px;
 }
 
-.storeLine {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-
-.storeLabel {
+.brandSub {
   font-size: 12px;
   color: var(--muted);
+}
+
+.storePill {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: var(--shadow2);
+}
+
+@media (prefers-color-scheme: light) {
+  .storePill {
+    background: rgba(37, 99, 235, 0.06);
+  }
+}
+
+.storePillLabel {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
 }
 
 .storeName {
@@ -85,7 +131,7 @@ body {
 
 .storeNameMain {
   font-size: 16px;
-  font-weight: 750;
+  font-weight: 800;
   color: var(--accent);
 }
 
@@ -95,17 +141,39 @@ body {
   color: var(--muted);
 }
 
-.rightBlock {
-  display: grid;
-  justify-items: end;
-  gap: 10px;
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
 }
 
-.companyName {
-  font-size: 14px;
+.panel {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.panelHeader {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  padding: 16px 16px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel2);
+}
+
+.panelTitle h1 {
+  margin: 0;
+  font-size: 20px;
   letter-spacing: 0.2px;
-  font-weight: 700;
-  color: var(--text);
+}
+
+.panelHint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .controls {
@@ -113,6 +181,7 @@ body {
   align-items: flex-end;
   gap: 12px;
   flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .field {
@@ -122,26 +191,27 @@ body {
   color: var(--muted);
 }
 
+select,
+.field input {
+  height: 38px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+}
+
+select {
+  width: 160px;
+}
+
 .field input {
   width: 96px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text);
 }
 
-button {
-  padding: 9px 12px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
-}
-
-button:hover {
-  border-color: var(--accent);
+.btnGroup {
+  display: inline-flex;
+  gap: 10px;
 }
 
 .btn {
@@ -149,11 +219,22 @@ button:hover {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  font-weight: 650;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 700;
   letter-spacing: 0.15px;
   transition: transform 80ms ease, box-shadow 120ms ease, border-color 120ms ease,
     background 120ms ease;
   user-select: none;
+}
+
+.btn:hover {
+  border-color: rgba(106, 166, 255, 0.65);
 }
 
 .btn:active {
@@ -168,53 +249,56 @@ button:hover {
 .btnPrimary {
   border-color: rgba(106, 166, 255, 0.45);
   background: rgba(106, 166, 255, 0.14);
+  box-shadow: 0 10px 20px rgba(37, 99, 235, 0.16);
 }
 
 .btnPrimary:hover {
   background: rgba(106, 166, 255, 0.2);
-  border-color: rgba(106, 166, 255, 0.7);
+  border-color: rgba(106, 166, 255, 0.75);
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.2);
 }
 
 .btnSecondary {
-  border-color: var(--border);
-  background: transparent;
+  background: rgba(255, 255, 255, 0.02);
 }
 
-select {
-  width: 160px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text);
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
 }
 
-.colSortable {
-  cursor: pointer;
-  user-select: none;
-  white-space: nowrap;
-}
-
-.colSortable:hover {
-  color: var(--text);
-}
-
-.sortIndicator {
-  display: inline-block;
-  width: 14px;
-  text-align: center;
-  color: var(--muted);
-}
-
-.card {
+.metric {
   border: 1px solid var(--border);
   border-radius: 14px;
-  background: var(--card);
-  overflow: hidden;
+  padding: 12px 12px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+@media (prefers-color-scheme: light) {
+  .metric {
+    background: rgba(255, 255, 255, 0.8);
+  }
+}
+
+.metricLabel {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.metricValue {
+  margin-top: 6px;
+  font-size: 18px;
+  font-weight: 850;
+  letter-spacing: 0.2px;
 }
 
 .status {
-  padding: 12px 14px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--border);
   font-size: 13px;
   color: var(--muted);
@@ -247,15 +331,30 @@ select {
   font-size: 13px;
 }
 
-.table th.colCheck,
-.table td.colCheck {
+.table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: rgba(16, 26, 47, 0.92);
+  color: var(--muted);
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+@media (prefers-color-scheme: light) {
+  .table thead th {
+    background: rgba(255, 255, 255, 0.92);
+  }
+}
+
+.table tbody tr:hover td {
+  background: rgba(106, 166, 255, 0.06);
+}
+
+.colCheck {
   width: 44px;
   padding-left: 10px;
   padding-right: 10px;
-}
-
-.table td.colCheck {
-  vertical-align: middle;
 }
 
 .table input[type="checkbox"] {
@@ -265,93 +364,72 @@ select {
   cursor: pointer;
 }
 
-.table td.colAddress {
-  max-width: 340px;
+.colSortable {
+  cursor: pointer;
+  user-select: none;
 }
 
-.addrCell {
-  position: relative;
-  padding-right: 58px;
+.sortIndicator {
+  display: inline-block;
+  width: 14px;
+  text-align: center;
+  color: var(--muted);
 }
 
-.addrText {
-  white-space: pre-line;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  line-clamp: 3;
-}
-
-.addrPopover {
-  display: none;
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: -8px;
-  transform: translateY(-100%);
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: var(--card);
-  color: var(--text);
-  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.35);
-  white-space: pre-line;
-  z-index: 10;
-}
-
-.copyBtn {
-  position: absolute;
-  right: 6px;
-  bottom: 6px;
-  width: 34px;
-  height: 34px;
-  padding: 0;
+.badge {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  border-radius: 10px;
-  opacity: 0;
-  transition: opacity 120ms ease;
-  background: rgba(0, 0, 0, 0.15);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
 }
 
-.copyBtn:hover {
-  border-color: var(--accent);
+.badgeOk {
+  border-color: rgba(74, 222, 128, 0.4);
+  color: var(--ok);
+  background: rgba(74, 222, 128, 0.12);
 }
 
-.copyIcon {
-  width: 18px;
-  height: 18px;
-  fill: currentColor;
+.badgeWarn {
+  border-color: rgba(251, 191, 36, 0.45);
+  color: var(--warn);
+  background: rgba(251, 191, 36, 0.12);
 }
 
-@media (prefers-color-scheme: light) {
-  .copyBtn {
-    background: rgba(15, 23, 42, 0.06);
-  }
+.badgeError {
+  border-color: rgba(251, 113, 133, 0.45);
+  color: var(--error);
+  background: rgba(251, 113, 133, 0.12);
 }
 
-.addrCell:hover .copyBtn,
-.addrCell:focus-within .copyBtn {
-  opacity: 1;
-}
-
-.addrCell:hover .addrPopover,
-.addrCell:focus-within .addrPopover {
-  display: block;
-}
-
-.table th {
-  position: sticky;
-  top: 0;
-  background: var(--card);
+.badgeMuted {
+  border-color: rgba(159, 176, 204, 0.35);
   color: var(--muted);
-  font-weight: 600;
-  z-index: 1;
+  background: rgba(159, 176, 204, 0.08);
 }
 
-.table tr:hover td {
-  background: rgba(255, 255, 255, 0.03);
+@media (max-width: 900px) {
+  .topbarInner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .panelHeader {
+    grid-template-columns: 1fr;
+  }
+
+  .controls {
+    justify-content: flex-start;
+  }
+
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  select {
+    width: 180px;
+  }
 }

@@ -6,7 +6,7 @@ export function createPagesRouter() {
   const router = Router();
 
   router.get("/orders", (_req, res) => {
-    const assetVersion = "4";
+    const assetVersion = "5";
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(html`<!doctype html>
 <html lang="en">
@@ -18,18 +18,28 @@ export function createPagesRouter() {
     <script src="/static/orders.js?v=${assetVersion}" defer></script>
   </head>
   <body>
-    <main class="container">
-      <header class="header">
-        <div class="titleBlock">
-          <h1>Latest Shopify Orders</h1>
-          <div class="storeLine">
-            <span class="storeLabel">Store</span>
-            <span id="storeName" class="storeName">Loading…</span>
-          </div>
+    <header class="topbar">
+      <div class="topbarInner">
+        <div class="brand">
+          <div class="brandTitle">Haul Riders Courier</div>
+          <div class="brandSub">Orders dashboard</div>
         </div>
 
-        <div class="rightBlock">
-          <div class="companyName">Haul Riders Courier</div>
+        <div class="storePill" aria-live="polite">
+          <div class="storePillLabel">Store</div>
+          <div id="storeName" class="storeName">Loading…</div>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="panel">
+        <div class="panelHeader">
+          <div class="panelTitle">
+            <h1>Latest Orders</h1>
+            <div class="panelHint">Fast view + export for ops and clients</div>
+          </div>
+
           <div class="controls">
             <label class="field">
               <span>Fulfillment</span>
@@ -55,14 +65,35 @@ export function createPagesRouter() {
               <span>Limit</span>
               <input id="limit" type="number" min="1" max="250" value="10" />
             </label>
-            <button id="refresh" class="btn btnPrimary" type="button">Refresh</button>
-            <button id="exportCsv" class="btn btnSecondary" type="button">Export CSV</button>
+
+            <div class="btnGroup">
+              <button id="refresh" class="btn btnPrimary" type="button">Refresh</button>
+              <button id="exportCsv" class="btn btnSecondary" type="button">Export CSV</button>
+            </div>
           </div>
         </div>
-      </header>
 
-      <section class="card">
+        <div class="metrics" aria-label="Order summary">
+          <div class="metric">
+            <div class="metricLabel">Showing</div>
+            <div id="metricShowing" class="metricValue">—</div>
+          </div>
+          <div class="metric">
+            <div class="metricLabel">Total loaded</div>
+            <div id="metricLoaded" class="metricValue">—</div>
+          </div>
+          <div class="metric">
+            <div class="metricLabel">Fulfilled</div>
+            <div id="metricFulfilled" class="metricValue">—</div>
+          </div>
+          <div class="metric">
+            <div class="metricLabel">Tracking assigned</div>
+            <div id="metricTracking" class="metricValue">—</div>
+          </div>
+        </div>
+
         <div id="status" class="status" aria-live="polite"></div>
+
         <div class="tableWrap">
           <table class="table" aria-label="Latest orders">
             <thead>

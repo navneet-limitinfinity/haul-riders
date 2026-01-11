@@ -33,6 +33,12 @@ const parseOrderNumber = (orderName) => {
 
 let sortState = { key: "orderName", dir: "desc" };
 
+const titleCase = (s) => {
+  const text = String(s ?? "").trim();
+  if (!text) return "";
+  return text.charAt(0).toUpperCase() + text.slice(1);
+};
+
 async function fetchShop() {
   const url = new URL("/api/shopify/shop", window.location.origin);
   const response = await fetch(url, { cache: "no-store" });
@@ -61,6 +67,12 @@ function setStatus(message, { kind = "info" } = {}) {
   el.textContent = message;
 }
 
+function setMetric(id, value) {
+  const el = $(id);
+  if (!el) return;
+  el.textContent = String(value ?? "—");
+}
+
 function syncSelectAllCheckbox() {
   const selectAll = $("selectAll");
   if (!selectAll) return;
@@ -80,6 +92,21 @@ function syncSelectAllCheckbox() {
   selectAll.checked = selectedCount === currentOrders.length;
   selectAll.indeterminate =
     selectedCount > 0 && selectedCount < currentOrders.length;
+}
+
+function updateMetrics(view) {
+  const v = Array.isArray(view) ? view : [];
+
+  setMetric("metricShowing", v.length);
+  setMetric("metricLoaded", allOrders.length);
+
+  const fulfilledCount = v.filter(
+    (row) => normalizeFulfillmentStatus(row?.fulfillmentStatus) === "fulfilled"
+  ).length;
+  setMetric("metricFulfilled", fulfilledCount);
+
+  const trackingAssignedCount = v.filter((row) => getTrackingAssigned(row)).length;
+  setMetric("metricTracking", trackingAssignedCount);
 }
 
 function applyFiltersAndSort() {
@@ -123,6 +150,7 @@ function applyFiltersAndSort() {
 
   renderRows(sorted);
   updateSortIndicators();
+  updateMetrics(sorted);
 
   const limit = Number.parseInt($("limit")?.value ?? "10", 10) || 10;
   setStatus(
@@ -156,6 +184,12 @@ function renderRows(orders) {
 
   currentOrders = Array.isArray(orders) ? orders : [];
 
+  const createBadge = ({ label, kind = "muted" }) => ({
+    badge: true,
+    label,
+    kind,
+  });
+
   const fragment = document.createDocumentFragment();
   for (const row of currentOrders) {
     const tr = document.createElement("tr");
@@ -165,21 +199,43 @@ function renderRows(orders) {
 
     const shipping = row?.shipping ?? {};
 
+    const fulfillmentNorm = normalizeFulfillmentStatus(row?.fulfillmentStatus);
+    const fulfillmentLabel =
+      fulfillmentNorm === "null" ? "Unknown" : titleCase(fulfillmentNorm);
+    const fulfillmentBadgeKind =
+      fulfillmentNorm === "fulfilled"
+        ? "ok"
+        : fulfillmentNorm === "partial"
+          ? "warn"
+          : "muted";
+
+    const trackingText =
+      row.trackingNumbersText ?? formatTrackingNumbers(row.trackingNumbers);
+    const trackingBadge =
+      trackingText && String(trackingText).trim()
+        ? null
+        : createBadge({ label: "Not assigned", kind: "muted" });
+
+    const phoneText = String(shipping.phoneNumbersText ?? "").trim();
+    const phoneBadge = phoneText
+      ? null
+      : createBadge({ label: "Missing", kind: "error" });
+
     const cells = [
       { check: true, checked: orderKey && selectedOrderIds.has(orderKey) },
       row.index ?? "",
-      row.orderName ?? "",
-      row.orderId ?? "",
+      { text: row.orderName ?? "", className: "mono" },
+      { text: row.orderId ?? "", className: "mono" },
       shipping.fullName ?? "",
       shipping.address1 ?? "",
       shipping.address2 ?? "",
       shipping.city ?? "",
       shipping.state ?? "",
-      shipping.pinCode ?? "",
-      shipping.phoneNumber ?? "",
-      row.totalPrice ?? "",
-      row.fulfillmentStatus ?? "",
-      row.trackingNumbersText ?? formatTrackingNumbers(row.trackingNumbers),
+      { text: shipping.pinCode ?? "", className: "mono" },
+      phoneBadge ?? { text: phoneText, className: "mono" },
+      { text: row.totalPrice ?? "", className: "mono" },
+      createBadge({ label: fulfillmentLabel, kind: fulfillmentBadgeKind }),
+      trackingBadge ?? { text: trackingText, className: "mono" },
       row.trackingCompany ?? "",
     ];
 
@@ -192,6 +248,21 @@ function renderRows(orders) {
         input.checked = Boolean(value.checked);
         input.ariaLabel = "Select row";
         td.appendChild(input);
+      } else if (value && typeof value === "object" && value.badge) {
+        const span = document.createElement("span");
+        span.className =
+          value.kind === "ok"
+            ? "badge badgeOk"
+            : value.kind === "warn"
+              ? "badge badgeWarn"
+              : value.kind === "error"
+                ? "badge badgeError"
+              : "badge badgeMuted";
+        span.textContent = String(value.label ?? "");
+        td.appendChild(span);
+      } else if (value && typeof value === "object" && "text" in value) {
+        td.textContent = String(value.text ?? "");
+        if (value.className) td.className = value.className;
       } else if (value && typeof value === "object" && "html" in value) {
         td.innerHTML = value.html;
       } else {
@@ -226,7 +297,7 @@ function buildCsvForOrders(orders) {
     "City",
     "State",
     "PIN Code",
-    "Phone Number",
+    "Phone Number(s)",
     "Total Price",
     "Fulfillment Status",
     "Tracking Numbers",
@@ -248,7 +319,7 @@ function buildCsvForOrders(orders) {
       shipping.city ?? "",
       shipping.state ?? "",
       shipping.pinCode ?? "",
-      shipping.phoneNumber ?? "",
+      shipping.phoneNumbersText ?? "",
       row.totalPrice ?? "",
       row.fulfillmentStatus ?? "",
       row.trackingNumbersText ?? formatTrackingNumbers(row.trackingNumbers),
@@ -323,10 +394,18 @@ window.addEventListener("DOMContentLoaded", () => {
       if (!storeEl) return;
 
       if (storeName || storeDomain) {
-        storeEl.innerHTML = `
-          <span class="storeNameMain">${storeName || "Unknown"}</span>
-          ${storeDomain ? `<span class="storeNameDomain">${storeDomain}</span>` : ""}
-        `.trim();
+        storeEl.textContent = "";
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "storeNameMain";
+        nameSpan.textContent = storeName || "Unknown";
+        storeEl.appendChild(nameSpan);
+
+        if (storeDomain) {
+          const domainSpan = document.createElement("span");
+          domainSpan.className = "storeNameDomain";
+          domainSpan.textContent = storeDomain;
+          storeEl.appendChild(domainSpan);
+        }
       } else {
         storeEl.textContent = "Unknown";
       }
