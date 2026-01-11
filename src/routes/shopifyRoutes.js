@@ -11,6 +11,7 @@ export function createShopifyRouter({ env, logger }) {
 
   router.get("/shop", async (_req, res, next) => {
     try {
+      res.setHeader("Cache-Control", "no-store");
       const client = createShopifyAdminClient({
         storeDomain: env.shopify.storeDomain,
         accessToken: env.shopify.accessToken,
@@ -25,8 +26,45 @@ export function createShopifyRouter({ env, logger }) {
     }
   });
 
+  router.get("/debug", async (_req, res, next) => {
+    try {
+      res.setHeader("Cache-Control", "no-store");
+      const client = createShopifyAdminClient({
+        storeDomain: env.shopify.storeDomain,
+        accessToken: env.shopify.accessToken,
+        apiVersion: env.shopify.apiVersion,
+      });
+
+      const [shop, accessScopes, ordersCountAny] = await Promise.all([
+        client.getShop(),
+        client.getAccessScopes(),
+        client.getOrdersCount({ status: "any" }),
+      ]);
+
+      res.json({
+        config: {
+          storeDomain: env.shopify.storeDomain,
+          apiVersion: env.shopify.apiVersion,
+          tokenPresent: Boolean(env.shopify.accessToken),
+        },
+        shop: {
+          id: shop?.id,
+          name: shop?.name,
+          myshopify_domain: shop?.myshopify_domain,
+          domain: shop?.domain,
+        },
+        accessScopes: accessScopes.map((s) => s.handle).filter(Boolean),
+        ordersCountAny,
+      });
+    } catch (error) {
+      logger.error({ error }, "Failed to fetch Shopify debug info");
+      next(error);
+    }
+  });
+
   router.get("/orders/latest", async (req, res, next) => {
     try {
+      res.setHeader("Cache-Control", "no-store");
       const rawLimit = req.query?.limit;
       const limit = Math.max(
         1,
@@ -44,7 +82,7 @@ export function createShopifyRouter({ env, logger }) {
         projectOrderRow({ order, index })
       );
 
-      res.json({ count: projected.length, orders: projected });
+      res.json({ count: projected.length, limit, orders: projected });
     } catch (error) {
       logger.error({ error }, "Failed to fetch latest orders");
       next(error);

@@ -271,7 +271,11 @@ async function refresh() {
     }
 
     renderRows(orders);
-    setStatus(`Loaded ${data?.count ?? 0} order(s).`, { kind: "ok" });
+    const loadedCount = data?.count ?? orders.length;
+    const usedLimit = data?.limit ?? limit;
+    setStatus(`Loaded ${loadedCount} order(s) (limit=${usedLimit}).`, {
+      kind: "ok",
+    });
   } catch (error) {
     setStatus(error?.message ?? "Failed to load orders.", { kind: "error" });
   }

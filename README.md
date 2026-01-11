@@ -47,7 +47,17 @@ Server will listen on `http://localhost:3000` by default (configurable via `PORT
 ## Useful endpoints
 - `GET /health` → health check
 - `GET /api/shopify/shop` → fetches shop details from Shopify Admin REST API
+- `GET /api/shopify/debug` → shows effective shop + token scopes + order count (useful for troubleshooting “missing orders”)
 - `GET /` → service info (quick sanity check)
+- `GET /orders` → interactive page to view/export latest orders
+
+## Troubleshooting
+### “Only a few orders show up”
+1) Open `http://localhost:3000/api/shopify/debug`
+2) Confirm:
+   - `shop.myshopify_domain` is the store you expect
+   - `accessScopes` includes `read_all_orders` (otherwise Shopify may only return recent orders)
+3) If scopes are missing, update scopes in Shopify and generate/rotate the Admin API token, then update `.env` and restart the server.
 
 ## Terminal scripts
 Fetch latest 10 orders and print to terminal:
