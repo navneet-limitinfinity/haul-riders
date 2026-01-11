@@ -50,6 +50,13 @@ export const projectOrderRow = ({ order, index }) => {
   const trackingNumbersText = trackingNumbers.join(", ");
 
   const trackingCompany = firstFulfillment?.tracking_company ?? "";
+  const trackingUrls = uniqueStrings([
+    ...(Array.isArray(firstFulfillment?.tracking_urls)
+      ? firstFulfillment.tracking_urls
+      : []),
+    firstFulfillment?.tracking_url,
+  ]);
+  const trackingUrl = trackingUrls[0] ?? "";
   const orderGid = order?.admin_graphql_api_id ?? "";
   const orderKey = orderGid || (order?.id == null ? "" : String(order.id));
 
@@ -65,5 +72,7 @@ export const projectOrderRow = ({ order, index }) => {
     trackingNumbers,
     trackingNumbersText,
     trackingCompany,
+    trackingUrls,
+    trackingUrl,
   };
 };

@@ -22,12 +22,14 @@ export function loadEnv(rawEnv) {
   const shopifyStore = rawEnv.SHOPIFY_STORE ?? "";
   const shopifyToken = rawEnv.SHOPIFY_TOKEN ?? "";
   const shopifyApiVersion = rawEnv.SHOPIFY_API_VERSION ?? "2025-10";
+  const storesFile = rawEnv.STORES_FILE ?? "";
 
   return {
     port,
     host,
     logLevel,
     trustProxy,
+    storesFile,
     shopify: {
       storeDomain: shopifyStore,
       accessToken: shopifyToken,

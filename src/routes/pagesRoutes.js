@@ -27,6 +27,7 @@ export function createPagesRouter() {
 
         <div class="storePill" aria-live="polite">
           <div class="storePillLabel">Store</div>
+          <select id="storeSelect" class="storeSelect" aria-label="Select store"></select>
           <div id="storeName" class="storeName">Loading…</div>
         </div>
       </div>
@@ -118,7 +119,7 @@ export function createPagesRouter() {
                   Fulfillment Status <span class="sortIndicator" aria-hidden="true"></span>
                 </th>
                 <th>Tracking Numbers</th>
-                <th>Tracking Company</th>
+                <th>Courier Partner</th>
               </tr>
             </thead>
             <tbody id="rows"></tbody>

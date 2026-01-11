@@ -2,6 +2,7 @@ import "dotenv/config";
 
 import { createApp } from "./app.js";
 import { loadEnv } from "./config/env.js";
+import { loadStoresConfig } from "./config/stores.js";
 import { startHttpServer } from "./http/startHttpServer.js";
 import { createLogger } from "./logging/createLogger.js";
 
@@ -15,22 +16,43 @@ async function main() {
   const env = loadEnv(process.env);
   const logger = createLogger({ level: env.logLevel });
 
-  if (!env.shopify.storeDomain) {
-    logger.warn(
-      { envVar: "SHOPIFY_STORE" },
-      "Missing Shopify store domain; Shopify routes will fail until set"
-    );
+  let storesConfig = null;
+  if (env.storesFile) {
+    try {
+      storesConfig = await loadStoresConfig({ filePath: env.storesFile });
+      logger.info(
+        { storesFile: env.storesFile, storeCount: storesConfig.stores.length },
+        "Loaded multi-store config"
+      );
+    } catch (error) {
+      logger.error(
+        { error, storesFile: env.storesFile },
+        "Failed to load STORES_FILE"
+      );
+      process.exit(1);
+    }
   }
 
-  if (!env.shopify.accessToken) {
-    logger.warn(
-      { envVar: "SHOPIFY_TOKEN" },
-      "Missing Shopify access token; Shopify routes will fail until set"
-    );
+  const appEnv = { ...env, storesConfig };
+
+  if (!storesConfig) {
+    if (!env.shopify.storeDomain) {
+      logger.warn(
+        { envVar: "SHOPIFY_STORE" },
+        "Missing Shopify store domain; Shopify routes will fail until set"
+      );
+    }
+
+    if (!env.shopify.accessToken) {
+      logger.warn(
+        { envVar: "SHOPIFY_TOKEN" },
+        "Missing Shopify access token; Shopify routes will fail until set"
+      );
+    }
   }
 
-  const app = createApp({ env, logger });
-  const server = await startHttpServer({ app, env, logger });
+  const app = createApp({ env: appEnv, logger });
+  const server = await startHttpServer({ app, env: appEnv, logger });
 
   // Graceful shutdown for local dev and production (PM2, systemd, Docker, etc.)
   const handleShutdownSignal = (signalName) => {

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { createHealthRouter } from "./healthRoutes.js";
 import { createPagesRouter } from "./pagesRoutes.js";
 import { createShopifyRouter } from "./shopifyRoutes.js";
+import { createStoresRouter } from "./storesRoutes.js";
 
 /**
  * Builds and returns the top-level router.
@@ -11,6 +12,7 @@ export function buildRoutes({ env, logger }) {
 
   router.use(createHealthRouter());
   router.use(createPagesRouter());
+  router.use("/api", createStoresRouter({ storesConfig: env.storesConfig ?? null }));
   router.use("/api/shopify", createShopifyRouter({ env, logger }));
 
   return router;

@@ -30,6 +30,7 @@ cp .env.example .env
 3) Edit `.env` and set:
 - `SHOPIFY_STORE` (example: `your-store.myshopify.com`)
 - `SHOPIFY_TOKEN` (your Admin API access token)
+  - Alternatively, for multi-store, set `STORES_FILE` and use a per-store token env var.
 
 ## Run locally
 Development (auto-reload):
@@ -50,6 +51,16 @@ Server will listen on `http://localhost:3000` by default (configurable via `PORT
 - `GET /api/shopify/debug` → shows effective shop + token scopes + order count (useful for troubleshooting “missing orders”)
 - `GET /` → service info (quick sanity check)
 - `GET /orders` → interactive page to view/export latest orders
+  - Multi-store: `GET /orders?store=<storeId>`
+
+## Multi-store setup (single server, multiple shops)
+1) Create a stores config file (copy `stores.example.json` to `stores.json`).
+2) Add `stores.json` to `.gitignore` (already ignored by default).
+3) In `.env`, set `STORES_FILE=./stores.json`.
+4) Provide tokens:
+   - Recommended: in `stores.json` use `tokenEnvVar` per store (ex: `SHOPIFY_TOKEN_VAIDIKI`) and set those env vars in `.env`.
+   - Alternatively (less recommended): put `token` directly in `stores.json`.
+5) Start the server and switch stores using the dropdown in the header or `?store=...`.
 
 ## Troubleshooting
 ### “Only a few orders show up”

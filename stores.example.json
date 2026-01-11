@@ -1,0 +1,12 @@
+{
+  "defaultStoreId": "vaidiki",
+  "stores": [
+    {
+      "id": "vaidiki",
+      "name": "Vaidiki Store",
+      "domain": "64dd6e-2.myshopify.com",
+      "apiVersion": "2025-10",
+      "tokenEnvVar": "SHOPIFY_TOKEN_VAIDIKI"
+    }
+  ]
+}

@@ -39,8 +39,30 @@ const titleCase = (s) => {
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
 
+async function copyToClipboard(text) {
+  const value = String(text ?? "").trim();
+  if (!value) return;
+
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  textarea.remove();
+}
+
 async function fetchShop() {
   const url = new URL("/api/shopify/shop", window.location.origin);
+  const storeId = getActiveStoreId();
+  if (storeId) url.searchParams.set("store", storeId);
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) {
     const text = await response.text().catch(() => "");
@@ -51,6 +73,8 @@ async function fetchShop() {
 
 async function fetchLatestOrders({ limit }) {
   const url = new URL("/api/shopify/orders/latest", window.location.origin);
+  const storeId = getActiveStoreId();
+  if (storeId) url.searchParams.set("store", storeId);
   if (limit) url.searchParams.set("limit", String(limit));
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) {
@@ -58,6 +82,29 @@ async function fetchLatestOrders({ limit }) {
     throw new Error(`${response.status} ${response.statusText} ${text}`.trim());
   }
   return response.json();
+}
+
+async function fetchStores() {
+  const url = new URL("/api/stores", window.location.origin);
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`${response.status} ${response.statusText} ${text}`.trim());
+  }
+  return response.json();
+}
+
+function getActiveStoreId() {
+  const url = new URL(window.location.href);
+  return String(url.searchParams.get("store") ?? "").trim();
+}
+
+function setActiveStoreId(storeId) {
+  const url = new URL(window.location.href);
+  const next = String(storeId ?? "").trim();
+  if (next) url.searchParams.set("store", next);
+  else url.searchParams.delete("store");
+  window.location.assign(url.toString());
 }
 
 function setStatus(message, { kind = "info" } = {}) {
@@ -190,6 +237,13 @@ function renderRows(orders) {
     kind,
   });
 
+  const createMenu = ({ label, url, trackingText }) => ({
+    menu: true,
+    label,
+    url,
+    trackingText,
+  });
+
   const fragment = document.createDocumentFragment();
   for (const row of currentOrders) {
     const tr = document.createElement("tr");
@@ -211,6 +265,7 @@ function renderRows(orders) {
 
     const trackingText =
       row.trackingNumbersText ?? formatTrackingNumbers(row.trackingNumbers);
+    const trackingUrl = String(row.trackingUrl ?? "").trim();
     const trackingBadge =
       trackingText && String(trackingText).trim()
         ? null
@@ -220,6 +275,15 @@ function renderRows(orders) {
     const phoneBadge = phoneText
       ? null
       : createBadge({ label: "Missing", kind: "error" });
+
+    const courierPartner = String(row.trackingCompany ?? "").trim();
+    const courierCell =
+      courierPartner && trackingUrl
+        ? createMenu({ label: courierPartner, url: trackingUrl, trackingText })
+        : courierPartner ||
+          (trackingUrl
+            ? createMenu({ label: "Track", url: trackingUrl, trackingText })
+            : "");
 
     const cells = [
       { check: true, checked: orderKey && selectedOrderIds.has(orderKey) },
@@ -236,7 +300,7 @@ function renderRows(orders) {
       { text: row.totalPrice ?? "", className: "mono" },
       createBadge({ label: fulfillmentLabel, kind: fulfillmentBadgeKind }),
       trackingBadge ?? { text: trackingText, className: "mono" },
-      row.trackingCompany ?? "",
+      courierCell,
     ];
 
     for (const value of cells) {
@@ -260,6 +324,39 @@ function renderRows(orders) {
               : "badge badgeMuted";
         span.textContent = String(value.label ?? "");
         td.appendChild(span);
+      } else if (value && typeof value === "object" && value.menu) {
+        const details = document.createElement("details");
+        details.className = "menuDetails";
+
+        const summary = document.createElement("summary");
+        summary.className = "menuSummary";
+        summary.textContent = String(value.label ?? "");
+        details.appendChild(summary);
+
+        const menu = document.createElement("div");
+        menu.className = "menuPopover";
+
+        const trackLink = document.createElement("a");
+        trackLink.className = "menuItem menuLink";
+        trackLink.href = String(value.url ?? "");
+        trackLink.target = "_blank";
+        trackLink.rel = "noopener noreferrer";
+        trackLink.dataset.action = "track-now";
+        trackLink.dataset.trackingText = String(value.trackingText ?? "");
+        trackLink.textContent = "Track Now";
+        menu.appendChild(trackLink);
+
+        const copyBtn = document.createElement("button");
+        copyBtn.type = "button";
+        copyBtn.className = "menuItem";
+        copyBtn.dataset.action = "copy-tracking";
+        copyBtn.dataset.trackingText = String(value.trackingText ?? "");
+        copyBtn.disabled = !String(value.trackingText ?? "").trim();
+        copyBtn.textContent = "Copy tracking #";
+        menu.appendChild(copyBtn);
+
+        details.appendChild(menu);
+        td.appendChild(details);
       } else if (value && typeof value === "object" && "text" in value) {
         td.textContent = String(value.text ?? "");
         if (value.className) td.className = value.className;
@@ -301,7 +398,8 @@ function buildCsvForOrders(orders) {
     "Total Price",
     "Fulfillment Status",
     "Tracking Numbers",
-    "Tracking Company",
+    "Courier Partner",
+    "Tracking URL",
   ];
 
   const lines = [];
@@ -324,6 +422,7 @@ function buildCsvForOrders(orders) {
       row.fulfillmentStatus ?? "",
       row.trackingNumbersText ?? formatTrackingNumbers(row.trackingNumbers),
       row.trackingCompany ?? "",
+      row.trackingUrl ?? "",
     ];
     lines.push(line.map(csvEscape).join(","));
   }
@@ -385,6 +484,38 @@ async function refresh() {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
+  fetchStores()
+    .then((data) => {
+      const stores = Array.isArray(data?.stores) ? data.stores : [];
+      const select = $("storeSelect");
+      if (!select || stores.length === 0) return;
+
+      const defaultStoreId = String(data?.defaultStoreId ?? "").trim();
+      const currentStoreId = getActiveStoreId();
+      const activeStoreId =
+        currentStoreId || defaultStoreId || String(stores[0]?.id ?? "");
+
+      select.innerHTML = "";
+      for (const s of stores) {
+        const opt = document.createElement("option");
+        opt.value = s.id;
+        opt.textContent = s.name || s.id;
+        select.appendChild(opt);
+      }
+      select.value = activeStoreId;
+
+      if (!currentStoreId && activeStoreId) {
+        setActiveStoreId(activeStoreId);
+        return;
+      }
+
+      select.addEventListener("change", (e) => {
+        const nextId = String(e.target?.value ?? "").trim();
+        if (nextId && nextId !== getActiveStoreId()) setActiveStoreId(nextId);
+      });
+    })
+    .catch(() => {});
+
   fetchShop()
     .then((data) => {
       const shop = data?.shop ?? {};
@@ -465,6 +596,40 @@ window.addEventListener("DOMContentLoaded", () => {
     else selectedOrderIds.delete(orderKey);
 
     syncSelectAllCheckbox();
+  });
+
+  $("rows")?.addEventListener("click", async (e) => {
+    const item = e.target?.closest?.(".menuItem");
+    if (!item) return;
+
+    const action = item.dataset.action ?? "";
+    const trackingText = item.dataset.trackingText ?? "";
+
+    const closeMenu = () => {
+      item.closest("details")?.removeAttribute("open");
+    };
+
+    if (action === "copy-tracking") {
+      try {
+        await copyToClipboard(trackingText);
+        setStatus("Tracking number(s) copied.", { kind: "ok" });
+      } catch {
+        setStatus("Failed to copy tracking number(s).", { kind: "error" });
+      } finally {
+        closeMenu();
+      }
+      return;
+    }
+
+    if (action === "track-now") {
+      try {
+        await copyToClipboard(trackingText);
+      } catch {
+        // ignore clipboard failures; still open tracking
+      }
+      // Let the anchor open in a new tab; close the menu after the click.
+      setTimeout(closeMenu, 0);
+    }
   });
 
   $("limit")?.addEventListener("keydown", (e) => {
