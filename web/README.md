@@ -8,11 +8,13 @@ Run:
   npm i
   npm run dev
 
-Run tests / snapshots:
+Run tests / snapshots and linting:
 
   cd web
   npm i
   npm test            # run tests
   npm test -- --updateSnapshot   # update snapshots after changes
+  npm run lint        # run linter
+  npm run lint:fix    # try to auto-fix lint problems
 
 The original Figma source folder (`Courier Dashboard with Order Management Figma code/`) is not committed and used only as source.

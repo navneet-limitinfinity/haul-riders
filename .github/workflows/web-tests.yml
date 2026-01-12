@@ -19,6 +19,11 @@ jobs:
         run: |
           cd web
           npm ci
+      - name: Run linter
+        run: |
+          cd web
+          npm ci
+          npm run lint --silent || npm run lint --silent
       - name: Run tests
         run: |
           cd web
