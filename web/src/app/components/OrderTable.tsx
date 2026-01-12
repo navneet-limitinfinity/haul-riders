@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Download, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { fetchShopifyOrders, ShopifyOrder, exportOrdersToCSV, downloadCSV } from '../services/shopifyApi';
 
@@ -14,7 +14,7 @@ interface OrderTableProps {
     fulfilled: number;
     trackingAssigned: number;
   };
-  onStatsUpdate: (stats: any) => void;
+  onStatsUpdate: (stats: { showing: number; totalLoaded: number; fulfilled: number; trackingAssigned: number }) => void;
 }
 
 export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
@@ -77,7 +77,7 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
 
   // Sort orders
   filteredOrders = [...filteredOrders].sort((a, b) => {
-    let aValue: any, bValue: any;
+    let aValue: string | number | Date | undefined, bValue: string | number | Date | undefined;
 
     switch (sortField) {
       case 'orderName':

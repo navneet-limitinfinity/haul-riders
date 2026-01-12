@@ -1,11 +1,13 @@
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect, beforeEach } from 'vitest';
-import App from '../../App';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import React from 'react';
+import type { ShopifyOrder } from '../services/shopifyApi';
+import App from '/src/app/App.tsx';
 
 describe('OrderTable UI', () => {
   beforeEach(() => {
     // simulate desktop width for snapshot parity
-    (global as any).innerWidth = 1440;
+    (global as unknown as Window).innerWidth = 1440;
     global.dispatchEvent(new Event('resize'));
   });
 
@@ -23,7 +25,7 @@ describe('OrderTable UI', () => {
 
   it('renders empty state when no orders', async () => {
     // mock the API to return no orders
-    const shopify = await import('../../services/shopifyApi');
+    const shopify = await import('../services/shopifyApi');
     vi.spyOn(shopify, 'fetchShopifyOrders').mockResolvedValueOnce([]);
 
     render(<App />);
@@ -32,7 +34,7 @@ describe('OrderTable UI', () => {
   });
 
   it('matches snapshot with sample orders', async () => {
-    const shopify = await import('../../services/shopifyApi');
+    const shopify = await import('../services/shopifyApi');
     vi.spyOn(shopify, 'fetchShopifyOrders').mockResolvedValueOnce([
       {
         id: 'gid://order/1',
@@ -44,6 +46,7 @@ describe('OrderTable UI', () => {
         date: '2026-01-01',
         status: 'fulfilled',
       },
+
       {
         id: 'gid://order/2',
         orderNumber: 'ORD-1002',
@@ -54,7 +57,7 @@ describe('OrderTable UI', () => {
         date: '2026-01-02',
         status: 'unfulfilled',
       },
-    ] as any);
+    ] as unknown as ShopifyOrder[]);
 
     const { container } = render(<App />);
     // Wait for table rows to render
@@ -63,11 +66,11 @@ describe('OrderTable UI', () => {
     expect(container).toMatchSnapshot();
   });
 
-  it('shows loading state while fetching', () => {
+  it('shows loading state while fetching', async () => {
     // mock a promise that never resolves to keep loading true
-    const shopifyPromise = new Promise(() => {});
-    const shopify = (await import('../../services/shopifyApi')) as any;
-    vi.spyOn(shopify, 'fetchShopifyOrders').mockReturnValueOnce(shopifyPromise as any);
+    const shopifyPromise = new Promise<ShopifyOrder[]>(() => {});
+    const shopify = (await import('../services/shopifyApi')) as typeof import('../services/shopifyApi');
+    vi.spyOn(shopify, 'fetchShopifyOrders').mockReturnValueOnce(shopifyPromise as unknown as Promise<ShopifyOrder[]>);
 
     render(<App />);
     expect(screen.getByText(/Loading orders/)).toBeInTheDocument();
