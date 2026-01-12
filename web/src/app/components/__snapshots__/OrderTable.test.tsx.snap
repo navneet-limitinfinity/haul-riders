@@ -1,0 +1,995 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`OrderTable UI > matches snapshot for desktop 1`] = `
+<div>
+  <div
+    class="min-h-screen bg-gray-50 py-12"
+  >
+    <div
+      class="max-w-screen-xl mx-auto px-6"
+    >
+      <h1
+        class="text-4xl font-semibold mb-6 leading-tight"
+      >
+        Courier Dashboard — Orders
+      </h1>
+      <div
+        class="bg-white rounded-lg border border-gray-200 shadow-sm"
+      >
+        <div
+          class="p-6 border-b border-gray-200 bg-gray-50"
+        >
+          <div
+            class="flex flex-wrap items-center gap-6"
+          >
+            <div
+              class="flex-shrink-0"
+            >
+              <label
+                class="text-sm font-medium text-gray-700 mb-1 block"
+              >
+                Fulfillment
+              </label>
+              <select
+                class="px-4 h-10 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 min-w-[140px] shadow-sm"
+              >
+                <option
+                  value="all"
+                >
+                  All
+                </option>
+                <option
+                  value="unfulfilled"
+                >
+                  Unfulfilled
+                </option>
+                <option
+                  value="fulfilled"
+                >
+                  Fulfilled
+                </option>
+              </select>
+            </div>
+            <div
+              class="flex-shrink-0"
+            >
+              <label
+                class="text-sm font-medium text-gray-700 mb-1 block"
+              >
+                Tracking
+              </label>
+              <select
+                class="px-4 h-10 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 min-w-[140px] shadow-sm"
+              >
+                <option
+                  value="any"
+                >
+                  Any
+                </option>
+                <option
+                  value="assigned"
+                >
+                  Assigned
+                </option>
+                <option
+                  value="not-assigned"
+                >
+                  Not Assigned
+                </option>
+              </select>
+            </div>
+            <div
+              class="flex-shrink-0"
+            >
+              <label
+                class="text-sm font-medium text-gray-700 mb-1 block"
+              >
+                Limit
+              </label>
+              <input
+                class="px-4 h-10 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-24 shadow-sm"
+                max="100"
+                min="1"
+                type="number"
+                value="10"
+              />
+            </div>
+            <div
+              class="flex-grow"
+            />
+            <button
+              class="h-10 px-4 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors text-sm font-medium disabled:opacity-50 flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              disabled=""
+            >
+              <svg
+                class="w-4 h-4 animate-spin text-blue-600"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"
+                />
+                <path
+                  d="M21 3v5h-5"
+                />
+                <path
+                  d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"
+                />
+                <path
+                  d="M8 16H3v5"
+                />
+              </svg>
+              Refresh
+            </button>
+            <button
+              aria-label="Export orders as CSV"
+              class="h-10 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <svg
+                class="w-4 h-4"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
+                />
+                <polyline
+                  points="7 10 12 15 17 10"
+                />
+                <line
+                  x1="12"
+                  x2="12"
+                  y1="15"
+                  y2="3"
+                />
+              </svg>
+              Export CSV
+            </button>
+          </div>
+        </div>
+        <div
+          class="p-6 border-b border-gray-200"
+        >
+          <div
+            class="grid grid-cols-4 gap-6"
+          >
+            <div
+              class="bg-gray-50 rounded-md p-6 shadow-sm border border-gray-100"
+            >
+              <div
+                class="text-sm text-gray-500 uppercase tracking-wider mb-1"
+              >
+                Showing
+              </div>
+              <div
+                class="text-2xl font-semibold text-gray-900"
+              >
+                0
+              </div>
+            </div>
+            <div
+              class="bg-gray-50 rounded-md p-6 shadow-sm border border-gray-100"
+            >
+              <div
+                class="text-sm text-gray-500 uppercase tracking-wider mb-1"
+              >
+                Total Loaded
+              </div>
+              <div
+                class="text-2xl font-semibold text-gray-900"
+              >
+                0
+              </div>
+            </div>
+            <div
+              class="bg-gray-50 rounded-md p-6 shadow-sm border border-gray-100"
+            >
+              <div
+                class="text-sm text-gray-500 uppercase tracking-wider mb-1"
+              >
+                Fulfilled
+              </div>
+              <div
+                class="text-2xl font-semibold text-gray-900"
+              >
+                0
+              </div>
+            </div>
+            <div
+              class="bg-gray-50 rounded-md p-6 shadow-sm border border-gray-100"
+            >
+              <div
+                class="text-sm text-gray-500 uppercase tracking-wider mb-1"
+              >
+                Tracking Assigned
+              </div>
+              <div
+                class="text-2xl font-semibold text-gray-900"
+              >
+                0
+              </div>
+            </div>
+          </div>
+        </div>
+        <div
+          class="px-6 py-3 bg-gray-50 border-b border-gray-200"
+        >
+          <p
+            class="text-sm text-gray-700"
+          >
+            Showing 
+            0
+             of 
+            0
+             order(s) (limit=
+            10
+            ).
+          </p>
+        </div>
+        <div
+          class="overflow-x-auto"
+        >
+          <table
+            class="w-full"
+          >
+            <thead
+              class="bg-gray-50 border-b border-gray-200"
+            >
+              <tr>
+                <th
+                  class="px-6 py-3 text-left text-sm text-gray-600 uppercase tracking-wider font-semibold"
+                >
+                  #
+                </th>
+                <th
+                  class="px-6 py-3 text-left text-sm text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 font-semibold"
+                >
+                  <div
+                    class="flex items-center text-sm font-medium text-gray-700"
+                  >
+                    Order Name
+                    <svg
+                      class="w-4 h-4 ml-3 text-blue-600"
+                      fill="none"
+                      height="24"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      viewBox="0 0 24 24"
+                      width="24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="m5 12 7-7 7 7"
+                      />
+                      <path
+                        d="M12 19V5"
+                      />
+                    </svg>
+                  </div>
+                </th>
+                <th
+                  class="px-6 py-3 text-left text-sm text-gray-700 uppercase tracking-wider font-semibold"
+                >
+                  Order ID
+                </th>
+                <th
+                  class="px-6 py-3 text-left text-sm text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 font-semibold"
+                >
+                  <div
+                    class="flex items-center text-sm font-medium text-gray-700"
+                  >
+                    Full Name
+                    <svg
+                      class="w-4 h-4 ml-3 opacity-40"
+                      fill="none"
+                      height="24"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      viewBox="0 0 24 24"
+                      width="24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="m21 16-4 4-4-4"
+                      />
+                      <path
+                        d="M17 20V4"
+                      />
+                      <path
+                        d="m3 8 4-4 4 4"
+                      />
+                      <path
+                        d="M7 4v16"
+                      />
+                    </svg>
+                  </div>
+                </th>
+                <th
+                  class="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider"
+                >
+                  Address 1
+                </th>
+                <th
+                  class="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider"
+                >
+                  Address 2
+                </th>
+                <th
+                  class="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider"
+                >
+                  City
+                </th>
+                <th
+                  class="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider"
+                >
+                  State
+                </th>
+                <th
+                  class="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider"
+                >
+                  PIN Code
+                </th>
+                <th
+                  class="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider"
+                >
+                  Phone Number
+                </th>
+                <th
+                  class="px-6 py-3 text-left text-sm text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 font-semibold"
+                >
+                  <div
+                    class="flex items-center text-sm font-medium text-gray-700"
+                  >
+                    Total Price
+                    <svg
+                      class="w-4 h-4 ml-3 opacity-40"
+                      fill="none"
+                      height="24"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      viewBox="0 0 24 24"
+                      width="24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="m21 16-4 4-4-4"
+                      />
+                      <path
+                        d="M17 20V4"
+                      />
+                      <path
+                        d="m3 8 4-4 4 4"
+                      />
+                      <path
+                        d="M7 4v16"
+                      />
+                    </svg>
+                  </div>
+                </th>
+                <th
+                  class="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider"
+                >
+                  Fulfillment
+                </th>
+              </tr>
+            </thead>
+            <tbody
+              class="bg-white divide-y divide-gray-200"
+            >
+              <tr>
+                <td
+                  class="px-6 py-8 text-center text-gray-500"
+                  colspan="12"
+                >
+                  <svg
+                    class="w-6 h-6 animate-spin mx-auto mb-2"
+                    fill="none"
+                    height="24"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                    width="24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"
+                    />
+                    <path
+                      d="M21 3v5h-5"
+                    />
+                    <path
+                      d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"
+                    />
+                    <path
+                      d="M8 16H3v5"
+                    />
+                  </svg>
+                  Loading orders...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`OrderTable UI > matches snapshot with sample orders 1`] = `
+<div>
+  <div
+    class="min-h-screen bg-gray-50 py-12"
+  >
+    <div
+      class="max-w-screen-xl mx-auto px-6"
+    >
+      <h1
+        class="text-4xl font-semibold mb-6 leading-tight"
+      >
+        Courier Dashboard — Orders
+      </h1>
+      <div
+        class="bg-white rounded-lg border border-gray-200 shadow-sm"
+      >
+        <div
+          class="p-6 border-b border-gray-200 bg-gray-50"
+        >
+          <div
+            class="flex flex-wrap items-center gap-6"
+          >
+            <div
+              class="flex-shrink-0"
+            >
+              <label
+                class="text-sm font-medium text-gray-700 mb-1 block"
+              >
+                Fulfillment
+              </label>
+              <select
+                class="px-4 h-10 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 min-w-[140px] shadow-sm"
+              >
+                <option
+                  value="all"
+                >
+                  All
+                </option>
+                <option
+                  value="unfulfilled"
+                >
+                  Unfulfilled
+                </option>
+                <option
+                  value="fulfilled"
+                >
+                  Fulfilled
+                </option>
+              </select>
+            </div>
+            <div
+              class="flex-shrink-0"
+            >
+              <label
+                class="text-sm font-medium text-gray-700 mb-1 block"
+              >
+                Tracking
+              </label>
+              <select
+                class="px-4 h-10 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 min-w-[140px] shadow-sm"
+              >
+                <option
+                  value="any"
+                >
+                  Any
+                </option>
+                <option
+                  value="assigned"
+                >
+                  Assigned
+                </option>
+                <option
+                  value="not-assigned"
+                >
+                  Not Assigned
+                </option>
+              </select>
+            </div>
+            <div
+              class="flex-shrink-0"
+            >
+              <label
+                class="text-sm font-medium text-gray-700 mb-1 block"
+              >
+                Limit
+              </label>
+              <input
+                class="px-4 h-10 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-24 shadow-sm"
+                max="100"
+                min="1"
+                type="number"
+                value="10"
+              />
+            </div>
+            <div
+              class="flex-grow"
+            />
+            <button
+              class="h-10 px-4 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors text-sm font-medium disabled:opacity-50 flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            >
+              <svg
+                class="w-4 h-4 text-gray-600"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"
+                />
+                <path
+                  d="M21 3v5h-5"
+                />
+                <path
+                  d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"
+                />
+                <path
+                  d="M8 16H3v5"
+                />
+              </svg>
+              Refresh
+            </button>
+            <button
+              aria-label="Export orders as CSV"
+              class="h-10 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <svg
+                class="w-4 h-4"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
+                />
+                <polyline
+                  points="7 10 12 15 17 10"
+                />
+                <line
+                  x1="12"
+                  x2="12"
+                  y1="15"
+                  y2="3"
+                />
+              </svg>
+              Export CSV
+            </button>
+          </div>
+        </div>
+        <div
+          class="p-6 border-b border-gray-200"
+        >
+          <div
+            class="grid grid-cols-4 gap-6"
+          >
+            <div
+              class="bg-gray-50 rounded-md p-6 shadow-sm border border-gray-100"
+            >
+              <div
+                class="text-sm text-gray-500 uppercase tracking-wider mb-1"
+              >
+                Showing
+              </div>
+              <div
+                class="text-2xl font-semibold text-gray-900"
+              >
+                2
+              </div>
+            </div>
+            <div
+              class="bg-gray-50 rounded-md p-6 shadow-sm border border-gray-100"
+            >
+              <div
+                class="text-sm text-gray-500 uppercase tracking-wider mb-1"
+              >
+                Total Loaded
+              </div>
+              <div
+                class="text-2xl font-semibold text-gray-900"
+              >
+                2
+              </div>
+            </div>
+            <div
+              class="bg-gray-50 rounded-md p-6 shadow-sm border border-gray-100"
+            >
+              <div
+                class="text-sm text-gray-500 uppercase tracking-wider mb-1"
+              >
+                Fulfilled
+              </div>
+              <div
+                class="text-2xl font-semibold text-gray-900"
+              >
+                1
+              </div>
+            </div>
+            <div
+              class="bg-gray-50 rounded-md p-6 shadow-sm border border-gray-100"
+            >
+              <div
+                class="text-sm text-gray-500 uppercase tracking-wider mb-1"
+              >
+                Tracking Assigned
+              </div>
+              <div
+                class="text-2xl font-semibold text-gray-900"
+              >
+                1
+              </div>
+            </div>
+          </div>
+        </div>
+        <div
+          class="px-6 py-3 bg-gray-50 border-b border-gray-200"
+        >
+          <p
+            class="text-sm text-gray-700"
+          >
+            Showing 
+            2
+             of 
+            2
+             order(s) (limit=
+            10
+            ).
+          </p>
+        </div>
+        <div
+          class="overflow-x-auto"
+        >
+          <table
+            class="w-full"
+          >
+            <thead
+              class="bg-gray-50 border-b border-gray-200"
+            >
+              <tr>
+                <th
+                  class="px-6 py-3 text-left text-sm text-gray-600 uppercase tracking-wider font-semibold"
+                >
+                  #
+                </th>
+                <th
+                  class="px-6 py-3 text-left text-sm text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 font-semibold"
+                >
+                  <div
+                    class="flex items-center text-sm font-medium text-gray-700"
+                  >
+                    Order Name
+                    <svg
+                      class="w-4 h-4 ml-3 text-blue-600"
+                      fill="none"
+                      height="24"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      viewBox="0 0 24 24"
+                      width="24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="m5 12 7-7 7 7"
+                      />
+                      <path
+                        d="M12 19V5"
+                      />
+                    </svg>
+                  </div>
+                </th>
+                <th
+                  class="px-6 py-3 text-left text-sm text-gray-700 uppercase tracking-wider font-semibold"
+                >
+                  Order ID
+                </th>
+                <th
+                  class="px-6 py-3 text-left text-sm text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 font-semibold"
+                >
+                  <div
+                    class="flex items-center text-sm font-medium text-gray-700"
+                  >
+                    Full Name
+                    <svg
+                      class="w-4 h-4 ml-3 opacity-40"
+                      fill="none"
+                      height="24"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      viewBox="0 0 24 24"
+                      width="24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="m21 16-4 4-4-4"
+                      />
+                      <path
+                        d="M17 20V4"
+                      />
+                      <path
+                        d="m3 8 4-4 4 4"
+                      />
+                      <path
+                        d="M7 4v16"
+                      />
+                    </svg>
+                  </div>
+                </th>
+                <th
+                  class="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider"
+                >
+                  Address 1
+                </th>
+                <th
+                  class="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider"
+                >
+                  Address 2
+                </th>
+                <th
+                  class="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider"
+                >
+                  City
+                </th>
+                <th
+                  class="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider"
+                >
+                  State
+                </th>
+                <th
+                  class="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider"
+                >
+                  PIN Code
+                </th>
+                <th
+                  class="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider"
+                >
+                  Phone Number
+                </th>
+                <th
+                  class="px-6 py-3 text-left text-sm text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 font-semibold"
+                >
+                  <div
+                    class="flex items-center text-sm font-medium text-gray-700"
+                  >
+                    Total Price
+                    <svg
+                      class="w-4 h-4 ml-3 opacity-40"
+                      fill="none"
+                      height="24"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      viewBox="0 0 24 24"
+                      width="24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="m21 16-4 4-4-4"
+                      />
+                      <path
+                        d="M17 20V4"
+                      />
+                      <path
+                        d="m3 8 4-4 4 4"
+                      />
+                      <path
+                        d="M7 4v16"
+                      />
+                    </svg>
+                  </div>
+                </th>
+                <th
+                  class="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider"
+                >
+                  Fulfillment
+                </th>
+              </tr>
+            </thead>
+            <tbody
+              class="bg-white divide-y divide-gray-200"
+            >
+              <tr
+                class="hover:bg-gray-50 transition-colors"
+              >
+                <td
+                  class="px-6 py-4 text-sm text-gray-900"
+                >
+                  1
+                </td>
+                <td
+                  class="px-6 py-4 text-sm text-gray-900"
+                >
+                  ORD-1001
+                </td>
+                <td
+                  class="px-6 py-4 text-sm text-gray-600"
+                >
+                  gid://order/1
+                </td>
+                <td
+                  class="px-6 py-4 text-sm text-gray-900"
+                >
+                  Alice Example
+                </td>
+                <td
+                  class="px-6 py-4 text-sm text-gray-600 max-w-[220px]"
+                >
+                  <div
+                    class="truncate"
+                  >
+                    1 Main St
+                  </div>
+                </td>
+                <td
+                  class="px-6 py-4 text-sm text-gray-600 max-w-[180px]"
+                >
+                  <div
+                    class="truncate"
+                  >
+                    Suite 1
+                  </div>
+                </td>
+                <td
+                  class="px-6 py-4 text-sm text-gray-900"
+                >
+                  Gotham
+                </td>
+                <td
+                  class="px-6 py-4 text-sm text-gray-900"
+                >
+                  NY
+                </td>
+                <td
+                  class="px-6 py-4 text-sm text-gray-900"
+                >
+                  10001
+                </td>
+                <td
+                  class="px-6 py-4 text-sm text-gray-900"
+                >
+                  5551112222
+                </td>
+                <td
+                  class="px-6 py-4 text-sm text-gray-900"
+                >
+                  $19.99
+                </td>
+                <td
+                  class="px-6 py-4"
+                >
+                  <span
+                    class="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-green-100 text-green-800"
+                  >
+                    Fulfilled
+                  </span>
+                </td>
+              </tr>
+              <tr
+                class="hover:bg-gray-50 transition-colors"
+              >
+                <td
+                  class="px-6 py-4 text-sm text-gray-900"
+                >
+                  2
+                </td>
+                <td
+                  class="px-6 py-4 text-sm text-gray-900"
+                >
+                  ORD-1002
+                </td>
+                <td
+                  class="px-6 py-4 text-sm text-gray-600"
+                >
+                  gid://order/2
+                </td>
+                <td
+                  class="px-6 py-4 text-sm text-gray-900"
+                >
+                  Bob Example
+                </td>
+                <td
+                  class="px-6 py-4 text-sm text-gray-600 max-w-[220px]"
+                >
+                  <div
+                    class="truncate"
+                  >
+                    2 Main St
+                  </div>
+                </td>
+                <td
+                  class="px-6 py-4 text-sm text-gray-600 max-w-[180px]"
+                >
+                  <div
+                    class="truncate"
+                  >
+                    Apt 2
+                  </div>
+                </td>
+                <td
+                  class="px-6 py-4 text-sm text-gray-900"
+                >
+                  Metropolis
+                </td>
+                <td
+                  class="px-6 py-4 text-sm text-gray-900"
+                >
+                  CA
+                </td>
+                <td
+                  class="px-6 py-4 text-sm text-gray-900"
+                >
+                  90001
+                </td>
+                <td
+                  class="px-6 py-4 text-sm text-gray-900"
+                >
+                  5553334444
+                </td>
+                <td
+                  class="px-6 py-4 text-sm text-gray-900"
+                >
+                  $29.99
+                </td>
+                <td
+                  class="px-6 py-4"
+                >
+                  <span
+                    class="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-yellow-100 text-yellow-800"
+                  >
+                    Unfulfilled
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+`;

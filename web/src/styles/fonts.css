@@ -1,0 +1,11 @@
+/* Add font-face or webfont imports here. */
+
+/* Using Inter from Google Fonts for pixel-perfect desktop typography */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --ui-font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+}
+
+body { font-family: var(--ui-font); }
+
