@@ -123,7 +123,7 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
       {/* Controls Section */}
-      <div className="p-8 border-b border-gray-200 bg-gray-50">
+      <div className="p-6 border-b border-gray-200 bg-gray-50">
         <div className="flex flex-wrap items-center gap-6">
           {/* Fulfillment Filter */}
           <div className="flex-shrink-0">
@@ -131,7 +131,7 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value as FilterType)}
-              className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 min-w-[140px] shadow-sm"
+              className="px-4 h-10 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 min-w-[140px] shadow-sm"
             >
               <option value="all">All</option>
               <option value="unfulfilled">Unfulfilled</option>
@@ -145,7 +145,7 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
             <select
               value={trackingFilter}
               onChange={(e) => setTrackingFilter(e.target.value as TrackingFilter)}
-              className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 min-w-[140px] shadow-sm"
+              className="px-4 h-10 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 min-w-[140px] shadow-sm"
             >
               <option value="any">Any</option>
               <option value="assigned">Assigned</option>
@@ -163,7 +163,7 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
                 const val = parseInt(e.target.value) || 10;
                 setLimit(Math.max(1, Math.min(100, val)));
               }}
-              className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-24 shadow-sm"
+              className="px-4 h-10 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-24 shadow-sm"
               min="1"
               max="100"
             />
@@ -175,7 +175,7 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
           <button
             onClick={loadOrders}
             disabled={loading}
-            className="h-10 px-4 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium disabled:opacity-50 flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="h-10 px-4 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors text-sm font-medium disabled:opacity-50 flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-blue-600' : 'text-gray-600'}`} />
             Refresh
@@ -184,7 +184,7 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
           <button
             onClick={exportToCSV}
             aria-label="Export orders as CSV"
-            className="h-10 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="h-10 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <Download className="w-4 h-4" />
             Export CSV
@@ -195,19 +195,19 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
       {/* Stats Cards */}
       <div className="p-6 border-b border-gray-200">
         <div className="grid grid-cols-4 gap-6">
-          <div className="bg-white rounded-md p-5 shadow-sm">
+          <div className="bg-gray-50 rounded-md p-6 shadow-sm border border-gray-100">
             <div className="text-sm text-gray-500 uppercase tracking-wider mb-1">Showing</div>
             <div className="text-2xl font-semibold text-gray-900">{displayedOrders.length}</div>
           </div>
-          <div className="bg-white rounded-md p-5 shadow-sm">
+          <div className="bg-gray-50 rounded-md p-6 shadow-sm border border-gray-100">
             <div className="text-sm text-gray-500 uppercase tracking-wider mb-1">Total Loaded</div>
             <div className="text-2xl font-semibold text-gray-900">{stats.totalLoaded}</div>
           </div>
-          <div className="bg-white rounded-md p-5 shadow-sm">
+          <div className="bg-gray-50 rounded-md p-6 shadow-sm border border-gray-100">
             <div className="text-sm text-gray-500 uppercase tracking-wider mb-1">Fulfilled</div>
             <div className="text-2xl font-semibold text-gray-900">{stats.fulfilled}</div>
           </div>
-          <div className="bg-white rounded-md p-5 shadow-sm">
+          <div className="bg-gray-50 rounded-md p-6 shadow-sm border border-gray-100">
             <div className="text-sm text-gray-500 uppercase tracking-wider mb-1">Tracking Assigned</div>
             <div className="text-2xl font-semibold text-gray-900">{stats.trackingAssigned}</div>
           </div>
@@ -226,9 +226,9 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="px-6 py-4 text-left text-sm text-gray-600 uppercase tracking-wider">#</th>
+              <th className="px-6 py-3 text-left text-sm text-gray-600 uppercase tracking-wider font-semibold">#</th>
               <th 
-                className="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                className="px-6 py-3 text-left text-sm text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 font-semibold"
                 onClick={() => handleSort('orderName')}
               >
                 <div className="flex items-center text-sm font-medium text-gray-700">
@@ -236,9 +236,9 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
                   {getSortIcon('orderName')}
                 </div>
               </th>
-              <th className="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider">Order ID</th>
+              <th className="px-6 py-3 text-left text-sm text-gray-700 uppercase tracking-wider font-semibold">Order ID</th>
               <th 
-                className="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                className="px-6 py-3 text-left text-sm text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 font-semibold"
                 onClick={() => handleSort('customerName')}
               >
                 <div className="flex items-center text-sm font-medium text-gray-700">
@@ -253,7 +253,7 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
               <th className="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider">PIN Code</th>
               <th className="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider">Phone Number</th>
               <th 
-                className="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                className="px-6 py-3 text-left text-sm text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 font-semibold"
                 onClick={() => handleSort('total')}
               >
                 <div className="flex items-center text-sm font-medium text-gray-700">
@@ -267,14 +267,14 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
           <tbody className="bg-white divide-y divide-gray-200">
             {loading ? (
               <tr>
-                <td colSpan={12} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={12} className="px-6 py-8 text-center text-gray-500">
                   <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" />
                   Loading orders...
                 </td>
               </tr>
             ) : displayedOrders.length === 0 ? (
               <tr>
-                <td colSpan={12} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={12} className="px-6 py-8 text-center text-gray-500">
                   No orders found
                 </td>
               </tr>
