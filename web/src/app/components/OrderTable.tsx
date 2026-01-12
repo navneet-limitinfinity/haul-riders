@@ -123,15 +123,15 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
       {/* Controls Section */}
-      <div className="p-6 border-b border-gray-200 bg-gray-50">
-        <div className="flex flex-wrap items-center gap-4">
+      <div className="p-8 border-b border-gray-200 bg-gray-50">
+        <div className="flex flex-wrap items-center gap-6">
           {/* Fulfillment Filter */}
           <div className="flex-shrink-0">
-            <label className="text-xs text-gray-600 mb-1 block">Fulfillment</label>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">Fulfillment</label>
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value as FilterType)}
-              className="px-4 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[120px]"
+              className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 min-w-[140px] shadow-sm"
             >
               <option value="all">All</option>
               <option value="unfulfilled">Unfulfilled</option>
@@ -141,11 +141,11 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
 
           {/* Tracking Filter */}
           <div className="flex-shrink-0">
-            <label className="text-xs text-gray-600 mb-1 block">Tracking</label>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">Tracking</label>
             <select
               value={trackingFilter}
               onChange={(e) => setTrackingFilter(e.target.value as TrackingFilter)}
-              className="px-4 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[120px]"
+              className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 min-w-[140px] shadow-sm"
             >
               <option value="any">Any</option>
               <option value="assigned">Assigned</option>
@@ -155,7 +155,7 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
 
           {/* Limit */}
           <div className="flex-shrink-0">
-            <label className="text-xs text-gray-600 mb-1 block">Limit</label>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">Limit</label>
             <input
               type="number"
               value={limit}
@@ -163,7 +163,7 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
                 const val = parseInt(e.target.value) || 10;
                 setLimit(Math.max(1, Math.min(100, val)));
               }}
-              className="px-4 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-20"
+              className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-24 shadow-sm"
               min="1"
               max="100"
             />
@@ -175,15 +175,15 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
           <button
             onClick={loadOrders}
             disabled={loading}
-            className="px-6 py-2 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors text-sm font-medium disabled:opacity-50 flex items-center gap-2"
+            className="px-5 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium disabled:opacity-50 flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-blue-600' : 'text-gray-600'}`} />
             Refresh
           </button>
 
           <button
             onClick={exportToCSV}
-            className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2"
+            className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <Download className="w-4 h-4" />
             Export CSV
@@ -193,29 +193,29 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
 
       {/* Stats Cards */}
       <div className="p-6 border-b border-gray-200">
-        <div className="grid grid-cols-4 gap-4">
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Showing</div>
-            <div className="text-2xl text-gray-900">{displayedOrders.length}</div>
+        <div className="grid grid-cols-4 gap-6">
+          <div className="bg-white rounded-md p-5 shadow-sm">
+            <div className="text-sm text-gray-500 uppercase tracking-wider mb-1">Showing</div>
+            <div className="text-2xl font-semibold text-gray-900">{displayedOrders.length}</div>
           </div>
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Total Loaded</div>
-            <div className="text-2xl text-gray-900">{stats.totalLoaded}</div>
+          <div className="bg-white rounded-md p-5 shadow-sm">
+            <div className="text-sm text-gray-500 uppercase tracking-wider mb-1">Total Loaded</div>
+            <div className="text-2xl font-semibold text-gray-900">{stats.totalLoaded}</div>
           </div>
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Fulfilled</div>
-            <div className="text-2xl text-gray-900">{stats.fulfilled}</div>
+          <div className="bg-white rounded-md p-5 shadow-sm">
+            <div className="text-sm text-gray-500 uppercase tracking-wider mb-1">Fulfilled</div>
+            <div className="text-2xl font-semibold text-gray-900">{stats.fulfilled}</div>
           </div>
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Tracking Assigned</div>
-            <div className="text-2xl text-gray-900">{stats.trackingAssigned}</div>
+          <div className="bg-white rounded-md p-5 shadow-sm">
+            <div className="text-sm text-gray-500 uppercase tracking-wider mb-1">Tracking Assigned</div>
+            <div className="text-2xl font-semibold text-gray-900">{stats.trackingAssigned}</div>
           </div>
         </div>
       </div>
 
       {/* Info Text */}
-      <div className="px-6 py-3 bg-green-50 border-b border-gray-200">
-        <p className="text-sm text-green-700">
+      <div className="px-6 py-3 bg-blue-50 border-b border-gray-200">
+        <p className="text-sm text-blue-700">
           Showing {displayedOrders.length} of {filteredOrders.length} order(s) (limit={limit}).
         </p>
       </div>
@@ -225,42 +225,42 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">#</th>
+              <th className="px-6 py-4 text-left text-sm text-gray-600 uppercase tracking-wider">#</th>
               <th 
-                className="px-4 py-3 text-left text-xs text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                className="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('orderName')}
               >
-                <div className="flex items-center">
+                <div className="flex items-center text-sm font-medium text-gray-700">
                   Order Name
                   {getSortIcon('orderName')}
                 </div>
               </th>
-              <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">Order ID</th>
+              <th className="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider">Order ID</th>
               <th 
-                className="px-4 py-3 text-left text-xs text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                className="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('customerName')}
               >
-                <div className="flex items-center">
+                <div className="flex items-center text-sm font-medium text-gray-700">
                   Full Name
                   {getSortIcon('customerName')}
                 </div>
               </th>
-              <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">Address 1</th>
-              <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">Address 2</th>
-              <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">City</th>
-              <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">State</th>
-              <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">PIN Code</th>
-              <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">Phone Number</th>
+              <th className="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider">Address 1</th>
+              <th className="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider">Address 2</th>
+              <th className="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider">City</th>
+              <th className="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider">State</th>
+              <th className="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider">PIN Code</th>
+              <th className="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider">Phone Number</th>
               <th 
-                className="px-4 py-3 text-left text-xs text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                className="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('total')}
               >
-                <div className="flex items-center">
+                <div className="flex items-center text-sm font-medium text-gray-700">
                   Total Price
                   {getSortIcon('total')}
                 </div>
               </th>
-              <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">Fulfillment</th>
+              <th className="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider">Fulfillment</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -289,30 +289,30 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
 
                 return (
                   <tr key={order.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 text-sm text-gray-900">{index + 1}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900">{order.orderNumber}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{order.id}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900">{order.customerName}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600 max-w-[200px]">
+                    <td className="px-6 py-4 text-sm text-gray-900">{index + 1}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{order.orderNumber}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{order.id}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{order.customerName}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600 max-w-[220px]">
                       <div className="truncate">{address1}</div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600 max-w-[150px]">
+                    <td className="px-6 py-4 text-sm text-gray-600 max-w-[180px]">
                       <div className="truncate">{address2 || '-'}</div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-900">{city}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900">{state}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900">{pinCode}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900">{order.phone || 'N/A'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900">{order.total}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-6 py-4 text-sm text-gray-900">{city}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{state}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{pinCode}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{order.phone || 'N/A'}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{order.total}</td>
+                    <td className="px-6 py-4">
                       <span
-                        className={`inline-flex items-center px-2 py-1 rounded text-xs ${
+                        className={`inline-flex items-center px-3 py-1 rounded-md text-sm font-medium ${
                           order.status === 'fulfilled'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-yellow-100 text-yellow-700'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-yellow-100 text-yellow-800'
                         }`}
                       >
-                        {order.status === 'fulfilled' ? '✓' : '○'}
+                        {order.status === 'fulfilled' ? 'Fulfilled' : 'Unfulfilled'}
                       </span>
                     </td>
                   </tr>
