@@ -63,10 +63,10 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
   };
 
   const getSortIcon = (field: SortField) => {
-    if (sortField !== field) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-50" />;
+    if (sortField !== field) return <ArrowUpDown className="w-4 h-4 ml-3 opacity-40" />;
     return sortDirection === 'asc' ?
-      <ArrowUp className="w-3 h-3 ml-1 text-blue-600" /> :
-      <ArrowDown className="w-3 h-3 ml-1 text-blue-600" />;
+      <ArrowUp className="w-4 h-4 ml-3 text-blue-600" /> :
+      <ArrowDown className="w-4 h-4 ml-3 text-blue-600" />;
   };
 
   // Filter and sort orders
@@ -175,7 +175,7 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
           <button
             onClick={loadOrders}
             disabled={loading}
-            className="px-5 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium disabled:opacity-50 flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="h-10 px-4 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium disabled:opacity-50 flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-blue-600' : 'text-gray-600'}`} />
             Refresh
@@ -183,7 +183,8 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
 
           <button
             onClick={exportToCSV}
-            className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-label="Export orders as CSV"
+            className="h-10 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <Download className="w-4 h-4" />
             Export CSV
@@ -214,8 +215,8 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
       </div>
 
       {/* Info Text */}
-      <div className="px-6 py-3 bg-blue-50 border-b border-gray-200">
-        <p className="text-sm text-blue-700">
+      <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
+        <p className="text-sm text-gray-700">
           Showing {displayedOrders.length} of {filteredOrders.length} order(s) (limit={limit}).
         </p>
       </div>
