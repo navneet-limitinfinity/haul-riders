@@ -31,6 +31,38 @@ describe('OrderTable UI', () => {
     expect(await screen.findByText(/No orders found/)).toBeInTheDocument();
   });
 
+  it('matches snapshot with sample orders', async () => {
+    const shopify = await import('../../services/shopifyApi');
+    vi.spyOn(shopify, 'fetchShopifyOrders').mockResolvedValueOnce([
+      {
+        id: 'gid://order/1',
+        orderNumber: 'ORD-1001',
+        customerName: 'Alice Example',
+        address: '1 Main St, Suite 1, Gotham, NY, 10001',
+        phone: '5551112222',
+        total: '$19.99',
+        date: '2026-01-01',
+        status: 'fulfilled',
+      },
+      {
+        id: 'gid://order/2',
+        orderNumber: 'ORD-1002',
+        customerName: 'Bob Example',
+        address: '2 Main St, Apt 2, Metropolis, CA, 90001',
+        phone: '5553334444',
+        total: '$29.99',
+        date: '2026-01-02',
+        status: 'unfulfilled',
+      },
+    ] as any);
+
+    const { container } = render(<App />);
+    // Wait for table rows to render
+    expect(await screen.findByText(/ORD-1001/)).toBeInTheDocument();
+    expect(await screen.findByText(/Alice Example/)).toBeInTheDocument();
+    expect(container).toMatchSnapshot();
+  });
+
   it('shows loading state while fetching', () => {
     // mock a promise that never resolves to keep loading true
     const shopifyPromise = new Promise(() => {});
