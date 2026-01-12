@@ -6,6 +6,29 @@ export function createLogger({ level }) {
   const levelOrder = { debug: 10, info: 20, warn: 30, error: 40 };
   const minLevel = levelOrder[level] ?? levelOrder.info;
 
+  const serializeError = (error) => {
+    if (!(error instanceof Error)) return error;
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      cause: error.cause instanceof Error ? serializeError(error.cause) : error.cause,
+    };
+  };
+
+  const normalizeValue = (value, depth = 0) => {
+    if (depth > 6) return "[MaxDepth]";
+    if (value instanceof Error) return serializeError(value);
+    if (!value || typeof value !== "object") return value;
+    if (Array.isArray(value)) return value.map((v) => normalizeValue(v, depth + 1));
+
+    const out = {};
+    for (const [k, v] of Object.entries(value)) {
+      out[k] = normalizeValue(v, depth + 1);
+    }
+    return out;
+  };
+
   const parseLogArgs = (args) => {
     // Support:
     // - logger.info("message")
@@ -31,12 +54,23 @@ export function createLogger({ level }) {
       timestamp: new Date().toISOString(),
       level: logLevel,
       message,
-      ...fields,
+      ...normalizeValue(fields),
     };
 
-    const output = JSON.stringify(record);
+    let output = "";
+    try {
+      output = JSON.stringify(record);
+    } catch (error) {
+      output = JSON.stringify({
+        timestamp: new Date().toISOString(),
+        level: "error",
+        message: "Failed to serialize log record",
+        serializationError: serializeError(error),
+      });
+    }
     // stderr for warnings/errors, stdout otherwise
-    if (logLevel === "warn" || logLevel === "error") process.stderr.write(output + "\n");
+    if (logLevel === "warn" || logLevel === "error")
+      process.stderr.write(output + "\n");
     else process.stdout.write(output + "\n");
   };
 

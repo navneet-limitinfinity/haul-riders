@@ -43,6 +43,8 @@ export function createShopifyRouter({ env, logger }) {
         storeDomain: store.domain,
         accessToken: store.token,
         apiVersion: store.apiVersion,
+        timeoutMs: env.shopify.timeoutMs,
+        maxRetries: env.shopify.maxRetries,
       });
 
       const shop = await client.getShop();
@@ -65,6 +67,8 @@ export function createShopifyRouter({ env, logger }) {
         storeDomain: store.domain,
         accessToken: store.token,
         apiVersion: store.apiVersion,
+        timeoutMs: env.shopify.timeoutMs,
+        maxRetries: env.shopify.maxRetries,
       });
 
       const [shop, accessScopes, ordersCountAny] = await Promise.all([
@@ -113,6 +117,8 @@ export function createShopifyRouter({ env, logger }) {
         storeDomain: store.domain,
         accessToken: store.token,
         apiVersion: store.apiVersion,
+        timeoutMs: env.shopify.timeoutMs,
+        maxRetries: env.shopify.maxRetries,
       });
 
       const orders = await client.getLatestOrders({ limit });

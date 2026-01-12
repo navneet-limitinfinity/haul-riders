@@ -80,6 +80,8 @@ npm run orders:latest
 - `PORT` (default `3000`) and `HOST` (default `0.0.0.0`)
 - `LOG_LEVEL` one of `debug | info | warn | error` (default `info`)
 - `TRUST_PROXY` set to `true` when running behind Nginx/Apache (default `false`)
+- `SHOPIFY_TIMEOUT_MS` request timeout in milliseconds (default `10000`)
+- `SHOPIFY_MAX_RETRIES` retries for transient Shopify errors (default `2`, range `0..5`)
 
 ## Run with Docker (optional)
 Build and run:

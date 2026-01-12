@@ -23,6 +23,8 @@ async function main() {
     storeDomain: env.shopify.storeDomain,
     accessToken: env.shopify.accessToken,
     apiVersion: env.shopify.apiVersion,
+    timeoutMs: env.shopify.timeoutMs,
+    maxRetries: env.shopify.maxRetries,
   });
 
   // Fetch the latest 10 orders and print the requested fields to terminal.

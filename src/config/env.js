@@ -22,6 +22,19 @@ export function loadEnv(rawEnv) {
   const shopifyStore = rawEnv.SHOPIFY_STORE ?? "";
   const shopifyToken = rawEnv.SHOPIFY_TOKEN ?? "";
   const shopifyApiVersion = rawEnv.SHOPIFY_API_VERSION ?? "2025-10";
+  const shopifyTimeoutMs = parseInt(rawEnv.SHOPIFY_TIMEOUT_MS ?? "10000", 10);
+  if (Number.isNaN(shopifyTimeoutMs) || shopifyTimeoutMs <= 0) {
+    throw new Error("SHOPIFY_TIMEOUT_MS must be a positive integer");
+  }
+
+  const shopifyMaxRetries = parseInt(rawEnv.SHOPIFY_MAX_RETRIES ?? "2", 10);
+  if (
+    Number.isNaN(shopifyMaxRetries) ||
+    shopifyMaxRetries < 0 ||
+    shopifyMaxRetries > 5
+  ) {
+    throw new Error("SHOPIFY_MAX_RETRIES must be an integer between 0 and 5");
+  }
   const storesFile = rawEnv.STORES_FILE ?? "";
 
   return {
@@ -34,6 +47,8 @@ export function loadEnv(rawEnv) {
       storeDomain: shopifyStore,
       accessToken: shopifyToken,
       apiVersion: shopifyApiVersion,
+      timeoutMs: shopifyTimeoutMs,
+      maxRetries: shopifyMaxRetries,
     },
   };
 }

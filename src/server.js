@@ -16,6 +16,17 @@ async function main() {
   const env = loadEnv(process.env);
   const logger = createLogger({ level: env.logLevel });
 
+  // Ensure unexpected crashes still leave a log trail.
+  process.on("unhandledRejection", (reason) => {
+    logger.error({ reason }, "Unhandled promise rejection");
+    process.exit(1);
+  });
+
+  process.on("uncaughtException", (error) => {
+    logger.error({ error }, "Uncaught exception");
+    process.exit(1);
+  });
+
   let storesConfig = null;
   if (env.storesFile) {
     try {
