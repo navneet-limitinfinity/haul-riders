@@ -7,6 +7,7 @@ export interface ShopifyOrder {
   total: string;
   date: string;
   status: 'fulfilled' | 'unfulfilled';
+  trackingAssigned: boolean;
 }
 
 export async function fetchShopifyOrders(): Promise<ShopifyOrder[]> {
@@ -20,12 +21,20 @@ export async function fetchShopifyOrders(): Promise<ShopifyOrder[]> {
     total: `$${(10 + i * 2).toFixed(2)}`,
     date: new Date().toISOString().split('T')[0],
     status: i % 3 === 0 ? 'fulfilled' : 'unfulfilled',
+    trackingAssigned: i % 2 === 0,
   })));
 }
 
 export function exportOrdersToCSV(orders: ShopifyOrder[]) {
-  const headers = ['Order Number', 'Customer', 'Total', 'Status', 'Date'];
-  const rows = orders.map(o => [o.orderNumber, o.customerName, o.total, o.status, o.date]);
+  const headers = ['Order Number', 'Customer', 'Total', 'Status', 'Date', 'Tracking'];
+  const rows = orders.map(o => [
+    o.orderNumber,
+    o.customerName,
+    o.total,
+    o.status,
+    o.date,
+    o.trackingAssigned ? 'Assigned' : 'Pending',
+  ]);
   const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
   return csv;
 }

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Download, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Download, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown, Check, Clock } from 'lucide-react';
 import { fetchShopifyOrders, ShopifyOrder, exportOrdersToCSV, downloadCSV } from '../services/shopifyApi';
 
 type FilterType = 'all' | 'unfulfilled' | 'fulfilled';
@@ -35,22 +35,11 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
     try {
       const data = await fetchShopifyOrders();
       setOrders(data);
-      updateStats(data);
     } catch (error) {
       console.error('Failed to fetch orders:', error);
     } finally {
       setLoading(false);
     }
-  };
-
-  const updateStats = (orderData: ShopifyOrder[]) => {
-    const fulfilled = orderData.filter(o => o.status === 'fulfilled').length;
-    onStatsUpdate({
-      showing: Math.min(limit, orderData.length),
-      totalLoaded: orderData.length,
-      fulfilled,
-      trackingAssigned: Math.floor(orderData.length * 0.5),
-    });
   };
 
   const handleSort = (field: SortField) => {
@@ -63,52 +52,80 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
   };
 
   const getSortIcon = (field: SortField) => {
-    if (sortField !== field) return <ArrowUpDown className="w-4 h-4 ml-3 opacity-40" />;
+    if (sortField !== field) return <ArrowUpDown className="w-4 h-4 ml-3 opacity-40" aria-hidden />;
     return sortDirection === 'asc' ?
-      <ArrowUp className="w-4 h-4 ml-3 text-blue-600" /> :
-      <ArrowDown className="w-4 h-4 ml-3 text-blue-600" />;
+      <ArrowUp className="w-4 h-4 ml-3 text-blue-600" aria-hidden /> :
+      <ArrowDown className="w-4 h-4 ml-3 text-blue-600" aria-hidden />;
   };
 
-  // Filter and sort orders
-  let filteredOrders = orders.filter((order) => {
-    const matchesFilter = filter === 'all' || order.status === filter;
-    return matchesFilter;
-  });
+  const getAriaSort = (field: SortField) => {
+    if (sortField !== field) return 'none';
+    return sortDirection === 'asc' ? 'ascending' : 'descending';
+  };
 
-  // Sort orders
-  filteredOrders = [...filteredOrders].sort((a, b) => {
-    let aValue: string | number | Date | undefined, bValue: string | number | Date | undefined;
-
-    switch (sortField) {
-      case 'orderName':
-        aValue = a.orderNumber;
-        bValue = b.orderNumber;
-        break;
-      case 'customerName':
-        aValue = a.customerName;
-        bValue = b.customerName;
-        break;
-      case 'total':
-        aValue = parseFloat(a.total.replace('$', ''));
-        bValue = parseFloat(b.total.replace('$', ''));
-        break;
-      case 'date':
-        aValue = new Date(a.date);
-        bValue = new Date(b.date);
-        break;
-      default:
-        aValue = a.orderNumber;
-        bValue = b.orderNumber;
+  const handleKeySort = (e: React.KeyboardEvent, field: SortField) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleSort(field);
     }
+  };
 
-    if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
-    if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
-    return 0;
-  });
+  const filteredAndSortedOrders = useMemo(() => {
+    const matchesStatusFilter = (order: ShopifyOrder) => filter === 'all' || order.status === filter;
+    const matchesTrackingFilter = (order: ShopifyOrder) => {
+      if (trackingFilter === 'assigned') return order.trackingAssigned;
+      if (trackingFilter === 'not-assigned') return !order.trackingAssigned;
+      return true;
+    };
+
+    const filtered = orders.filter(order => matchesStatusFilter(order) && matchesTrackingFilter(order));
+
+    return [...filtered].sort((a, b) => {
+      let aValue: string | number | Date | undefined;
+      let bValue: string | number | Date | undefined;
+
+      switch (sortField) {
+        case 'orderName':
+          aValue = a.orderNumber;
+          bValue = b.orderNumber;
+          break;
+        case 'customerName':
+          aValue = a.customerName;
+          bValue = b.customerName;
+          break;
+        case 'total':
+          aValue = parseFloat(a.total.replace('$', ''));
+          bValue = parseFloat(b.total.replace('$', ''));
+          break;
+        case 'date':
+          aValue = new Date(a.date);
+          bValue = new Date(b.date);
+          break;
+        default:
+          aValue = a.orderNumber;
+          bValue = b.orderNumber;
+      }
+
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [orders, filter, trackingFilter, sortField, sortDirection]);
+
+  const displayedOrders = filteredAndSortedOrders.slice(0, limit);
+
+  useEffect(() => {
+    const fulfilled = orders.filter(order => order.status === 'fulfilled').length;
+    const trackingAssignedCount = orders.filter(order => order.trackingAssigned).length;
+    onStatsUpdate({
+      showing: displayedOrders.length,
+      totalLoaded: orders.length,
+      fulfilled,
+      trackingAssigned: trackingAssignedCount,
+    });
+  }, [displayedOrders.length, orders, onStatsUpdate]);
 
   // Apply limit
-  const displayedOrders = filteredOrders.slice(0, limit);
-
   const exportToCSV = () => {
     if (displayedOrders.length === 0) {
       alert('No orders to export');
@@ -127,8 +144,9 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
         <div className="flex flex-wrap items-center gap-6">
           {/* Fulfillment Filter */}
           <div className="flex-shrink-0">
-            <label className="text-sm font-medium text-gray-700 mb-1 block">Fulfillment</label>
+            <label htmlFor="fulfillmentFilter" className="text-sm font-medium text-gray-700 mb-1 block">Fulfillment</label>
             <select
+              id="fulfillmentFilter"
               value={filter}
               onChange={(e) => setFilter(e.target.value as FilterType)}
               className="px-4 h-10 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 min-w-[140px] shadow-sm"
@@ -141,8 +159,9 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
 
           {/* Tracking Filter */}
           <div className="flex-shrink-0">
-            <label className="text-sm font-medium text-gray-700 mb-1 block">Tracking</label>
+            <label htmlFor="trackingFilter" className="text-sm font-medium text-gray-700 mb-1 block">Tracking</label>
             <select
+              id="trackingFilter"
               value={trackingFilter}
               onChange={(e) => setTrackingFilter(e.target.value as TrackingFilter)}
               className="px-4 h-10 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 min-w-[140px] shadow-sm"
@@ -155,8 +174,9 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
 
           {/* Limit */}
           <div className="flex-shrink-0">
-            <label className="text-sm font-medium text-gray-700 mb-1 block">Limit</label>
+            <label htmlFor="limitInput" className="text-sm font-medium text-gray-700 mb-1 block">Limit</label>
             <input
+              id="limitInput"
               type="number"
               value={limit}
               onChange={(e) => {
@@ -217,19 +237,23 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
       {/* Info Text */}
       <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
         <p className="text-sm text-gray-700">
-          Showing {displayedOrders.length} of {filteredOrders.length} order(s) (limit={limit}).
+          Showing {displayedOrders.length} of {filteredAndSortedOrders.length} order(s) (limit={limit}).
         </p>
       </div>
 
       {/* Table */}
       <div className="overflow-x-auto">
-        <table className="w-full">
+        <table className="w-full min-w-[1200px] table-fixed">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="px-6 py-3 text-left text-sm text-gray-600 uppercase tracking-wider font-semibold">#</th>
               <th 
                 className="px-6 py-3 text-left text-sm text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 font-semibold"
+                role="button"
+                tabIndex={0}
                 onClick={() => handleSort('orderName')}
+                onKeyDown={(e) => handleKeySort(e, 'orderName')}
+                aria-sort={getAriaSort('orderName')}
               >
                 <div className="flex items-center text-sm font-medium text-gray-700">
                   Order Name
@@ -239,7 +263,11 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
               <th className="px-6 py-3 text-left text-sm text-gray-700 uppercase tracking-wider font-semibold">Order ID</th>
               <th 
                 className="px-6 py-3 text-left text-sm text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 font-semibold"
+                role="button"
+                tabIndex={0}
                 onClick={() => handleSort('customerName')}
+                onKeyDown={(e) => handleKeySort(e, 'customerName')}
+                aria-sort={getAriaSort('customerName')}
               >
                 <div className="flex items-center text-sm font-medium text-gray-700">
                   Full Name
@@ -254,27 +282,32 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
               <th className="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider">Phone Number</th>
               <th 
                 className="px-6 py-3 text-left text-sm text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 font-semibold"
+                role="button"
+                tabIndex={0}
                 onClick={() => handleSort('total')}
+                onKeyDown={(e) => handleKeySort(e, 'total')}
+                aria-sort={getAriaSort('total')}
               >
                 <div className="flex items-center text-sm font-medium text-gray-700">
                   Total Price
                   {getSortIcon('total')}
                 </div>
               </th>
+              <th className="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider">Tracking</th>
               <th className="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider">Fulfillment</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {loading ? (
               <tr>
-                <td colSpan={12} className="px-6 py-8 text-center text-gray-500">
+                <td colSpan={13} className="px-6 py-8 text-center text-gray-500">
                   <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" />
                   Loading orders...
                 </td>
               </tr>
             ) : displayedOrders.length === 0 ? (
               <tr>
-                <td colSpan={12} className="px-6 py-8 text-center text-gray-500">
+                <td colSpan={13} className="px-6 py-8 text-center text-gray-500">
                   No orders found
                 </td>
               </tr>
@@ -294,10 +327,10 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
                     <td className="px-6 py-4 text-sm text-gray-900">{order.orderNumber}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{order.id}</td>
                     <td className="px-6 py-4 text-sm text-gray-900">{order.customerName}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600 max-w-[220px]">
+                    <td className="px-6 py-4 text-sm text-gray-600 max-w-[220px]" title={address1}>
                       <div className="truncate">{address1}</div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 max-w-[180px]">
+                    <td className="px-6 py-4 text-sm text-gray-600 max-w-[180px]" title={address2 || ''}>
                       <div className="truncate">{address2 || '-'}</div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">{city}</td>
@@ -305,6 +338,15 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
                     <td className="px-6 py-4 text-sm text-gray-900">{pinCode}</td>
                     <td className="px-6 py-4 text-sm text-gray-900">{order.phone || 'N/A'}</td>
                     <td className="px-6 py-4 text-sm text-gray-900">{order.total}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      <span
+                        className={`inline-flex items-center px-3 py-1 rounded-md text-sm font-medium ${
+                          order.trackingAssigned ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-700'
+                        }`}
+                      >
+                        {order.trackingAssigned ? 'Assigned' : 'Pending'}
+                      </span>
+                    </td>
                     <td className="px-6 py-4">
                       <span
                         className={`inline-flex items-center px-3 py-1 rounded-md text-sm font-medium ${
@@ -312,8 +354,10 @@ export function OrderTable({ stats, onStatsUpdate }: OrderTableProps) {
                             ? 'bg-green-100 text-green-800'
                             : 'bg-yellow-100 text-yellow-800'
                         }`}
+                        aria-label={`Status: ${order.status}`}
                       >
-                        {order.status === 'fulfilled' ? 'Fulfilled' : 'Unfulfilled'}
+                        {order.status === 'fulfilled' ? <Check className="w-4 h-4 mr-2 text-green-700" /> : <Clock className="w-4 h-4 mr-2 text-yellow-700" />}
+                        <span>{order.status === 'fulfilled' ? 'Fulfilled' : 'Unfulfilled'}</span>
                       </span>
                     </td>
                   </tr>
