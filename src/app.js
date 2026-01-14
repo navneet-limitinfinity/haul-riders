@@ -20,7 +20,18 @@ export function createApp({ env, logger }) {
   if (env.trustProxy) app.set("trust proxy", 1);
 
   app.disable("x-powered-by");
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        useDefaults: true,
+        directives: {
+          // Temporary: allow running over plain HTTP (e.g. IP-based deployments).
+          // Remove this once HTTPS is enabled.
+          upgradeInsecureRequests: null,
+        },
+      },
+    })
+  );
   app.use(express.json({ limit: "1mb" }));
   app.use("/static", express.static(publicDir, { etag: true, maxAge: "5m" }));
 
