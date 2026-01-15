@@ -6,7 +6,7 @@ export function createPagesRouter({ env } = {}) {
   const router = Router();
 
   router.get("/orders", (_req, res) => {
-    const assetVersion = "7";
+    const assetVersion = "8";
     const userName = String(env?.adminName ?? "Haul Riders Admin").trim();
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(html`<!doctype html>
@@ -39,34 +39,35 @@ export function createPagesRouter({ env } = {}) {
           </div>
         </div>
 
-        <div class="storePill" aria-live="polite">
-          <div class="storePillLabel">Store</div>
-          <select id="storeSelect" class="storeSelect" aria-label="Select store"></select>
-          <div id="storeName" class="storeName">Loading…</div>
-        </div>
-
-        <details class="userMenu" aria-label="User menu">
-          <summary class="userMenuSummary">
-            <img
-              class="userAvatar"
-              src="/static/haul_riders_logo.jpeg?v=${assetVersion}"
-              alt="User avatar"
-              decoding="async"
-            />
-            <span class="userMenuLabel">${userName}</span>
-          </summary>
-          <div class="userMenuList">
-            <div class="userMenuSection">
-              <span class="userMenuTitle">Logged in as</span>
-              <strong>${userName}</strong>
-            </div>
-            <a class="userMenuItem" href="/orders">Dashboard</a>
-            <a class="userMenuItem" href="mailto:support@haulriders.com">Support</a>
-            <button type="button" class="userMenuItem userMenuButton" data-action="logout">
-              Logout
-            </button>
+        <div class="topbarActions">
+          <div class="storePill" aria-live="polite">
+            <div class="storePillLabel">Store</div>
+            <select id="storeSelect" class="storeSelect" aria-label="Select store"></select>
+            <div id="storeName" class="storeName">Loading…</div>
           </div>
-        </details>
+
+          <details class="userMenu" aria-label="User menu">
+            <summary class="userMenuSummary" aria-label="Open user menu">
+              <img
+                class="userAvatar"
+                src="/static/haul_riders_logo.jpeg?v=${assetVersion}"
+                alt="User"
+                decoding="async"
+              />
+            </summary>
+            <div class="userMenuList">
+              <div class="userMenuSection">
+                <strong>${userName}</strong>
+              </div>
+              <a class="userMenuItem" href="/orders">Dashboard</a>
+              <a class="userMenuItem" href="/health">System health</a>
+              <a class="userMenuItem" href="mailto:support@haulriders.com">Support</a>
+              <button type="button" class="userMenuItem userMenuButton" data-action="logout">
+                Logout
+              </button>
+            </div>
+          </details>
+        </div>
       </div>
     </header>
 

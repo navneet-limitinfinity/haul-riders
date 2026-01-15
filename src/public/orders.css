@@ -79,6 +79,12 @@ body {
   gap: 18px;
 }
 
+.topbarActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .brand {
   display: flex;
   align-items: center;
@@ -169,14 +175,14 @@ body {
 .userMenu {
   border-radius: 14px;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--bg2);
   box-shadow: var(--shadow2);
   position: relative;
 }
 
 .userMenuSummary {
   cursor: pointer;
-  padding: 10px 12px;
+  padding: 8px 10px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -197,11 +203,6 @@ body {
   object-fit: cover;
 }
 
-.userMenuLabel {
-  font-size: 14px;
-  font-weight: 600;
-}
-
 .userMenuList {
   position: absolute;
   top: 100%;
@@ -210,7 +211,8 @@ body {
   min-width: 200px;
   padding: 12px;
   border-radius: 12px;
-  background: var(--panel2);
+  background: var(--bg2);
+  border: 1px solid var(--border);
   box-shadow: var(--shadow);
   display: none;
   gap: 8px;

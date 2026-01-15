@@ -48,6 +48,10 @@ export function createApp({ env, logger }) {
     res.redirect(302, "/orders");
   });
 
+  app.get("/favicon.ico", (_req, res) => {
+    res.redirect(302, "/static/logo_haul_riders.png");
+  });
+
   app.use(buildRoutes({ env, logger }));
 
   // 404 handler (kept after routes, before the error handler).
