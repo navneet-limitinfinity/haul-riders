@@ -2,12 +2,12 @@ import { Router } from "express";
 
 const html = String.raw;
 
-export function createPagesRouter() {
+export function createPagesRouter({ env } = {}) {
   const router = Router();
 
   router.get("/orders", (_req, res) => {
     const assetVersion = "7";
-    const userName = String(env.adminName ?? "Haul Riders Admin").trim();
+    const userName = String(env?.adminName ?? "Haul Riders Admin").trim();
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(html`<!doctype html>
 <html lang="en">

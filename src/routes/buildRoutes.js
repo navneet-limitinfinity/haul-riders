@@ -11,7 +11,7 @@ export function buildRoutes({ env, logger }) {
   const router = Router();
 
   router.use(createHealthRouter());
-  router.use(createPagesRouter());
+  router.use(createPagesRouter({ env }));
   router.use("/api", createStoresRouter({ storesConfig: env.storesConfig ?? null }));
   router.use("/api/shopify", createShopifyRouter({ env, logger }));
 
