@@ -10,6 +10,7 @@ yarn-error.log*
 coverage/
 logs/
 *.log
+*.pem
 .vscode/
 .idea/
 stores.json

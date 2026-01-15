@@ -45,6 +45,7 @@ describe('OrderTable UI', () => {
         total: '$19.99',
         date: '2026-01-01',
         status: 'fulfilled',
+        trackingAssigned: true,
       },
 
       {
@@ -56,6 +57,7 @@ describe('OrderTable UI', () => {
         total: '$29.99',
         date: '2026-01-02',
         status: 'unfulfilled',
+        trackingAssigned: false,
       },
     ] as unknown as ShopifyOrder[]);
 

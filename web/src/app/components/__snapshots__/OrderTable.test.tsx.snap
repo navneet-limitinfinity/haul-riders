@@ -389,6 +389,11 @@ exports[`OrderTable UI > matches snapshot for desktop 1`] = `
                 <th
                   class="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider"
                 >
+                  Tracking
+                </th>
+                <th
+                  class="px-6 py-4 text-left text-sm text-gray-700 uppercase tracking-wider"
+                >
                   Fulfillment
                 </th>
               </tr>
@@ -399,7 +404,7 @@ exports[`OrderTable UI > matches snapshot for desktop 1`] = `
               <tr>
                 <td
                   class="px-6 py-8 text-center text-gray-500"
-                  colspan="12"
+                  colspan="13"
                 >
                   <svg
                     class="w-6 h-6 animate-spin mx-auto mb-2"
@@ -900,6 +905,15 @@ exports[`OrderTable UI > matches snapshot with sample orders 1`] = `
                   $19.99
                 </td>
                 <td
+                  class="px-6 py-4 text-sm text-gray-900"
+                >
+                  <span
+                    class="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-blue-100 text-blue-800"
+                  >
+                    Assigned
+                  </span>
+                </td>
+                <td
                   class="px-6 py-4"
                 >
                   <span
@@ -974,6 +988,15 @@ exports[`OrderTable UI > matches snapshot with sample orders 1`] = `
                   class="px-6 py-4 text-sm text-gray-900"
                 >
                   $29.99
+                </td>
+                <td
+                  class="px-6 py-4 text-sm text-gray-900"
+                >
+                  <span
+                    class="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-gray-100 text-gray-700"
+                  >
+                    Pending
+                  </span>
                 </td>
                 <td
                   class="px-6 py-4"

@@ -45,11 +45,7 @@ export function createApp({ env, logger }) {
   );
 
   app.get("/", (_req, res) => {
-    res.json({
-      name: "haul-riders",
-      status: "ok",
-      endpoints: ["/health", "/api/shopify/shop"],
-    });
+    res.redirect(302, "/orders");
   });
 
   app.use(buildRoutes({ env, logger }));

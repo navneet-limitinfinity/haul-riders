@@ -6,7 +6,7 @@ export function createPagesRouter() {
   const router = Router();
 
   router.get("/orders", (_req, res) => {
-    const assetVersion = "5";
+    const assetVersion = "6";
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(html`<!doctype html>
 <html lang="en">
@@ -21,8 +21,16 @@ export function createPagesRouter() {
     <header class="topbar">
       <div class="topbarInner">
         <div class="brand">
-          <div class="brandTitle">Haul Riders Courier</div>
-          <div class="brandSub">Orders dashboard</div>
+          <img
+            class="brandLogo"
+            src="/static/haul_riders_logo.jpeg?v=${assetVersion}"
+            alt="Haul Riders"
+            decoding="async"
+          />
+          <div class="brandText">
+            <div class="brandTitle">Haul Riders</div>
+            <div class="brandSub">Orders dashboard</div>
+          </div>
         </div>
 
         <div class="storePill" aria-live="polite">
