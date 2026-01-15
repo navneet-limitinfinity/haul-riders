@@ -89,6 +89,32 @@ body {
   gap: 18px;
 }
 
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.brandLogo {
+  height: 34px;
+  width: auto;
+  border-radius: 10px;
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.18);
+}
+
+@media (prefers-color-scheme: light) {
+  .brandLogo {
+    box-shadow: 0 10px 18px rgba(15, 23, 42, 0.12);
+  }
+}
+
+.brandText {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
 .brandTitle {
   font-size: 16px;
   font-weight: 850;
