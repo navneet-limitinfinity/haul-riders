@@ -36,6 +36,7 @@ export function loadEnv(rawEnv) {
     throw new Error("SHOPIFY_MAX_RETRIES must be an integer between 0 and 5");
   }
   const storesFile = rawEnv.STORES_FILE ?? "";
+  const adminName = String(rawEnv.ADMIN_NAME ?? "Haul Riders Admin").trim() || "Haul Riders Admin";
 
   return {
     port,
@@ -43,6 +44,7 @@ export function loadEnv(rawEnv) {
     logLevel,
     trustProxy,
     storesFile,
+    adminName,
     shopify: {
       storeDomain: shopifyStore,
       accessToken: shopifyToken,

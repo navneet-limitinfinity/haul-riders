@@ -269,6 +269,9 @@ function renderRows(orders) {
         ? null
         : createBadge({ label: "Not Added", kind: "muted" });
 
+    const shipmentStatus =
+      String(row.shipmentStatus ?? "").trim() || "Pending";
+
     const phone1 = String(shipping.phone1 ?? "").trim();
     const phone2 = String(shipping.phone2 ?? "").trim();
     const phone1Badge = phone1 ? null : createBadge({ label: "Missing", kind: "error" });
@@ -299,6 +302,7 @@ function renderRows(orders) {
       { text: row.totalPrice ?? "", className: "mono" },
       createBadge({ label: fulfillmentLabel, kind: fulfillmentBadgeKind }),
       trackingBadge ?? { text: trackingText, className: "mono" },
+      { text: shipmentStatus, className: "mono" },
       courierCell,
     ];
 
@@ -389,6 +393,7 @@ function buildCsvForOrders(orders) {
     "Total Price",
     "Fulfillment Status",
     "Tracking Numbers",
+    "Shipments Status",
     "Courier Partner",
     "Tracking URL",
   ];
@@ -413,6 +418,7 @@ function buildCsvForOrders(orders) {
       row.totalPrice ?? "",
       row.fulfillmentStatus ?? "",
       row.trackingNumbersText ?? formatTrackingNumbers(row.trackingNumbers),
+      row.shipmentStatus ?? "",
       row.trackingCompany ?? "",
       row.trackingUrl ?? "",
     ];
@@ -610,4 +616,16 @@ window.addEventListener("DOMContentLoaded", () => {
     if (e.key === "Enter") refresh();
   });
   refresh();
+
+  const userMenu = document.querySelector(".userMenu");
+  userMenu?.addEventListener("click", (e) => {
+    const target = e.target;
+    if (!target) return;
+    const action = target.dataset?.action ?? "";
+    if (action === "logout") {
+      e.preventDefault();
+      userMenu.removeAttribute("open");
+      setStatus("Logged out (stub).", { kind: "info" });
+    }
+  });
 });

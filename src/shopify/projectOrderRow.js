@@ -75,6 +75,10 @@ export const projectOrderRow = ({ order, index }) => {
   const trackingUrl = trackingUrls[0] ?? "";
   const orderGid = order?.admin_graphql_api_id ?? "";
   const orderKey = orderGid || (order?.id == null ? "" : String(order.id));
+  const shipmentStatus =
+    firstFulfillment?.status ??
+    order?.fulfillment_status ??
+    "";
 
   return {
     index: index + 1,
@@ -90,5 +94,6 @@ export const projectOrderRow = ({ order, index }) => {
     trackingCompany,
     trackingUrls,
     trackingUrl,
+    shipmentStatus,
   };
 };
