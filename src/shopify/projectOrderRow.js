@@ -21,14 +21,31 @@ const uniqueStrings = (values) => {
   return out;
 };
 
+const normalizePhone10 = (value) => {
+  const digits = String(value ?? "").replaceAll(/\D/g, "");
+  if (!digits) return "";
+  if (digits.length < 10) return "";
+  return digits.slice(-10);
+};
+
+const buildDtdcTrackingUrl = (trackingNumber) => {
+  const tn = String(trackingNumber ?? "").trim();
+  if (!tn) return "";
+  return `https://txk.dtdc.com/ctbs-tracking/customerInterface.tr?submitName=showCITrackingDetails&cType=Consignment&cnNo=${encodeURIComponent(
+    tn
+  )}`;
+};
+
 export const projectOrderRow = ({ order, index }) => {
   const shippingAddress = getBestShippingAddress(order);
   const firstFulfillment = getFirstFulfillment(order);
 
   const phoneNumbers = uniqueStrings([
-    shippingAddress?.phone,
-    order?.phone ? String(order.phone) : "",
+    normalizePhone10(shippingAddress?.phone),
+    normalizePhone10(order?.phone ? String(order.phone) : ""),
   ]);
+  const phone1 = phoneNumbers[0] ?? "";
+  const phone2 = phoneNumbers[1] ?? "";
 
   const shipping = {
     fullName: shippingAddress?.name ?? "",
@@ -38,6 +55,8 @@ export const projectOrderRow = ({ order, index }) => {
     state: shippingAddress?.province ?? "",
     pinCode: shippingAddress?.zip ?? "",
     phoneNumbers,
+    phone1,
+    phone2,
     phoneNumbersText: phoneNumbers.join(", "),
   };
 
@@ -49,13 +68,10 @@ export const projectOrderRow = ({ order, index }) => {
   ]);
   const trackingNumbersText = trackingNumbers.join(", ");
 
-  const trackingCompany = firstFulfillment?.tracking_company ?? "";
-  const trackingUrls = uniqueStrings([
-    ...(Array.isArray(firstFulfillment?.tracking_urls)
-      ? firstFulfillment.tracking_urls
-      : []),
-    firstFulfillment?.tracking_url,
-  ]);
+  const primaryTrackingNumber = trackingNumbers[0] ?? "";
+  const trackingCompany =
+    firstFulfillment?.tracking_company ?? (primaryTrackingNumber ? "DTDC" : "");
+  const trackingUrls = uniqueStrings([buildDtdcTrackingUrl(primaryTrackingNumber)]);
   const trackingUrl = trackingUrls[0] ?? "";
   const orderGid = order?.admin_graphql_api_id ?? "";
   const orderKey = orderGid || (order?.id == null ? "" : String(order.id));

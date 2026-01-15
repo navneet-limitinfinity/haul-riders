@@ -56,8 +56,6 @@ export function createPagesRouter() {
                 <option value="all" selected>All</option>
                 <option value="fulfilled">Fulfilled</option>
                 <option value="unfulfilled">Unfulfilled</option>
-                <option value="partial">Partial</option>
-                <option value="null">Unknown</option>
               </select>
             </label>
 
@@ -65,8 +63,8 @@ export function createPagesRouter() {
               <span>Tracking</span>
               <select id="trackingFilter">
                 <option value="any" selected>Any</option>
-                <option value="assigned">Assigned</option>
-                <option value="unassigned">Not assigned</option>
+                <option value="added">Added</option>
+                <option value="not_added">Not Added</option>
               </select>
             </label>
 
@@ -121,7 +119,8 @@ export function createPagesRouter() {
                 <th>City</th>
                 <th>State</th>
                 <th>PIN Code</th>
-                <th>Phone Number</th>
+                <th>Phone 1</th>
+                <th>Phone 2</th>
                 <th>Total Price</th>
                 <th class="colSortable" data-sort-key="fulfillmentStatus">
                   Fulfillment Status <span class="sortIndicator" aria-hidden="true"></span>

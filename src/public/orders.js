@@ -163,13 +163,16 @@ function applyFiltersAndSort() {
   let view = allOrders;
 
   if (fulfillmentFilter !== "all") {
-    view = view.filter(
-      (row) => normalizeFulfillmentStatus(row?.fulfillmentStatus) === fulfillmentFilter
-    );
+    view = view.filter((row) => {
+      const status = normalizeFulfillmentStatus(row?.fulfillmentStatus);
+      if (fulfillmentFilter === "fulfilled") return status === "fulfilled";
+      if (fulfillmentFilter === "unfulfilled") return status !== "fulfilled";
+      return true;
+    });
   }
 
   if (trackingFilter !== "any") {
-    const wantAssigned = trackingFilter === "assigned";
+    const wantAssigned = trackingFilter === "added";
     view = view.filter((row) => getTrackingAssigned(row) === wantAssigned);
   }
 
@@ -254,14 +257,9 @@ function renderRows(orders) {
     const shipping = row?.shipping ?? {};
 
     const fulfillmentNorm = normalizeFulfillmentStatus(row?.fulfillmentStatus);
-    const fulfillmentLabel =
-      fulfillmentNorm === "null" ? "Unknown" : titleCase(fulfillmentNorm);
-    const fulfillmentBadgeKind =
-      fulfillmentNorm === "fulfilled"
-        ? "ok"
-        : fulfillmentNorm === "partial"
-          ? "warn"
-          : "muted";
+    const isFulfilled = fulfillmentNorm === "fulfilled";
+    const fulfillmentLabel = isFulfilled ? "Fulfilled" : "Unfulfilled";
+    const fulfillmentBadgeKind = isFulfilled ? "ok" : "muted";
 
     const trackingText =
       row.trackingNumbersText ?? formatTrackingNumbers(row.trackingNumbers);
@@ -269,12 +267,12 @@ function renderRows(orders) {
     const trackingBadge =
       trackingText && String(trackingText).trim()
         ? null
-        : createBadge({ label: "Not assigned", kind: "muted" });
+        : createBadge({ label: "Not Added", kind: "muted" });
 
-    const phoneText = String(shipping.phoneNumbersText ?? "").trim();
-    const phoneBadge = phoneText
-      ? null
-      : createBadge({ label: "Missing", kind: "error" });
+    const phone1 = String(shipping.phone1 ?? "").trim();
+    const phone2 = String(shipping.phone2 ?? "").trim();
+    const phone1Badge = phone1 ? null : createBadge({ label: "Missing", kind: "error" });
+    const phone2Badge = null;
 
     const courierPartner = String(row.trackingCompany ?? "").trim();
     const courierCell =
@@ -296,7 +294,8 @@ function renderRows(orders) {
       shipping.city ?? "",
       shipping.state ?? "",
       { text: shipping.pinCode ?? "", className: "mono" },
-      phoneBadge ?? { text: phoneText, className: "mono" },
+      phone1Badge ?? { text: phone1, className: "mono" },
+      phone2Badge ?? { text: phone2, className: "mono" },
       { text: row.totalPrice ?? "", className: "mono" },
       createBadge({ label: fulfillmentLabel, kind: fulfillmentBadgeKind }),
       trackingBadge ?? { text: trackingText, className: "mono" },
@@ -346,15 +345,6 @@ function renderRows(orders) {
         trackLink.textContent = "Track Now";
         menu.appendChild(trackLink);
 
-        const copyBtn = document.createElement("button");
-        copyBtn.type = "button";
-        copyBtn.className = "menuItem";
-        copyBtn.dataset.action = "copy-tracking";
-        copyBtn.dataset.trackingText = String(value.trackingText ?? "");
-        copyBtn.disabled = !String(value.trackingText ?? "").trim();
-        copyBtn.textContent = "Copy tracking #";
-        menu.appendChild(copyBtn);
-
         details.appendChild(menu);
         td.appendChild(details);
       } else if (value && typeof value === "object" && "text" in value) {
@@ -394,7 +384,8 @@ function buildCsvForOrders(orders) {
     "City",
     "State",
     "PIN Code",
-    "Phone Number(s)",
+    "Phone 1",
+    "Phone 2",
     "Total Price",
     "Fulfillment Status",
     "Tracking Numbers",
@@ -417,7 +408,8 @@ function buildCsvForOrders(orders) {
       shipping.city ?? "",
       shipping.state ?? "",
       shipping.pinCode ?? "",
-      shipping.phoneNumbersText ?? "",
+      shipping.phone1 ?? "",
+      shipping.phone2 ?? "",
       row.totalPrice ?? "",
       row.fulfillmentStatus ?? "",
       row.trackingNumbersText ?? formatTrackingNumbers(row.trackingNumbers),
@@ -603,30 +595,12 @@ window.addEventListener("DOMContentLoaded", () => {
     if (!item) return;
 
     const action = item.dataset.action ?? "";
-    const trackingText = item.dataset.trackingText ?? "";
 
     const closeMenu = () => {
       item.closest("details")?.removeAttribute("open");
     };
 
-    if (action === "copy-tracking") {
-      try {
-        await copyToClipboard(trackingText);
-        setStatus("Tracking number(s) copied.", { kind: "ok" });
-      } catch {
-        setStatus("Failed to copy tracking number(s).", { kind: "error" });
-      } finally {
-        closeMenu();
-      }
-      return;
-    }
-
     if (action === "track-now") {
-      try {
-        await copyToClipboard(trackingText);
-      } catch {
-        // ignore clipboard failures; still open tracking
-      }
       // Let the anchor open in a new tab; close the menu after the click.
       setTimeout(closeMenu, 0);
     }
