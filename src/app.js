@@ -49,7 +49,7 @@ export function createApp({ env, logger }) {
   });
 
   app.get("/favicon.ico", (_req, res) => {
-    res.redirect(302, "/static/logo_haul_riders.png");
+    res.redirect(302, "/static/icon.png");
   });
 
   app.use(buildRoutes({ env, logger }));

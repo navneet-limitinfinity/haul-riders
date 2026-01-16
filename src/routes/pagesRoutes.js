@@ -19,7 +19,7 @@ export function createPagesRouter({ env } = {}) {
     <link
       rel="icon"
       type="image/png"
-      href="/static/logo_haul_riders.png?v=${assetVersion}"
+      href="/static/icon.png?v=${assetVersion}"
     />
     <script src="/static/orders.js?v=${assetVersion}" defer></script>
   </head>
