@@ -58,6 +58,14 @@ async function resolveUserFromFirebase({ env, logger, req }) {
   const email = String(decoded?.email ?? "").trim().toLowerCase();
   const firestore = admin.firestore();
 
+  const toStoreIdFromShopDomain = (domain) => {
+    const raw = String(domain ?? "").trim().toLowerCase();
+    if (!raw) return "";
+    const withoutScheme = raw.replace(/^https?:\/\//, "");
+    const host = withoutScheme.split("/")[0] ?? "";
+    return host.endsWith(".myshopify.com") ? host.slice(0, -".myshopify.com".length) : host;
+  };
+
   // Shop accounts are resolved from `shops` where `shop_admin == <email>`.
   // The shop's Firestore collection is derived from `shopDomain`.
   if (email) {
@@ -71,13 +79,14 @@ async function resolveUserFromFirebase({ env, logger, req }) {
       const doc = snap?.docs?.[0] ?? null;
       const shop = doc?.exists ? doc.data() : null;
       const shopDomain = String(shop?.shopDomain ?? "").trim().toLowerCase();
-      if (shopDomain) {
+      const storeIdFromDomain = toStoreIdFromShopDomain(shopDomain);
+      if (storeIdFromDomain) {
         return {
           provider: "firebase",
           uid,
           email,
           role: ROLE_SHOP,
-          storeId: shopDomain,
+          storeId: storeIdFromDomain,
           claims: decoded ?? {},
         };
       }

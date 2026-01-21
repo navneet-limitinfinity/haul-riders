@@ -50,7 +50,10 @@ export function createShipmentsRouter({ env, auth }) {
       }
 
       const admin = await getFirebaseAdmin({ env });
-      const { collectionId, displayName } = getShopCollectionInfo({ env, storeId });
+      const { collectionId, displayName, storeId: normalizedStoreId } = getShopCollectionInfo({
+        env,
+        storeId,
+      });
       const docId = toOrderDocId(orderKey);
       const docRef = admin.firestore().collection(collectionId).doc(docId);
 
@@ -69,7 +72,7 @@ export function createShipmentsRouter({ env, auth }) {
           {
             orderKey,
             docId,
-            storeId,
+            storeId: normalizedStoreId,
             shopName: displayName,
             order,
             shipment,
@@ -85,7 +88,11 @@ export function createShipmentsRouter({ env, auth }) {
           { merge: true }
         );
 
-      res.json({ ok: true, shipment, firestore: { collectionId, docId, storeId } });
+      res.json({
+        ok: true,
+        shipment,
+        firestore: { collectionId, docId, storeId: normalizedStoreId },
+      });
     } catch (error) {
       next(error);
     }
@@ -116,7 +123,10 @@ export function createShipmentsRouter({ env, auth }) {
       const updatedAt = new Date().toISOString();
 
       const admin = await getFirebaseAdmin({ env });
-      const { collectionId, displayName } = getShopCollectionInfo({ env, storeId });
+      const { collectionId, displayName, storeId: normalizedStoreId } = getShopCollectionInfo({
+        env,
+        storeId,
+      });
       const docId = toOrderDocId(orderKey);
 
       await admin
@@ -127,7 +137,7 @@ export function createShipmentsRouter({ env, auth }) {
           {
             orderKey,
             docId,
-            storeId,
+            storeId: normalizedStoreId,
             shopName: displayName,
             shipmentStatus,
             trackingNumber,
@@ -147,7 +157,11 @@ export function createShipmentsRouter({ env, auth }) {
           { merge: true }
         );
 
-      res.json({ ok: true, shipment: { shipmentStatus, trackingNumber, updatedAt } });
+      res.json({
+        ok: true,
+        shipment: { shipmentStatus, trackingNumber, updatedAt },
+        firestore: { collectionId, docId, storeId: normalizedStoreId },
+      });
     } catch (error) {
       next(error);
     }

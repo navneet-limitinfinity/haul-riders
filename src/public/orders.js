@@ -143,6 +143,14 @@ function getIdToken() {
   }
 }
 
+function clearAuthClientState() {
+  try {
+    localStorage.removeItem("haulIdToken");
+  } catch {
+    // ignore storage failures
+  }
+}
+
 function getAuthHeaders() {
   const token = getIdToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -179,6 +187,41 @@ async function postJson(path, body) {
     throw new Error(`${response.status} ${response.statusText} ${text}`.trim());
   }
   return response.json();
+}
+
+async function signOut() {
+  setStatus("Signing out…", { kind: "info" });
+  clearAuthClientState();
+
+  try {
+    await fetch("/api/auth/logout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    }).catch(() => {});
+  } catch {
+    // ignore
+  }
+
+  // Best-effort: sign out Firebase Auth so Firestore listeners stop.
+  try {
+    const response = await fetch("/auth/firebase-config.json", { cache: "no-store" });
+    const data = await response.json().catch(() => ({}));
+    const firebaseConfig = response.ok ? data?.config ?? null : null;
+    if (firebaseConfig) {
+      const [{ initializeApp }, { getAuth, signOut: firebaseSignOut }] = await Promise.all([
+        import("https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"),
+        import("https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"),
+      ]);
+      const app = initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      await firebaseSignOut(auth).catch(() => {});
+    }
+  } catch {
+    // ignore
+  }
+
+  window.location.assign("/login");
 }
 
 async function fetchShop() {
@@ -1175,7 +1218,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (action === "logout") {
       e.preventDefault();
       userMenu.removeAttribute("open");
-      setStatus("Logged out (stub).", { kind: "info" });
+      signOut();
     }
   });
 });

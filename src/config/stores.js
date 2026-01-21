@@ -3,6 +3,14 @@ import fs from "node:fs/promises";
 const isNonEmptyString = (v) => typeof v === "string" && v.trim().length > 0;
 
 const normalizeStoreId = (id) => String(id ?? "").trim().toLowerCase();
+const normalizeDomain = (domain) => String(domain ?? "").trim().toLowerCase();
+const toDomainKey = (domain) => {
+  const d = normalizeDomain(domain);
+  if (!d) return "";
+  const withoutScheme = d.replace(/^https?:\/\//, "");
+  const host = withoutScheme.split("/")[0] ?? "";
+  return host.endsWith(".myshopify.com") ? host.slice(0, -".myshopify.com".length) : host;
+};
 
 export async function loadStoresConfig({ filePath }) {
   if (!isNonEmptyString(filePath)) return null;
@@ -57,8 +65,16 @@ export async function loadStoresConfig({ filePath }) {
 
 export function resolveStore({ storesConfig, storeId, env }) {
   if (!storesConfig) return null;
-  const id = normalizeStoreId(storeId) || storesConfig.defaultStoreId;
-  const store = storesConfig.stores.find((s) => s.id === id);
+  const raw = String(storeId ?? "").trim();
+  const id = normalizeStoreId(raw);
+  const domain = normalizeDomain(raw);
+  const effectiveId = id || storesConfig.defaultStoreId;
+
+  const store =
+    storesConfig.stores.find((s) => s.id === effectiveId) ||
+    storesConfig.stores.find((s) => normalizeDomain(s.domain) === domain) ||
+    storesConfig.stores.find((s) => toDomainKey(s.domain) === id) ||
+    null;
   if (!store) return null;
 
   const token =
@@ -73,4 +89,3 @@ export function resolveStore({ storesConfig, storeId, env }) {
     token,
   };
 }
-
