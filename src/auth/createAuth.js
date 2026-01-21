@@ -66,36 +66,7 @@ async function resolveUserFromFirebase({ env, logger, req }) {
     return host.endsWith(".myshopify.com") ? host.slice(0, -".myshopify.com".length) : host;
   };
 
-  // Shop accounts are resolved from `shops` where `shop_admin == <email>`.
-  // The shop's Firestore collection is derived from `shopDomain`.
-  if (email) {
-    try {
-      const shopsCollection = String(env.auth.firebase.shopsCollection ?? "shops").trim() || "shops";
-      const snap = await firestore
-        .collection(shopsCollection)
-        .where("shop_admin", "==", email)
-        .limit(1)
-        .get();
-      const doc = snap?.docs?.[0] ?? null;
-      const shop = doc?.exists ? doc.data() : null;
-      const shopDomain = String(shop?.shopDomain ?? "").trim().toLowerCase();
-      const storeIdFromDomain = toStoreIdFromShopDomain(shopDomain);
-      if (storeIdFromDomain) {
-        return {
-          provider: "firebase",
-          uid,
-          email,
-          role: ROLE_SHOP,
-          storeId: storeIdFromDomain,
-          claims: decoded ?? {},
-        };
-      }
-    } catch (error) {
-      logger?.warn?.({ error }, "Failed to resolve shop account from Firestore");
-    }
-  }
-
-  // Fallback: admin accounts (and any legacy users) resolved from `users/<uid>`.
+  // Primary source of truth: `users/<uid>` with `role: "admin" | "shop"`.
   let profile = null;
   try {
     const snap = await firestore.collection(env.auth.firebase.usersCollection).doc(uid).get();
@@ -105,7 +76,38 @@ async function resolveUserFromFirebase({ env, logger, req }) {
   }
 
   const role = normalizeRole(profile?.role ?? decoded?.role);
-  const storeId = String(profile?.storeId ?? "").trim().toLowerCase();
+
+  // Admin users: go straight to admin dashboard (no store required).
+  if (role === ROLE_ADMIN) {
+    return {
+      provider: "firebase",
+      uid,
+      email,
+      role: ROLE_ADMIN,
+      storeId: "",
+      claims: decoded ?? {},
+    };
+  }
+
+  // Shop users: resolve storeId from users/<uid>.storeId, else via `shops` lookup.
+  let storeId = String(profile?.storeId ?? "").trim().toLowerCase();
+  if (!storeId && email) {
+    try {
+      const shopsCollection =
+        String(env.auth.firebase.shopsCollection ?? "shops").trim() || "shops";
+      const snap = await firestore
+        .collection(shopsCollection)
+        .where("shop_admin", "==", email)
+        .limit(1)
+        .get();
+      const doc = snap?.docs?.[0] ?? null;
+      const shop = doc?.exists ? doc.data() : null;
+      const shopDomain = String(shop?.shopDomain ?? "").trim().toLowerCase();
+      storeId = toStoreIdFromShopDomain(shopDomain);
+    } catch (error) {
+      logger?.warn?.({ error }, "Failed to resolve shop storeId from Firestore");
+    }
+  }
 
   return {
     provider: "firebase",
