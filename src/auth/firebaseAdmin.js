@@ -4,10 +4,13 @@ export async function getFirebaseAdmin({ env }) {
   let mod;
   try {
     mod = await import("firebase-admin");
-  } catch {
-    throw new Error(
-      "Missing dependency 'firebase-admin'. Install it with: npm i firebase-admin"
-    );
+  } catch (error) {
+    const message = String(error?.message ?? error ?? "").trim();
+    const hint =
+      message.includes("requires Node") || message.includes("Unsupported engine")
+        ? " (check your Node.js version; firebase-admin requires Node 18+)"
+        : "";
+    throw new Error(`Failed to import 'firebase-admin': ${message || "unknown error"}${hint}`);
   }
   const admin = mod.default ?? mod;
 

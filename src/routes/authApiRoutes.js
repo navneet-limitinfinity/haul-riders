@@ -49,7 +49,10 @@ export function createAuthApiRouter({ auth, env, logger }) {
         return;
       }
 
-      if (message.includes("Missing dependency 'firebase-admin'")) {
+      if (
+        message.includes("Missing dependency 'firebase-admin'") ||
+        message.includes("Failed to import 'firebase-admin'")
+      ) {
         res.status(500).json({
           error: "firebase_admin_dependency_missing",
           ...(firebaseCode ? { firebaseCode } : {}),
