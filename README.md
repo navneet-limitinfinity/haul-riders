@@ -93,6 +93,7 @@ npm run orders:latest
     - `DEV_AUTH_STORE_ID` (recommended for multi-store shop accounts)
   - Firebase auth:
     - `FIREBASE_USERS_COLLECTION` (default `users`)
+    - `FIREBASE_SHOPS_COLLECTION` (default `shops`)
     - `FIREBASE_WEB_CONFIG_JSON` (Firebase web config JSON, used by `/login`)
     - Server verification credentials (choose one):
       - `FIREBASE_ADMIN_CREDENTIALS_FILE` (path to service account JSON)

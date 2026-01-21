@@ -55,25 +55,53 @@ async function resolveUserFromFirebase({ env, logger, req }) {
   const uid = String(decoded?.uid ?? "").trim();
   if (!uid) return null;
 
+  const email = String(decoded?.email ?? "").trim().toLowerCase();
+  const firestore = admin.firestore();
+
+  // Shop accounts are resolved from `shops` where `shop_admin == <email>`.
+  // The shop's Firestore collection is derived from `shopDomain`.
+  if (email) {
+    try {
+      const shopsCollection = String(env.auth.firebase.shopsCollection ?? "shops").trim() || "shops";
+      const snap = await firestore
+        .collection(shopsCollection)
+        .where("shop_admin", "==", email)
+        .limit(1)
+        .get();
+      const doc = snap?.docs?.[0] ?? null;
+      const shop = doc?.exists ? doc.data() : null;
+      const shopDomain = String(shop?.shopDomain ?? "").trim().toLowerCase();
+      if (shopDomain) {
+        return {
+          provider: "firebase",
+          uid,
+          email,
+          role: ROLE_SHOP,
+          storeId: shopDomain,
+          claims: decoded ?? {},
+        };
+      }
+    } catch (error) {
+      logger?.warn?.({ error }, "Failed to resolve shop account from Firestore");
+    }
+  }
+
+  // Fallback: admin accounts (and any legacy users) resolved from `users/<uid>`.
   let profile = null;
   try {
-    const snap = await admin
-      .firestore()
-      .collection(env.auth.firebase.usersCollection)
-      .doc(uid)
-      .get();
+    const snap = await firestore.collection(env.auth.firebase.usersCollection).doc(uid).get();
     profile = snap?.exists ? snap.data() : null;
   } catch (error) {
     logger?.warn?.({ error }, "Failed to fetch user profile from Firestore");
   }
 
   const role = normalizeRole(profile?.role ?? decoded?.role);
-  const storeId = String(profile?.storeId ?? "").trim();
+  const storeId = String(profile?.storeId ?? "").trim().toLowerCase();
 
   return {
     provider: "firebase",
     uid,
-    email: String(decoded?.email ?? "").trim(),
+    email,
     role: role || "",
     storeId,
     claims: decoded ?? {},

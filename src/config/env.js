@@ -64,6 +64,7 @@ export function loadEnv(rawEnv) {
 
   const firebaseWebConfigJson = String(rawEnv.FIREBASE_WEB_CONFIG_JSON ?? "").trim();
   const firebaseUsersCollection = String(rawEnv.FIREBASE_USERS_COLLECTION ?? "users").trim() || "users";
+  const firebaseShopsCollection = String(rawEnv.FIREBASE_SHOPS_COLLECTION ?? "shops").trim() || "shops";
 
   return {
     port,
@@ -88,6 +89,7 @@ export function loadEnv(rawEnv) {
         privateKey: firebasePrivateKey,
         webConfigJson: firebaseWebConfigJson,
         usersCollection: firebaseUsersCollection,
+        shopsCollection: firebaseShopsCollection,
       },
     },
     shopify: {
