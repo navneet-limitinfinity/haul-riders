@@ -15,4 +15,4 @@ logs/
 .idea/
 stores.json
 shipments_state.json
-haul-riders-firebase-adminsdk-*.json
+
