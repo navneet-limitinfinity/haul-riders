@@ -199,7 +199,7 @@ export function createShopifyAdminClient({
     return data.count ?? 0;
   };
 
-  const getLatestOrders = async ({ limit = 10 } = {}) => {
+  const getLatestOrders = async ({ limit = 250, createdAtMin } = {}) => {
     // Note:
     // - `status=any` includes open/closed/cancelled (latest is by created_at desc)
     // - `fields` keeps payload small, but still includes fulfillment tracking data
@@ -210,8 +210,9 @@ export function createShopifyAdminClient({
         status: "any",
         fulfillment_status: "any",
         order: "created_at desc",
+        created_at_min: createdAtMin,
         fields:
-          "id,admin_graphql_api_id,name,total_price,shipping_address,phone,fulfillment_status,fulfillments",
+          "id,admin_graphql_api_id,name,created_at,financial_status,total_price,shipping_address,phone,fulfillment_status,fulfillments",
       },
     });
 

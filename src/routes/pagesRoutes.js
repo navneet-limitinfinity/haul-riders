@@ -1,29 +1,33 @@
 import { Router } from "express";
+import { getShopCollectionInfo } from "../firestore/shopCollections.js";
 
 const html = String.raw;
 
-export function createPagesRouter({ env } = {}) {
-  const router = Router();
+const escapeHtml = (value) =>
+  String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 
-  router.get("/orders", (_req, res) => {
-    const assetVersion = "8";
-    const userName = String(env?.adminName ?? "Haul Riders Admin").trim();
-    res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.send(html`<!doctype html>
+function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
+  const assetVersion = "12";
+  const safeUserLabel = escapeHtml(userLabel);
+  const safeStoreId = escapeHtml(storeId);
+  const safeFirestoreCollectionId = escapeHtml(firestoreCollectionId);
+
+  return html`<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Latest Shopify Orders</title>
+    <title>Orders</title>
     <link rel="stylesheet" href="/static/orders.css?v=${assetVersion}" />
-    <link
-      rel="icon"
-      type="image/png"
-      href="/static/icon.png?v=${assetVersion}"
-    />
+    <link rel="icon" type="image/png" href="/static/icon.png?v=${assetVersion}" />
     <script src="/static/orders.js?v=${assetVersion}" defer></script>
   </head>
-  <body>
+  <body data-role="${role}" data-store-id="${safeStoreId}" data-firestore-collection="${safeFirestoreCollectionId}">
     <header class="topbar">
       <div class="topbarInner">
         <div class="brand">
@@ -40,11 +44,15 @@ export function createPagesRouter({ env } = {}) {
         </div>
 
         <div class="topbarActions">
-          <div class="storePill" aria-live="polite">
-            <div class="storePillLabel">Store</div>
-            <select id="storeSelect" class="storeSelect" aria-label="Select store"></select>
-            <div id="storeName" class="storeName">Loading…</div>
-          </div>
+          ${
+            role === "admin"
+              ? html`<div class="storePill" aria-live="polite">
+                  <div class="storePillLabel">Store</div>
+                  <select id="storeSelect" class="storeSelect" aria-label="Select store"></select>
+                  <div id="storeName" class="storeName">Loading…</div>
+                </div>`
+              : ""
+          }
 
           <details class="userMenu" aria-label="User menu">
             <summary class="userMenuSummary" aria-label="Open user menu">
@@ -57,9 +65,9 @@ export function createPagesRouter({ env } = {}) {
             </summary>
             <div class="userMenuList">
               <div class="userMenuSection">
-                <strong>${userName}</strong>
+                <strong>${safeUserLabel}</strong>
               </div>
-              <a class="userMenuItem" href="/orders">Dashboard</a>
+              <a class="userMenuItem" href="${role === "admin" ? "/admin/orders" : "/shop/orders"}">Dashboard</a>
               <a class="userMenuItem" href="/health">System health</a>
               <a class="userMenuItem" href="mailto:support@haulriders.com">Support</a>
               <button type="button" class="userMenuItem userMenuButton" data-action="logout">
@@ -76,11 +84,20 @@ export function createPagesRouter({ env } = {}) {
         <div class="panelHeader">
           <div class="panelTitle">
             <h1>Latest Orders</h1>
-            <div class="panelHint">Fast view + export for ops and clients</div>
+            <div class="panelHint">Fast view + export</div>
           </div>
 
           <div class="controls">
-            <label class="field">
+            <div class="tabs" role="tablist" aria-label="Order status tabs">
+              <button class="tabBtn" type="button" data-tab="new" role="tab">New</button>
+              <button class="tabBtn" type="button" data-tab="assigned" role="tab">Assigned</button>
+              <button class="tabBtn" type="button" data-tab="in_transit" role="tab">In Transit</button>
+              <button class="tabBtn" type="button" data-tab="delivered" role="tab">Delivered</button>
+              <button class="tabBtn" type="button" data-tab="rto" role="tab">RTO</button>
+              <button class="tabBtn" type="button" data-tab="all" role="tab">All</button>
+            </div>
+
+            <label class="field fieldFulfillment">
               <span>Fulfillment</span>
               <select id="fulfillmentFilter">
                 <option value="all" selected>All</option>
@@ -89,7 +106,7 @@ export function createPagesRouter({ env } = {}) {
               </select>
             </label>
 
-            <label class="field">
+            <label class="field fieldTracking">
               <span>Tracking</span>
               <select id="trackingFilter">
                 <option value="any" selected>Any</option>
@@ -98,13 +115,17 @@ export function createPagesRouter({ env } = {}) {
               </select>
             </label>
 
-            <label class="field">
-              <span>Limit</span>
-              <input id="limit" type="number" min="1" max="250" value="10" />
-            </label>
-
             <div class="btnGroup">
-              <button id="refresh" class="btn btnPrimary" type="button">Refresh</button>
+              <label id="dateRangeWrap" class="field">
+                <select id="dateRange">
+                  <option value="today">Today</option>
+                  <option value="last7" selected>Last 7 days</option>
+                  <option value="thisMonth">This Month</option>
+                  <option value="last60">Last 60 days</option>
+                </select>
+              </label>
+              <button id="refresh" class="btn btnPrimary" type="button">Sync Orders</button>
+              <button id="bulkShip" class="btn btnPrimary" type="button">Bulk Ship</button>
               <button id="exportCsv" class="btn btnSecondary" type="button">Export CSV</button>
             </div>
           </div>
@@ -158,6 +179,7 @@ export function createPagesRouter({ env } = {}) {
                 <th>Tracking Numbers</th>
                 <th>Shipments Status</th>
                 <th>Courier Partner</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody id="rows"></tbody>
@@ -166,7 +188,28 @@ export function createPagesRouter({ env } = {}) {
       </section>
     </main>
   </body>
-</html>`);
+</html>`;
+}
+
+export function createPagesRouter({ env, auth } = {}) {
+  const router = Router();
+
+  router.get("/orders", (_req, res) => {
+    res.redirect(302, "/shop/orders");
+  });
+
+  router.get("/shop/orders", auth.requireRole("shop"), (req, res) => {
+    const userLabel = String(req.user?.email ?? "Shop").trim() || "Shop";
+    const storeId = String(req.user?.storeId ?? "").trim();
+    const firestoreCollectionId = getShopCollectionInfo({ env, storeId }).collectionId;
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(renderOrdersPage({ role: "shop", userLabel, storeId, firestoreCollectionId }));
+  });
+
+  router.get("/admin/orders", auth.requireRole("admin"), (req, res) => {
+    const userLabel = String(req.user?.email ?? env?.adminName ?? "Admin").trim() || "Admin";
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(renderOrdersPage({ role: "admin", userLabel, storeId: "", firestoreCollectionId: "" }));
   });
 
   return router;

@@ -36,7 +36,7 @@ const buildDtdcTrackingUrl = (trackingNumber) => {
   )}`;
 };
 
-export const projectOrderRow = ({ order, index }) => {
+export const projectOrderRow = ({ order, index, overrides = null }) => {
   const shippingAddress = getBestShippingAddress(order);
   const firstFulfillment = getFirstFulfillment(order);
 
@@ -60,12 +60,17 @@ export const projectOrderRow = ({ order, index }) => {
     phoneNumbersText: phoneNumbers.join(", "),
   };
 
-  const trackingNumbers = uniqueStrings([
-    ...(Array.isArray(firstFulfillment?.tracking_numbers)
-      ? firstFulfillment.tracking_numbers
-      : []),
-    firstFulfillment?.tracking_number,
-  ]);
+  const overrideTrackingNumber = String(overrides?.trackingNumber ?? "").trim();
+  const trackingNumbers = uniqueStrings(
+    overrideTrackingNumber
+      ? [overrideTrackingNumber]
+      : [
+          ...(Array.isArray(firstFulfillment?.tracking_numbers)
+            ? firstFulfillment.tracking_numbers
+            : []),
+          firstFulfillment?.tracking_number,
+        ]
+  );
   const trackingNumbersText = trackingNumbers.join(", ");
 
   const primaryTrackingNumber = trackingNumbers[0] ?? "";
@@ -75,10 +80,12 @@ export const projectOrderRow = ({ order, index }) => {
   const trackingUrl = trackingUrls[0] ?? "";
   const orderGid = order?.admin_graphql_api_id ?? "";
   const orderKey = orderGid || (order?.id == null ? "" : String(order.id));
-  const shipmentStatus =
-    firstFulfillment?.status ??
-    order?.fulfillment_status ??
-    "";
+  const shipmentStatus = String(
+    overrides?.shipmentStatus ??
+      firstFulfillment?.status ??
+      order?.fulfillment_status ??
+      ""
+  ).trim();
 
   return {
     index: index + 1,
@@ -86,6 +93,8 @@ export const projectOrderRow = ({ order, index }) => {
     orderId: order?.id == null ? "" : String(order.id),
     orderKey,
     orderGid,
+    createdAt: order?.created_at ?? "",
+    financialStatus: order?.financial_status ?? "",
     shipping,
     totalPrice: order?.total_price,
     fulfillmentStatus: order?.fulfillment_status,

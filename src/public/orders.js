@@ -6,6 +6,28 @@ const selectedOrderIds = new Set();
 
 const getOrderKey = (row) => String(row?.orderKey ?? row?.orderId ?? "");
 
+const normalizeShipmentStatus = (value) => {
+  const s = String(value ?? "").trim().toLowerCase();
+  if (!s) return "new";
+  if (s === "new") return "new";
+  if (s === "assigned") return "assigned";
+  if (s === "in_transit" || s === "in transit") return "in_transit";
+  if (s === "delivered") return "delivered";
+  if (s === "rto") return "rto";
+
+  if (s === "fulfilled") return "delivered";
+  if (s === "unfulfilled") return "new";
+  if (s.includes("deliver")) return "delivered";
+  if (s.includes("transit")) return "in_transit";
+  if (s.includes("rto")) return "rto";
+  if (s.includes("assign")) return "assigned";
+
+  return "new";
+};
+
+const getEffectiveShipmentStatus = (row) =>
+  normalizeShipmentStatus(row?.shipmentStatus || row?.fulfillmentStatus);
+
 const formatTrackingNumbers = (trackingNumbers) => {
   if (!Array.isArray(trackingNumbers)) return "";
   return trackingNumbers.filter(Boolean).join(", ");
@@ -31,39 +53,139 @@ const parseOrderNumber = (orderName) => {
   return Number.isNaN(n) ? null : n;
 };
 
+const SHOPIFY_MAX_LIMIT = 250;
+
+const DATE_RANGE_DEFAULT = "last7";
+const DATE_RANGE_STORAGE_KEY = "haulDateRange";
+
+function startOfDay(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function isoStartOfDayDaysAgo(days) {
+  const n = Number.parseInt(String(days ?? "0"), 10);
+  const safeDays = Number.isNaN(n) ? 0 : Math.max(0, n);
+  const today = startOfDay(new Date());
+  const d = new Date(today.getTime() - safeDays * 24 * 60 * 60 * 1000);
+  return d.toISOString();
+}
+
+function isoStartOfThisMonth() {
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth(), 1);
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
+function normalizeDateRange(value) {
+  const v = String(value ?? "").trim();
+  const allowed = new Set(["today", "last7", "thisMonth", "last60"]);
+  return allowed.has(v) ? v : DATE_RANGE_DEFAULT;
+}
+
+function getDateRange() {
+  const select = $("dateRange");
+  const fromUi = select ? normalizeDateRange(select.value) : "";
+  if (fromUi) return fromUi;
+  try {
+    return normalizeDateRange(localStorage.getItem(DATE_RANGE_STORAGE_KEY));
+  } catch {
+    return DATE_RANGE_DEFAULT;
+  }
+}
+
+function setDateRange(range) {
+  const value = normalizeDateRange(range);
+  const select = $("dateRange");
+  if (select) select.value = value;
+  try {
+    localStorage.setItem(DATE_RANGE_STORAGE_KEY, value);
+  } catch {
+    // ignore storage failures
+  }
+}
+
+function getSinceIsoForRange(range) {
+  const r = normalizeDateRange(range);
+  if (r === "today") return isoStartOfDayDaysAgo(0);
+  if (r === "last7") return isoStartOfDayDaysAgo(7);
+  if (r === "thisMonth") return isoStartOfThisMonth();
+  if (r === "last60") return isoStartOfDayDaysAgo(60);
+  return isoStartOfDayDaysAgo(7);
+}
+
 let sortState = { key: "orderName", dir: "desc" };
-
-const titleCase = (s) => {
-  const text = String(s ?? "").trim();
-  if (!text) return "";
-  return text.charAt(0).toUpperCase() + text.slice(1);
+let activeTab = "all";
+let activeRole = "shop";
+let firestoreAssignedState = {
+  started: false,
+  ready: false,
+  unsubscribe: null,
+  orders: [],
 };
+const sessionAssignedOrderKeys = new Set();
 
-async function copyToClipboard(text) {
-  const value = String(text ?? "").trim();
-  if (!value) return;
+function normalizeRole(role) {
+  const r = String(role ?? "").trim().toLowerCase();
+  if (r === "admin") return "admin";
+  if (r === "shop") return "shop";
+  if (r === "client") return "shop";
+  return "shop";
+}
 
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(value);
-    return;
+function getIdToken() {
+  try {
+    return String(localStorage.getItem("haulIdToken") ?? "").trim();
+  } catch {
+    return "";
+  }
+}
+
+function getAuthHeaders() {
+  const token = getIdToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function getDefaultTabForRole(role) {
+  return role === "shop" ? "new" : "all";
+}
+
+function setActiveTab(nextTab) {
+  activeTab = String(nextTab ?? "").trim().toLowerCase() || "all";
+  const buttons = document.querySelectorAll(".tabBtn[data-tab]");
+  for (const btn of buttons) {
+    const tab = btn.dataset.tab;
+    btn.classList.toggle("isActive", tab === activeTab);
+    btn.setAttribute("aria-selected", tab === activeTab ? "true" : "false");
   }
 
-  const textarea = document.createElement("textarea");
-  textarea.value = value;
-  textarea.setAttribute("readonly", "");
-  textarea.style.position = "fixed";
-  textarea.style.left = "-9999px";
-  document.body.appendChild(textarea);
-  textarea.select();
-  document.execCommand("copy");
-  textarea.remove();
+  const rangeWrap = $("dateRangeWrap");
+  if (rangeWrap) {
+    rangeWrap.style.display =
+      activeRole === "shop" && activeTab === "new" ? "" : "none";
+  }
+}
+
+async function postJson(path, body) {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify(body ?? {}),
+  });
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`${response.status} ${response.statusText} ${text}`.trim());
+  }
+  return response.json();
 }
 
 async function fetchShop() {
   const url = new URL("/api/shopify/shop", window.location.origin);
-  const storeId = getActiveStoreId();
+  const storeId = getStoreIdForRequests();
   if (storeId) url.searchParams.set("store", storeId);
-  const response = await fetch(url, { cache: "no-store" });
+  const response = await fetch(url, { cache: "no-store", headers: getAuthHeaders() });
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     throw new Error(`${response.status} ${response.statusText} ${text}`.trim());
@@ -71,22 +193,168 @@ async function fetchShop() {
   return response.json();
 }
 
-async function fetchLatestOrders({ limit }) {
+async function fetchLatestOrders({ limit, since }) {
   const url = new URL("/api/shopify/orders/latest", window.location.origin);
-  const storeId = getActiveStoreId();
+  const storeId = getStoreIdForRequests();
   if (storeId) url.searchParams.set("store", storeId);
   if (limit) url.searchParams.set("limit", String(limit));
-  const response = await fetch(url, { cache: "no-store" });
+  if (since) url.searchParams.set("since", String(since));
+  const response = await fetch(url, { cache: "no-store", headers: getAuthHeaders() });
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     throw new Error(`${response.status} ${response.statusText} ${text}`.trim());
   }
   return response.json();
+}
+
+async function fetchFirestoreOrders({ status, limit }) {
+  const url = new URL("/api/firestore/orders", window.location.origin);
+  if (status) url.searchParams.set("status", String(status));
+  if (limit) url.searchParams.set("limit", String(limit));
+  const response = await fetch(url, { cache: "no-store", headers: getAuthHeaders() });
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`${response.status} ${response.statusText} ${text}`.trim());
+  }
+  return response.json();
+}
+
+async function checkFirestoreOrderExists(orderKey) {
+  const key = String(orderKey ?? "").trim();
+  if (!key) return null;
+  try {
+    const data = await postJson("/api/firestore/orders/exists", { orderKey: key });
+    return Boolean(data?.exists);
+  } catch {
+    return null;
+  }
+}
+
+async function ensureFirestoreAssignedRealtime() {
+  if (firestoreAssignedState.started) return;
+  firestoreAssignedState.started = true;
+
+  const collectionId = String(document.body?.dataset?.firestoreCollection ?? "").trim();
+  if (!collectionId) {
+    setStatus("Missing shop collection id.", { kind: "error" });
+    firestoreAssignedState.ready = true;
+    return;
+  }
+
+  setStatus("Syncing assigned orders…", { kind: "info" });
+
+  try {
+    let firebaseConfig = window.__FIREBASE_WEB_CONFIG__ ?? null;
+    if (!firebaseConfig) {
+      const response = await fetch("/auth/firebase-config.json", { cache: "no-store" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(String(data?.error ?? "firebase_config_unavailable"));
+      }
+      firebaseConfig = data?.config ?? null;
+      if (!firebaseConfig) throw new Error("firebase_config_unavailable");
+    }
+
+    const [
+      { initializeApp },
+      { getAuth, onAuthStateChanged },
+      {
+        getFirestore,
+        enableIndexedDbPersistence,
+        collection,
+        query,
+        orderBy,
+        limit,
+        onSnapshot,
+      },
+    ] = await Promise.all([
+      import("https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"),
+      import("https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"),
+      import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"),
+    ]);
+
+    const app = initializeApp(firebaseConfig);
+    // Ensure Firebase Auth state is loaded so Firestore uses the logged-in user.
+    const auth = getAuth(app);
+    await new Promise((resolve) => {
+      const unsub = onAuthStateChanged(auth, () => {
+        unsub();
+        resolve();
+      });
+    });
+
+    const db = getFirestore(app);
+    try {
+      await enableIndexedDbPersistence(db);
+    } catch {
+      // Ignore: multiple tabs or unsupported browsers.
+    }
+
+    const q = query(
+      collection(db, collectionId),
+      orderBy("requestedAt", "desc"),
+      limit(200)
+    );
+
+    firestoreAssignedState.unsubscribe = onSnapshot(
+      q,
+      (snap) => {
+        const rows = [];
+        for (const doc of snap.docs) {
+          const data = doc.data() ?? {};
+          if (String(data.shipmentStatus ?? "") !== "assigned") continue;
+          const order = data.order && typeof data.order === "object" ? data.order : null;
+          const orderKey = String(data.orderKey ?? "").trim();
+          if (orderKey) sessionAssignedOrderKeys.add(orderKey);
+          rows.push({
+            ...(order ?? {}),
+            orderKey,
+            shipmentStatus: "assigned",
+            firestore: {
+              requestedAt: String(data.requestedAt ?? ""),
+            },
+          });
+        }
+        firestoreAssignedState.orders = rows;
+        firestoreAssignedState.ready = true;
+
+        if (activeRole === "shop" && activeTab === "assigned") {
+          allOrders = rows;
+          applyFiltersAndSort();
+          setStatus(`Loaded ${rows.length} assigned order(s).`, { kind: "ok" });
+        }
+      },
+      async () => {
+        // Fallback to server endpoint (no realtime) if client rules/config block.
+        try {
+          const data = await fetchFirestoreOrders({ status: "assigned", limit: 200 });
+          const orders = Array.isArray(data?.orders) ? data.orders : [];
+          for (const row of orders) {
+            const key = String(row?.orderKey ?? "").trim();
+            if (key) sessionAssignedOrderKeys.add(key);
+          }
+          firestoreAssignedState.orders = orders;
+          firestoreAssignedState.ready = true;
+          if (activeRole === "shop" && activeTab === "assigned") {
+            allOrders = orders;
+            applyFiltersAndSort();
+            setStatus(`Loaded ${orders.length} assigned order(s).`, { kind: "ok" });
+          }
+        } catch (error) {
+          firestoreAssignedState.ready = true;
+          setStatus(error?.message ?? "Failed to load assigned orders.", { kind: "error" });
+        }
+      }
+    );
+  } catch (error) {
+    firestoreAssignedState.ready = true;
+    setStatus(error?.message ?? "Failed to enable realtime assigned orders.", { kind: "error" });
+  }
 }
 
 async function fetchStores() {
   const url = new URL("/api/stores", window.location.origin);
-  const response = await fetch(url, { cache: "no-store" });
+  const response = await fetch(url, { cache: "no-store", headers: getAuthHeaders() });
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     throw new Error(`${response.status} ${response.statusText} ${text}`.trim());
@@ -105,6 +373,11 @@ function setActiveStoreId(storeId) {
   if (next) url.searchParams.set("store", next);
   else url.searchParams.delete("store");
   window.location.assign(url.toString());
+}
+
+function getStoreIdForRequests() {
+  if (activeRole === "admin") return getActiveStoreId();
+  return String(document.body?.dataset?.storeId ?? "").trim();
 }
 
 function setStatus(message, { kind = "info" } = {}) {
@@ -162,6 +435,10 @@ function applyFiltersAndSort() {
 
   let view = allOrders;
 
+  if (activeTab && activeTab !== "all") {
+    view = view.filter((row) => getEffectiveShipmentStatus(row) === activeTab);
+  }
+
   if (fulfillmentFilter !== "all") {
     view = view.filter((row) => {
       const status = normalizeFulfillmentStatus(row?.fulfillmentStatus);
@@ -202,9 +479,8 @@ function applyFiltersAndSort() {
   updateSortIndicators();
   updateMetrics(sorted);
 
-  const limit = Number.parseInt($("limit")?.value ?? "10", 10) || 10;
   setStatus(
-    `Showing ${sorted.length} of ${allOrders.length} order(s) (limit=${limit}).`,
+    `Showing ${sorted.length} of ${allOrders.length} order(s).`,
     { kind: "ok" }
   );
 }
@@ -247,6 +523,20 @@ function renderRows(orders) {
     trackingText,
   });
 
+  const createAdminUpdateMenu = ({ orderKey, shipmentStatus, trackingText }) => ({
+    adminMenu: true,
+    orderKey,
+    shipmentStatus,
+    trackingText,
+  });
+
+  const createActionButton = ({ label, action, orderKey }) => ({
+    actionButton: true,
+    label,
+    action,
+    orderKey,
+  });
+
   const fragment = document.createDocumentFragment();
   for (const row of currentOrders) {
     const tr = document.createElement("tr");
@@ -269,8 +559,28 @@ function renderRows(orders) {
         ? null
         : createBadge({ label: "Not Added", kind: "muted" });
 
-    const shipmentStatus =
-      String(row.shipmentStatus ?? "").trim() || "Pending";
+    const effectiveShipmentStatus = getEffectiveShipmentStatus(row);
+    const shipmentLabel =
+      effectiveShipmentStatus === "new"
+        ? "New"
+        : effectiveShipmentStatus === "assigned"
+          ? "Assigned"
+          : effectiveShipmentStatus === "in_transit"
+            ? "In Transit"
+            : effectiveShipmentStatus === "delivered"
+              ? "Delivered"
+              : effectiveShipmentStatus === "rto"
+                ? "RTO"
+                : "New";
+    const shipmentKind =
+      effectiveShipmentStatus === "delivered"
+        ? "ok"
+        : effectiveShipmentStatus === "in_transit" ||
+            effectiveShipmentStatus === "assigned"
+          ? "warn"
+          : effectiveShipmentStatus === "rto"
+            ? "error"
+            : "muted";
 
     const phone1 = String(shipping.phone1 ?? "").trim();
     const phone2 = String(shipping.phone2 ?? "").trim();
@@ -285,6 +595,21 @@ function renderRows(orders) {
           (trackingUrl
             ? createMenu({ label: "Track", url: trackingUrl, trackingText })
             : "");
+
+    const actionCell =
+      activeRole === "shop"
+        ? effectiveShipmentStatus === "new"
+          ? sessionAssignedOrderKeys.has(orderKey)
+            ? createBadge({ label: "Assigned", kind: "warn" })
+            : createActionButton({ label: "Ship Now", action: "ship-now", orderKey })
+          : trackingUrl
+            ? createMenu({ label: "Track", url: trackingUrl, trackingText })
+            : ""
+        : createAdminUpdateMenu({
+            orderKey,
+            shipmentStatus: effectiveShipmentStatus,
+            trackingText,
+          });
 
     const cells = [
       { check: true, checked: orderKey && selectedOrderIds.has(orderKey) },
@@ -302,8 +627,9 @@ function renderRows(orders) {
       { text: row.totalPrice ?? "", className: "mono" },
       createBadge({ label: fulfillmentLabel, kind: fulfillmentBadgeKind }),
       trackingBadge ?? { text: trackingText, className: "mono" },
-      { text: shipmentStatus, className: "mono" },
+      createBadge({ label: shipmentLabel, kind: shipmentKind }),
       courierCell,
+      actionCell,
     ];
 
     for (const value of cells) {
@@ -348,6 +674,74 @@ function renderRows(orders) {
         trackLink.dataset.trackingText = String(value.trackingText ?? "");
         trackLink.textContent = "Track Now";
         menu.appendChild(trackLink);
+
+        details.appendChild(menu);
+        td.appendChild(details);
+      } else if (value && typeof value === "object" && value.actionButton) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn btnPrimary";
+        btn.dataset.action = String(value.action ?? "");
+        btn.dataset.orderKey = String(value.orderKey ?? "");
+        btn.textContent = String(value.label ?? "");
+        td.appendChild(btn);
+      } else if (value && typeof value === "object" && value.adminMenu) {
+        const details = document.createElement("details");
+        details.className = "menuDetails";
+
+        const summary = document.createElement("summary");
+        summary.className = "menuSummary";
+        summary.textContent = "Update";
+        details.appendChild(summary);
+
+        const menu = document.createElement("div");
+        menu.className = "menuPopover";
+
+        const statusLabel = document.createElement("div");
+        statusLabel.className = "menuItem";
+        statusLabel.textContent = "Shipment status";
+        statusLabel.style.cursor = "default";
+        menu.appendChild(statusLabel);
+
+        const select = document.createElement("select");
+        select.className = "menuItem";
+        select.dataset.role = "shipment-status";
+        const options = [
+          { value: "new", label: "New" },
+          { value: "assigned", label: "Assigned" },
+          { value: "in_transit", label: "In Transit" },
+          { value: "delivered", label: "Delivered" },
+          { value: "rto", label: "RTO" },
+        ];
+        for (const o of options) {
+          const opt = document.createElement("option");
+          opt.value = o.value;
+          opt.textContent = o.label;
+          select.appendChild(opt);
+        }
+        select.value = String(value.shipmentStatus ?? "new");
+        menu.appendChild(select);
+
+        const trackingLabel = document.createElement("div");
+        trackingLabel.className = "menuItem";
+        trackingLabel.textContent = "Tracking code (optional)";
+        trackingLabel.style.cursor = "default";
+        menu.appendChild(trackingLabel);
+
+        const trackingInput = document.createElement("input");
+        trackingInput.className = "menuItem";
+        trackingInput.placeholder = "e.g. 7D112220026";
+        trackingInput.dataset.role = "tracking-number";
+        trackingInput.value = String(value.trackingText ?? "");
+        menu.appendChild(trackingInput);
+
+        const saveBtn = document.createElement("button");
+        saveBtn.type = "button";
+        saveBtn.className = "menuItem";
+        saveBtn.dataset.action = "admin-save";
+        saveBtn.dataset.orderKey = String(value.orderKey ?? "");
+        saveBtn.textContent = "Save";
+        menu.appendChild(saveBtn);
 
         details.appendChild(menu);
         td.appendChild(details);
@@ -418,7 +812,7 @@ function buildCsvForOrders(orders) {
       row.totalPrice ?? "",
       row.fulfillmentStatus ?? "",
       row.trackingNumbersText ?? formatTrackingNumbers(row.trackingNumbers),
-      row.shipmentStatus ?? "",
+      getEffectiveShipmentStatus(row),
       row.trackingCompany ?? "",
       row.trackingUrl ?? "",
     ];
@@ -461,12 +855,32 @@ function exportSelectedToCsv() {
 }
 
 async function refresh() {
-  const limit = Number.parseInt($("limit")?.value ?? "10", 10) || 10;
+  const limit = SHOPIFY_MAX_LIMIT;
+  const since = getSinceIsoForRange(getDateRange());
   setStatus("Loading…");
 
   try {
-    const data = await fetchLatestOrders({ limit });
-    const orders = Array.isArray(data?.orders) ? data.orders : [];
+    if (activeRole === "shop" && activeTab === "assigned") {
+      await ensureFirestoreAssignedRealtime();
+      allOrders = Array.isArray(firestoreAssignedState.orders)
+        ? firestoreAssignedState.orders
+        : [];
+      applyFiltersAndSort();
+      if (firestoreAssignedState.ready) {
+        setStatus(`Loaded ${allOrders.length} assigned order(s).`, { kind: "ok" });
+      }
+      return;
+    }
+
+    const data = await fetchLatestOrders({ limit, since });
+    let orders = Array.isArray(data?.orders) ? data.orders : [];
+
+    // Shop "New" tab: show only orders that are not fulfilled.
+    if (activeRole === "shop" && activeTab === "new") {
+      orders = orders.filter(
+        (row) => normalizeFulfillmentStatus(row?.fulfillmentStatus) !== "fulfilled"
+      );
+    }
 
     allOrders = orders;
 
@@ -482,37 +896,71 @@ async function refresh() {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-  fetchStores()
-    .then((data) => {
-      const stores = Array.isArray(data?.stores) ? data.stores : [];
-      const select = $("storeSelect");
-      if (!select || stores.length === 0) return;
+  activeRole = normalizeRole(document.body?.dataset?.role);
+  if (document.body) document.body.dataset.role = activeRole;
 
-      const defaultStoreId = String(data?.defaultStoreId ?? "").trim();
-      const currentStoreId = getActiveStoreId();
-      const activeStoreId =
-        currentStoreId || defaultStoreId || String(stores[0]?.id ?? "");
+  setDateRange(getDateRange());
 
-      select.innerHTML = "";
-      for (const s of stores) {
-        const opt = document.createElement("option");
-        opt.value = s.id;
-        opt.textContent = s.name || s.id;
-        select.appendChild(opt);
-      }
-      select.value = activeStoreId;
+  const url = new URL(window.location.href);
+  const tabFromUrl = String(url.searchParams.get("tab") ?? "").trim().toLowerCase();
+  const allowedTabs = new Set([
+    "new",
+    "assigned",
+    "in_transit",
+    "delivered",
+    "rto",
+    "all",
+  ]);
+  setActiveTab(allowedTabs.has(tabFromUrl) ? tabFromUrl : getDefaultTabForRole(activeRole));
 
-      if (!currentStoreId && activeStoreId) {
-        setActiveStoreId(activeStoreId);
+  document.querySelectorAll(".tabBtn[data-tab]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const tab = String(btn.dataset.tab ?? "");
+      const prevTab = activeTab;
+      setActiveTab(tab);
+
+      if (activeRole === "shop" && (tab === "assigned" || prevTab === "assigned")) {
+        refresh();
         return;
       }
 
-      select.addEventListener("change", (e) => {
-        const nextId = String(e.target?.value ?? "").trim();
-        if (nextId && nextId !== getActiveStoreId()) setActiveStoreId(nextId);
-      });
-    })
-    .catch(() => {});
+      applyFiltersAndSort();
+    });
+  });
+
+  if (activeRole === "admin") {
+    fetchStores()
+      .then((data) => {
+        const stores = Array.isArray(data?.stores) ? data.stores : [];
+        const select = $("storeSelect");
+        if (!select || stores.length === 0) return;
+
+        const defaultStoreId = String(data?.defaultStoreId ?? "").trim();
+        const currentStoreId = getActiveStoreId();
+        const activeStoreId =
+          currentStoreId || defaultStoreId || String(stores[0]?.id ?? "");
+
+        select.innerHTML = "";
+        for (const s of stores) {
+          const opt = document.createElement("option");
+          opt.value = s.id;
+          opt.textContent = s.name || s.id;
+          select.appendChild(opt);
+        }
+        select.value = activeStoreId;
+
+        if (!currentStoreId && activeStoreId) {
+          setActiveStoreId(activeStoreId);
+          return;
+        }
+
+        select.addEventListener("change", (e) => {
+          const nextId = String(e.target?.value ?? "").trim();
+          if (nextId && nextId !== getActiveStoreId()) setActiveStoreId(nextId);
+        });
+      })
+      .catch(() => {});
+  }
 
   fetchShop()
     .then((data) => {
@@ -540,11 +988,46 @@ window.addEventListener("DOMContentLoaded", () => {
       }
     })
     .catch(() => {
-      $("storeName").textContent = "Unknown";
+      const storeEl = $("storeName");
+      if (storeEl) storeEl.textContent = "Unknown";
     });
 
+  $("dateRange")?.addEventListener("change", (e) => {
+    setDateRange(e.target?.value);
+  });
   $("refresh")?.addEventListener("click", refresh);
   $("exportCsv")?.addEventListener("click", exportSelectedToCsv);
+  $("bulkShip")?.addEventListener("click", async (e) => {
+    const btn = e.target;
+    const selected = currentOrders.filter((row) => selectedOrderIds.has(getOrderKey(row)));
+    if (selected.length === 0) {
+      setStatus("Select at least one order to ship.", { kind: "error" });
+      return;
+    }
+
+    btn.disabled = true;
+    try {
+      await Promise.all(
+        selected.map((row) =>
+          postJson("/api/shipments/assign", { orderKey: getOrderKey(row), order: row })
+        )
+      );
+      for (const row of selected) {
+        const key = getOrderKey(row);
+        if (key) {
+          sessionAssignedOrderKeys.add(key);
+          selectedOrderIds.delete(key);
+        }
+      }
+      setStatus(`Assigned ${selected.length} order(s).`, { kind: "ok" });
+      renderRows(currentOrders);
+      syncSelectAllCheckbox();
+    } catch (error) {
+      setStatus(error?.message ?? "Failed to bulk assign shipments.", { kind: "error" });
+    } finally {
+      btn.disabled = false;
+    }
+  });
   $("fulfillmentFilter")?.addEventListener("change", applyFiltersAndSort);
   $("trackingFilter")?.addEventListener("change", applyFiltersAndSort);
 
@@ -597,7 +1080,7 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   $("rows")?.addEventListener("click", async (e) => {
-    const item = e.target?.closest?.(".menuItem");
+    const item = e.target?.closest?.("[data-action]");
     if (!item) return;
 
     const action = item.dataset.action ?? "";
@@ -609,12 +1092,79 @@ window.addEventListener("DOMContentLoaded", () => {
     if (action === "track-now") {
       // Let the anchor open in a new tab; close the menu after the click.
       setTimeout(closeMenu, 0);
+      return;
+    }
+
+    if (action === "ship-now") {
+      const orderKey = String(item.dataset.orderKey ?? "").trim();
+      if (!orderKey) return;
+      const order = currentOrders.find((r) => getOrderKey(r) === orderKey) ?? null;
+      item.disabled = true;
+      try {
+        const exists = await checkFirestoreOrderExists(orderKey);
+        if (exists) {
+          sessionAssignedOrderKeys.add(orderKey);
+          setStatus("Already assigned.", { kind: "ok" });
+          renderRows(currentOrders);
+          syncSelectAllCheckbox();
+          return;
+        }
+
+        const result = await postJson("/api/shipments/assign", { orderKey, order });
+        sessionAssignedOrderKeys.add(orderKey);
+        const alreadyAssigned = Boolean(result?.alreadyAssigned);
+        const collectionId = String(result?.firestore?.collectionId ?? "").trim();
+        const docId = String(result?.firestore?.docId ?? "").trim();
+        setStatus(
+          alreadyAssigned
+            ? "Already assigned."
+            : collectionId && docId
+              ? `Shipment saved (collection=${collectionId}, doc=${docId}).`
+              : "Shipment saved.",
+          { kind: "ok" }
+        );
+        renderRows(currentOrders);
+        syncSelectAllCheckbox();
+      } catch (error) {
+        setStatus(error?.message ?? "Failed to assign shipment.", { kind: "error" });
+      } finally {
+        item.disabled = false;
+      }
+      return;
+    }
+
+    if (action === "admin-save") {
+      if (activeRole !== "admin") return;
+      const orderKey = String(item.dataset.orderKey ?? "").trim();
+      if (!orderKey) return;
+
+      const storeId = getActiveStoreId();
+      if (!storeId) {
+        setStatus("Select a store before updating shipments.", { kind: "error" });
+        return;
+      }
+
+      const details = item.closest("details");
+      const statusSelect = details?.querySelector?.("[data-role='shipment-status']");
+      const trackingInput = details?.querySelector?.("[data-role='tracking-number']");
+      const shipmentStatus = String(statusSelect?.value ?? "").trim();
+      const trackingNumber = String(trackingInput?.value ?? "").trim();
+
+      item.disabled = true;
+      try {
+        await postJson("/api/shipments/update", { orderKey, storeId, shipmentStatus, trackingNumber });
+        setStatus("Shipment updated.", { kind: "ok" });
+        await refresh();
+      } catch (error) {
+        setStatus(error?.message ?? "Failed to update shipment.", { kind: "error" });
+      } finally {
+        item.disabled = false;
+        closeMenu();
+      }
+      return;
     }
   });
 
-  $("limit")?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") refresh();
-  });
   refresh();
 
   const userMenu = document.querySelector(".userMenu");

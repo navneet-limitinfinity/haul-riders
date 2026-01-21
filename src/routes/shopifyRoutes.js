@@ -7,17 +7,27 @@ import { resolveStore } from "../config/stores.js";
  * Shopify-related routes.
  * This is intentionally small now; you can add coupon/discount endpoints later.
  */
-export function createShopifyRouter({ env, logger }) {
+export function createShopifyRouter({ env, logger, auth }) {
   const router = Router();
 
   const getStoreIdFromRequest = (req) =>
     String(req.query?.store ?? req.get?.("x-store-id") ?? "").trim();
 
+  const getStoreIdForRequest = (req) => {
+    const role = String(req.user?.role ?? "").trim().toLowerCase();
+    if (role === "shop") return String(req.user?.storeId ?? "").trim();
+    return getStoreIdFromRequest(req);
+  };
+
   const getStoreForRequest = (req) => {
     if (env.storesConfig) {
+      const storeId = getStoreIdForRequest(req);
+      if (String(req.user?.role ?? "").trim().toLowerCase() === "shop" && !storeId) {
+        return null;
+      }
       return resolveStore({
         storesConfig: env.storesConfig,
-        storeId: getStoreIdFromRequest(req),
+        storeId,
         env: process.env,
       });
     }
@@ -31,7 +41,7 @@ export function createShopifyRouter({ env, logger }) {
     };
   };
 
-  router.get("/shop", async (req, res, next) => {
+  router.get("/shop", auth.requireAnyRole(["admin", "shop"]), async (req, res, next) => {
     try {
       res.setHeader("Cache-Control", "no-store");
       const store = getStoreForRequest(req);
@@ -55,7 +65,7 @@ export function createShopifyRouter({ env, logger }) {
     }
   });
 
-  router.get("/debug", async (req, res, next) => {
+  router.get("/debug", auth.requireRole("admin"), async (req, res, next) => {
     try {
       res.setHeader("Cache-Control", "no-store");
       const store = getStoreForRequest(req);
@@ -99,20 +109,30 @@ export function createShopifyRouter({ env, logger }) {
     }
   });
 
-  router.get("/orders/latest", async (req, res, next) => {
+  router.get(
+    "/orders/latest",
+    auth.requireAnyRole(["admin", "shop"]),
+    async (req, res, next) => {
     try {
       res.setHeader("Cache-Control", "no-store");
       const rawLimit = req.query?.limit;
       const limit = Math.max(
         1,
-        Math.min(250, Number.parseInt(rawLimit ?? "10", 10) || 10)
+        Math.min(250, Number.parseInt(rawLimit ?? "250", 10) || 250)
       );
+      const rawSince = String(req.query?.since ?? "").trim();
+      const createdAtMin = rawSince ? new Date(rawSince) : null;
+      const createdAtMinIso =
+        createdAtMin && !Number.isNaN(createdAtMin.getTime())
+          ? createdAtMin.toISOString()
+          : "";
 
       const store = getStoreForRequest(req);
       if (!store?.domain || !store?.token) {
         res.status(400).json({ error: "store_not_configured" });
         return;
       }
+
       const client = createShopifyAdminClient({
         storeDomain: store.domain,
         accessToken: store.token,
@@ -121,12 +141,18 @@ export function createShopifyRouter({ env, logger }) {
         maxRetries: env.shopify.maxRetries,
       });
 
-      const orders = await client.getLatestOrders({ limit });
+      const orders = await client.getLatestOrders({ limit, createdAtMin: createdAtMinIso });
       const projected = orders.map((order, index) =>
-        projectOrderRow({ order, index })
+        projectOrderRow({ order, index, overrides: null })
       );
 
-      res.json({ storeId: store.id, count: projected.length, limit, orders: projected });
+      res.json({
+        storeId: store.id,
+        count: projected.length,
+        limit,
+        since: createdAtMinIso,
+        orders: projected,
+      });
     } catch (error) {
       logger.error({ error }, "Failed to fetch latest orders");
       next(error);

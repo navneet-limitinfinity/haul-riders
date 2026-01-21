@@ -1,9 +1,9 @@
 import { Router } from "express";
 
-export function createStoresRouter({ storesConfig }) {
+export function createStoresRouter({ storesConfig, auth }) {
   const router = Router();
 
-  router.get("/stores", (_req, res) => {
+  router.get("/stores", auth.requireRole("admin"), (_req, res) => {
     res.setHeader("Cache-Control", "no-store");
 
     if (!storesConfig) {
@@ -23,4 +23,3 @@ export function createStoresRouter({ storesConfig }) {
 
   return router;
 }
-

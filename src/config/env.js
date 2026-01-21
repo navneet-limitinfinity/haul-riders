@@ -37,6 +37,33 @@ export function loadEnv(rawEnv) {
   }
   const storesFile = rawEnv.STORES_FILE ?? "";
   const adminName = String(rawEnv.ADMIN_NAME ?? "Haul Riders Admin").trim() || "Haul Riders Admin";
+  const shipmentsStateFile = String(
+    rawEnv.SHIPMENTS_STATE_FILE ?? "./shipments_state.json"
+  ).trim();
+
+  const authProvider = String(rawEnv.AUTH_PROVIDER ?? "dev").trim().toLowerCase();
+  const allowedAuthProviders = new Set(["none", "dev", "firebase"]);
+  if (!allowedAuthProviders.has(authProvider)) {
+    throw new Error("AUTH_PROVIDER must be one of: none, dev, firebase");
+  }
+
+  const authRequiredRaw = String(rawEnv.AUTH_REQUIRED ?? "true").trim().toLowerCase();
+  const authRequired = authRequiredRaw === "true" || authRequiredRaw === "1" || authRequiredRaw === "yes";
+
+  const devAuthRoleRaw = String(rawEnv.DEV_AUTH_ROLE ?? "shop").trim().toLowerCase();
+  const devAuthRole = devAuthRoleRaw === "admin" ? "admin" : "shop";
+  const devAuthStoreId = String(rawEnv.DEV_AUTH_STORE_ID ?? "").trim();
+
+  const firebaseAdminCredentialsJson = String(rawEnv.FIREBASE_ADMIN_CREDENTIALS_JSON ?? "").trim();
+  const firebaseAdminCredentialsFile = String(rawEnv.FIREBASE_ADMIN_CREDENTIALS_FILE ?? "").trim();
+  const firebaseProjectId = String(rawEnv.FIREBASE_PROJECT_ID ?? "").trim();
+  const firebaseClientEmail = String(rawEnv.FIREBASE_CLIENT_EMAIL ?? "").trim();
+  const firebasePrivateKey = String(rawEnv.FIREBASE_PRIVATE_KEY ?? "")
+    .replaceAll("\\n", "\n")
+    .trim();
+
+  const firebaseWebConfigJson = String(rawEnv.FIREBASE_WEB_CONFIG_JSON ?? "").trim();
+  const firebaseUsersCollection = String(rawEnv.FIREBASE_USERS_COLLECTION ?? "users").trim() || "users";
 
   return {
     port,
@@ -45,6 +72,24 @@ export function loadEnv(rawEnv) {
     trustProxy,
     storesFile,
     adminName,
+    shipmentsStateFile,
+    auth: {
+      provider: authProvider,
+      required: authRequired,
+      dev: {
+        role: devAuthRole,
+        storeId: devAuthStoreId,
+      },
+      firebase: {
+        adminCredentialsJson: firebaseAdminCredentialsJson,
+        adminCredentialsFile: firebaseAdminCredentialsFile,
+        projectId: firebaseProjectId,
+        clientEmail: firebaseClientEmail,
+        privateKey: firebasePrivateKey,
+        webConfigJson: firebaseWebConfigJson,
+        usersCollection: firebaseUsersCollection,
+      },
+    },
     shopify: {
       storeDomain: shopifyStore,
       accessToken: shopifyToken,

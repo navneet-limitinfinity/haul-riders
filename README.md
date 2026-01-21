@@ -49,9 +49,12 @@ Server will listen on `http://localhost:3000` by default (configurable via `PORT
 - `GET /health` → health check
 - `GET /api/shopify/shop` → fetches shop details from Shopify Admin REST API
 - `GET /api/shopify/debug` → shows effective shop + token scopes + order count (useful for troubleshooting “missing orders”)
-- `GET /` → service info (quick sanity check)
-- `GET /orders` → interactive page to view/export latest orders
-  - Multi-store: `GET /orders?store=<storeId>`
+- `GET /login` → login page (Firebase Auth when configured)
+- `POST /api/auth/sessionLogin` → exchanges Firebase ID token for an HTTP-only session cookie
+- `GET /api/me` → current user (role + storeId)
+- `GET /shop/orders` → shop (client) orders dashboard
+- `GET /admin/orders` → admin orders dashboard
+  - Multi-store (admin): `GET /admin/orders?store=<storeId>`
 
 ## Multi-store setup (single server, multiple shops)
 1) Create a stores config file (copy `stores.example.json` to `stores.json`).
@@ -82,6 +85,19 @@ npm run orders:latest
 - `TRUST_PROXY` set to `true` when running behind Nginx/Apache (default `false`)
 - `SHOPIFY_TIMEOUT_MS` request timeout in milliseconds (default `10000`)
 - `SHOPIFY_MAX_RETRIES` retries for transient Shopify errors (default `2`, range `0..5`)
+- Auth:
+  - `AUTH_PROVIDER` one of `none | dev | firebase` (default `dev`)
+  - `AUTH_REQUIRED` (`true|false`, default `true`)
+  - Dev auth (local only):
+    - `DEV_AUTH_ROLE` (`shop|admin`, default `shop`)
+    - `DEV_AUTH_STORE_ID` (recommended for multi-store shop accounts)
+  - Firebase auth:
+    - `FIREBASE_USERS_COLLECTION` (default `users`)
+    - `FIREBASE_WEB_CONFIG_JSON` (Firebase web config JSON, used by `/login`)
+    - Server verification credentials (choose one):
+      - `FIREBASE_ADMIN_CREDENTIALS_FILE` (path to service account JSON)
+      - `FIREBASE_ADMIN_CREDENTIALS_JSON` (service account JSON)
+      - or `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`
 
 ## Run with Docker (optional)
 Build and run:

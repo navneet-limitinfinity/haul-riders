@@ -292,6 +292,38 @@ body {
   justify-content: flex-end;
 }
 
+.tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.tabBtn {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.tabBtn:hover {
+  color: var(--text);
+  border-color: rgba(106, 166, 255, 0.35);
+}
+
+.tabBtn.isActive {
+  color: var(--text);
+  border-color: rgba(106, 166, 255, 0.55);
+  background: rgba(106, 166, 255, 0.14);
+}
+
 .field {
   display: grid;
   gap: 6px;
@@ -320,6 +352,17 @@ select {
 .btnGroup {
   display: inline-flex;
   gap: 10px;
+}
+
+body[data-role="shop"] .storePill,
+body[data-role="shop"] .fieldFulfillment,
+body[data-role="shop"] .fieldTracking,
+body[data-role="shop"] #exportCsv {
+  display: none;
+}
+
+body[data-role="admin"] #bulkShip {
+  display: none;
 }
 
 .btn {
@@ -428,6 +471,28 @@ select {
   width: 100%;
   border-collapse: collapse;
   min-width: 1600px;
+}
+
+body[data-role="shop"] .table {
+  min-width: 1100px;
+}
+
+/* Shop view: keep only essential columns */
+body[data-role="shop"] .table th:nth-child(2),
+body[data-role="shop"] .table td:nth-child(2),
+body[data-role="shop"] .table th:nth-child(4),
+body[data-role="shop"] .table td:nth-child(4),
+body[data-role="shop"] .table th:nth-child(6),
+body[data-role="shop"] .table td:nth-child(6),
+body[data-role="shop"] .table th:nth-child(7),
+body[data-role="shop"] .table td:nth-child(7),
+body[data-role="shop"] .table th:nth-child(12),
+body[data-role="shop"] .table td:nth-child(12),
+body[data-role="shop"] .table th:nth-child(14),
+body[data-role="shop"] .table td:nth-child(14),
+body[data-role="shop"] .table th:nth-child(17),
+body[data-role="shop"] .table td:nth-child(17) {
+  display: none;
 }
 
 .table th,

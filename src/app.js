@@ -15,6 +15,12 @@ export function createApp({ env, logger }) {
     path.dirname(fileURLToPath(import.meta.url)),
     "public"
   );
+  const vendorFirebaseDir = path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "node_modules",
+    "firebase"
+  );
 
   // Needed for correct client IP / protocol when running behind Nginx/Apache.
   if (env.trustProxy) app.set("trust proxy", 1);
@@ -22,18 +28,29 @@ export function createApp({ env, logger }) {
   app.disable("x-powered-by");
   app.use(
     helmet({
-      contentSecurityPolicy: {
-        useDefaults: true,
-        directives: {
-          // Temporary: allow running over plain HTTP (e.g. IP-based deployments).
-          // Remove this once HTTPS is enabled.
-          upgradeInsecureRequests: null,
-        },
+      contentSecurityPolicy: false,
+    })
+  );
+  app.use(
+    helmet.contentSecurityPolicy({
+      useDefaults: true,
+      directives: {
+        // Allow Firebase JS SDK ESM modules (loaded from /login via dynamic import()).
+        "script-src": ["'self'", "https://www.gstatic.com"],
+        // Allow Firebase Auth network calls (identitytoolkit/securetoken are under googleapis.com).
+        "connect-src": ["'self'", "https:"],
+        // Temporary: allow running over plain HTTP (e.g. IP-based deployments).
+        // Remove this once HTTPS is enabled.
+        "upgrade-insecure-requests": null,
       },
     })
   );
   app.use(express.json({ limit: "1mb" }));
   app.use("/static", express.static(publicDir, { etag: true, maxAge: "5m" }));
+  app.use(
+    "/vendor/firebase",
+    express.static(vendorFirebaseDir, { etag: true, maxAge: "5m" })
+  );
 
   // HTTP access logs (short + useful). The logger is used instead of console.
   app.use(
@@ -45,7 +62,7 @@ export function createApp({ env, logger }) {
   );
 
   app.get("/", (_req, res) => {
-    res.redirect(302, "/orders");
+    res.redirect(302, "/shop/orders");
   });
 
   app.get("/favicon.ico", (_req, res) => {
