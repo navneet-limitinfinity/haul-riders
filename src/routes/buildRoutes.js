@@ -9,7 +9,6 @@ import { createShipmentsRouter } from "./shipmentsRoutes.js";
 import { createShopifyRouter } from "./shopifyRoutes.js";
 import { createStoresRouter } from "./storesRoutes.js";
 import { createShopsRouter } from "./shopsRoutes.js";
-import { createShopifyOAuthRouter } from "./shopifyOAuthRoutes.js";
 
 /**
  * Builds and returns the top-level router.
@@ -21,7 +20,6 @@ export function buildRoutes({ env, logger }) {
   router.use(auth.attachUser);
   router.use(createHealthRouter());
   router.use(createAuthRouter({ env }));
-  router.use(createShopifyOAuthRouter({ env, logger }));
   router.use(createPagesRouter({ env, auth }));
   router.use("/api", createAuthApiRouter({ auth, env, logger }));
   router.use("/api", createFirestoreOrdersRouter({ env, auth }));
