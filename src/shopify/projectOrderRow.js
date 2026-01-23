@@ -87,6 +87,8 @@ export const projectOrderRow = ({ order, index, overrides = null }) => {
       ""
   ).trim();
 
+  const customerEmail = String(order?.email ?? order?.customer?.email ?? "").trim();
+
   return {
     index: index + 1,
     orderName: order?.name,
@@ -94,6 +96,7 @@ export const projectOrderRow = ({ order, index, overrides = null }) => {
     orderKey,
     orderGid,
     createdAt: order?.created_at ?? "",
+    customerEmail,
     financialStatus: order?.financial_status ?? "",
     shipping,
     totalPrice: order?.total_price,

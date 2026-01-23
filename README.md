@@ -49,6 +49,8 @@ Server will listen on `http://localhost:3000` by default (configurable via `PORT
 - `GET /health` → health check
 - `GET /api/shopify/shop` → fetches shop details from Shopify Admin REST API
 - `GET /api/shopify/debug` → shows effective shop + token scopes + order count (useful for troubleshooting “missing orders”)
+- `GET /oauth/install?shop=<shop>.myshopify.com` → hosted Shopify OAuth install (stores token in Firestore `shops/<shop>.myshopify.com`)
+- `GET /oauth/callback` → OAuth callback handler (called by Shopify)
 - `GET /login` → login page (Firebase Auth when configured)
 - `POST /api/auth/sessionLogin` → exchanges Firebase ID token for an HTTP-only session cookie
 - `GET /api/me` → current user (role + storeId)
@@ -85,6 +87,11 @@ npm run orders:latest
 - `TRUST_PROXY` set to `true` when running behind Nginx/Apache (default `false`)
 - `SHOPIFY_TIMEOUT_MS` request timeout in milliseconds (default `10000`)
 - `SHOPIFY_MAX_RETRIES` retries for transient Shopify errors (default `2`, range `0..5`)
+- Shopify OAuth install (Dev Dashboard apps):
+  - `SHOPIFY_OAUTH_API_KEY` (OAuth client id)
+  - `SHOPIFY_OAUTH_API_SECRET` (OAuth client secret; comma-separated allowed for rotated secrets)
+  - `SHOPIFY_OAUTH_SCOPES` (default `read_orders`)
+  - `SHOPIFY_OAUTH_REDIRECT_URI` (optional; if empty, derived from request host as `https://<host>/oauth/callback`)
 - Auth:
   - `AUTH_PROVIDER` one of `none | dev | firebase` (default `dev`)
   - `AUTH_REQUIRED` (`true|false`, default `true`)

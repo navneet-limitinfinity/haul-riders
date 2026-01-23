@@ -12,7 +12,7 @@ const escapeHtml = (value) =>
     .replaceAll("'", "&#39;");
 
 function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
-  const assetVersion = "12";
+  const assetVersion = "28";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
   const safeFirestoreCollectionId = escapeHtml(firestoreCollectionId);
@@ -89,7 +89,9 @@ function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
 
           <div class="controls">
             <div class="tabs" role="tablist" aria-label="Order status tabs">
-              <button class="tabBtn" type="button" data-tab="new" role="tab">New</button>
+              ${role === "shop"
+                ? html`<button class="tabBtn" type="button" data-tab="new" role="tab">New</button>`
+                : ""}
               <button class="tabBtn" type="button" data-tab="assigned" role="tab">Assigned</button>
               <button class="tabBtn" type="button" data-tab="in_transit" role="tab">In Transit</button>
               <button class="tabBtn" type="button" data-tab="delivered" role="tab">Delivered</button>
@@ -179,6 +181,8 @@ function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
                 <th>Tracking Numbers</th>
                 <th>Shipments Status</th>
                 <th>Courier Partner</th>
+                <th>Weight</th>
+                <th>Courier Type</th>
                 <th>Action</th>
               </tr>
             </thead>

@@ -58,14 +58,6 @@ async function resolveUserFromFirebase({ env, logger, req }) {
   const email = String(decoded?.email ?? "").trim().toLowerCase();
   const firestore = admin.firestore();
 
-  const toStoreIdFromShopDomain = (domain) => {
-    const raw = String(domain ?? "").trim().toLowerCase();
-    if (!raw) return "";
-    const withoutScheme = raw.replace(/^https?:\/\//, "");
-    const host = withoutScheme.split("/")[0] ?? "";
-    return host.endsWith(".myshopify.com") ? host.slice(0, -".myshopify.com".length) : host;
-  };
-
   // Primary source of truth: `users/<uid>` with `role: "admin" | "shop"`.
   let profile = null;
   try {
@@ -89,25 +81,8 @@ async function resolveUserFromFirebase({ env, logger, req }) {
     };
   }
 
-  // Shop users: resolve storeId from users/<uid>.storeId, else via `shops` lookup.
-  let storeId = String(profile?.storeId ?? "").trim().toLowerCase();
-  if (!storeId && email) {
-    try {
-      const shopsCollection =
-        String(env.auth.firebase.shopsCollection ?? "shops").trim() || "shops";
-      const snap = await firestore
-        .collection(shopsCollection)
-        .where("shop_admin", "==", email)
-        .limit(1)
-        .get();
-      const doc = snap?.docs?.[0] ?? null;
-      const shop = doc?.exists ? doc.data() : null;
-      const shopDomain = String(shop?.shopDomain ?? "").trim().toLowerCase();
-      storeId = toStoreIdFromShopDomain(shopDomain);
-    } catch (error) {
-      logger?.warn?.({ error }, "Failed to resolve shop storeId from Firestore");
-    }
-  }
+  // Shop users: use users/<uid>.storeId (full shop domain like `abc.myshopify.com`).
+  const storeId = String(profile?.storeId ?? "").trim().toLowerCase();
 
   return {
     provider: "firebase",

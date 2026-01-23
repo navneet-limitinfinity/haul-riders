@@ -23,6 +23,19 @@ const normalizeShipmentStatus = (value) => {
 export function createShipmentsRouter({ env, auth }) {
   const router = Router();
 
+  const parseWeightKg = (value) => {
+    if (value === null || value === undefined || value === "") return null;
+    const n = Number.parseFloat(String(value));
+    if (Number.isNaN(n) || n < 0) return null;
+    return Number.parseFloat(n.toFixed(1));
+  };
+
+  const normalizeCourierType = (value) => {
+    const v = String(value ?? "").trim();
+    const allowed = new Set(["Z- Express", "D- Surface", "D- Air"]);
+    return allowed.has(v) ? v : "";
+  };
+
   router.post("/shipments/assign", auth.requireRole("shop"), async (req, res, next) => {
     try {
       const orderKey = String(req.body?.orderKey ?? "").trim();
@@ -38,10 +51,15 @@ export function createShipmentsRouter({ env, auth }) {
         return;
       }
 
+      const weightKg = parseWeightKg(req.body?.weightKg);
+      const courierType = normalizeCourierType(req.body?.courierType);
+
       const assignedAt = new Date().toISOString();
       const shipment = {
         shipmentStatus: "assigned",
         assignedAt,
+        ...(weightKg != null ? { weightKg } : {}),
+        ...(courierType ? { courierType } : {}),
       };
 
       if (env?.auth?.provider !== "firebase") {

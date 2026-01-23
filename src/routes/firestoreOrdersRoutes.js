@@ -6,6 +6,85 @@ import { toOrderDocId } from "../firestore/ids.js";
 export function createFirestoreOrdersRouter({ env, auth }) {
   const router = Router();
 
+  const toStoreIdFromShopDomain = (domain) => {
+    const raw = String(domain ?? "").trim().toLowerCase();
+    if (!raw) return "";
+    const withoutScheme = raw.replace(/^https?:\/\//, "");
+    const host = withoutScheme.split("/")[0] ?? "";
+    return host.endsWith(".myshopify.com") ? host.slice(0, -".myshopify.com".length) : host;
+  };
+
+  router.get("/firestore/admin/orders", auth.requireRole("admin"), async (req, res, next) => {
+    try {
+      if (env?.auth?.provider !== "firebase") {
+        res.status(400).json({ error: "auth_provider_not_firebase" });
+        return;
+      }
+
+      const shopDomain = String(req.query?.shopDomain ?? "").trim().toLowerCase();
+      const storeIdRaw = String(req.query?.storeId ?? req.query?.store ?? "").trim().toLowerCase();
+      const storeId = storeIdRaw || toStoreIdFromShopDomain(shopDomain);
+      if (!storeId && !shopDomain) {
+        res.status(400).json({ error: "store_id_required" });
+        return;
+      }
+
+      const status = String(req.query?.status ?? "assigned").trim().toLowerCase();
+      const limit = Math.max(
+        1,
+        Math.min(250, Number.parseInt(req.query?.limit ?? "200", 10) || 200)
+      );
+
+      const admin = await getFirebaseAdmin({ env });
+      const { collectionId, displayName, storeId: normalizedStoreId } = getShopCollectionInfo({
+        env,
+        storeId: storeId || shopDomain,
+      });
+
+      let query = admin.firestore().collection(collectionId);
+      if (status && status !== "all") {
+        query = query.where("shipmentStatus", "==", status).limit(limit);
+      } else {
+        query = query.orderBy("requestedAt", "desc").limit(limit);
+      }
+
+      const snap = await query.get();
+      const rows = snap.docs.map((doc) => {
+        const data = doc.data() ?? {};
+        const order = data.order && typeof data.order === "object" ? data.order : null;
+        const shipmentStatus = String(data.shipmentStatus ?? "").trim();
+        const orderKey = String(data.orderKey ?? doc.id).trim();
+        const requestedAt = String(data.requestedAt ?? data.updatedAt ?? "").trim();
+        return {
+          ...(order ?? {}),
+          orderKey,
+          shipmentStatus: shipmentStatus || "assigned",
+          firestore: {
+            shopName: String(data.shopName ?? displayName),
+            requestedAt,
+          },
+        };
+      });
+
+      const orders = rows.sort((a, b) =>
+        String(b?.firestore?.requestedAt ?? "").localeCompare(
+          String(a?.firestore?.requestedAt ?? "")
+        )
+      );
+
+      res.setHeader("Cache-Control", "no-store");
+      res.json({
+        shopName: displayName,
+        storeId: normalizedStoreId,
+        status,
+        count: orders.length,
+        orders,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.post(
     "/firestore/orders/exists",
     auth.requireRole("shop"),

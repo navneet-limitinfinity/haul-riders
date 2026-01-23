@@ -39,6 +39,8 @@ export function createApp({ env, logger }) {
         "script-src": ["'self'", "https://www.gstatic.com"],
         // Allow Firebase Auth network calls (identitytoolkit/securetoken are under googleapis.com).
         "connect-src": ["'self'", "https:"],
+        // Allow barcode image from bwipjs API.
+        "img-src": ["'self'", "data:", "https:"],
         // Temporary: allow running over plain HTTP (e.g. IP-based deployments).
         // Remove this once HTTPS is enabled.
         "upgrade-insecure-requests": null,

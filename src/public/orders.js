@@ -6,6 +6,14 @@ const selectedOrderIds = new Set();
 
 const getOrderKey = (row) => String(row?.orderKey ?? row?.orderId ?? "");
 
+const escapeHtml = (value) =>
+  String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+
 const normalizeShipmentStatus = (value) => {
   const s = String(value ?? "").trim().toLowerCase();
   if (!s) return "new";
@@ -27,6 +35,44 @@ const normalizeShipmentStatus = (value) => {
 
 const getEffectiveShipmentStatus = (row) =>
   normalizeShipmentStatus(row?.shipmentStatus || row?.fulfillmentStatus);
+
+function getPrimaryTrackingCode(text) {
+  const raw = String(text ?? "").trim();
+  if (!raw) return "";
+  const first = raw.split(",")[0] ?? "";
+  return first.trim();
+}
+
+function buildBwipJsCode128Url(code) {
+  const text = String(code ?? "").trim();
+  if (!text) return "";
+  const url = new URL("https://bwipjs-api.metafloor.com/");
+  url.searchParams.set("bcid", "code128");
+  url.searchParams.set("text", text);
+  url.searchParams.set("scale", "2");
+  url.searchParams.set("height", "10");
+  url.searchParams.set("includetext", "true");
+  url.searchParams.set("backgroundcolor", "FFFFFF");
+  return url.toString();
+}
+
+const formatOrderDate = (iso) => {
+  const d = new Date(String(iso ?? ""));
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+  });
+};
+
+const getPaymentFlag = (financialStatus) => {
+  const s = String(financialStatus ?? "").trim().toLowerCase();
+  if (!s) return "";
+  if (s === "paid" || s === "partially_paid") return "Prepaid";
+  if (s === "pending" || s === "authorized" || s === "partially_paid") return "COD";
+  return s.toUpperCase();
+};
 
 const formatTrackingNumbers = (trackingNumbers) => {
   if (!Array.isArray(trackingNumbers)) return "";
@@ -126,6 +172,62 @@ let firestoreAssignedState = {
   orders: [],
 };
 const sessionAssignedOrderKeys = new Set();
+const shipFormState = new Map();
+
+function getShipForm(orderKey) {
+  const key = String(orderKey ?? "").trim();
+  if (!key) return { weightKg: "", courierType: "" };
+  const existing = shipFormState.get(key);
+  if (existing) return existing;
+  const initial = { weightKg: "", courierType: "" };
+  shipFormState.set(key, initial);
+  return initial;
+}
+
+function parseWeightKg(value) {
+  const s = String(value ?? "").trim();
+  if (!s) return { ok: true, value: null };
+
+  // Accept: "0.1", ".1", "1", "1.0" (at most 1 decimal place).
+  // Reject: "0.10", "1.23", "1.", ".", "abc".
+  if (!/^(?:\d+|\d*\.\d)$/.test(s)) return { ok: false, value: null };
+
+  const n = Number.parseFloat(s);
+  if (Number.isNaN(n) || n < 0) return { ok: false, value: null };
+  return { ok: true, value: n };
+}
+
+function setHeaderText(th, text) {
+  if (!th) return;
+  const indicator = th.querySelector?.(".sortIndicator") ?? null;
+  if (indicator) {
+    th.textContent = "";
+    th.append(document.createTextNode(`${String(text ?? "")} `));
+    th.append(indicator);
+    return;
+  }
+  th.textContent = String(text ?? "");
+}
+
+function syncNewTabLayout() {
+  if (!document.body) return;
+  document.body.dataset.tab = activeTab;
+
+  const isShopNew = activeRole === "shop" && activeTab === "new";
+
+  setHeaderText(
+    document.querySelector("th[data-sort-key='orderName']"),
+    isShopNew ? "Order Details" : "Order Name"
+  );
+  setHeaderText(
+    document.querySelector("thead th:nth-child(5)"),
+    isShopNew ? "Customer Details" : "Full Name"
+  );
+  setHeaderText(
+    document.querySelector("thead th:nth-child(13)"),
+    isShopNew ? "Payment" : "Total Price"
+  );
+}
 
 function normalizeRole(role) {
   const r = String(role ?? "").trim().toLowerCase();
@@ -157,7 +259,8 @@ function getAuthHeaders() {
 }
 
 function getDefaultTabForRole(role) {
-  return role === "shop" ? "new" : "all";
+  if (role === "shop") return "new";
+  return "assigned";
 }
 
 function setActiveTab(nextTab) {
@@ -169,10 +272,11 @@ function setActiveTab(nextTab) {
     btn.setAttribute("aria-selected", tab === activeTab ? "true" : "false");
   }
 
+  syncNewTabLayout();
+
   const rangeWrap = $("dateRangeWrap");
   if (rangeWrap) {
-    rangeWrap.style.display =
-      activeRole === "shop" && activeTab === "new" ? "" : "none";
+    rangeWrap.style.display = activeRole === "shop" ? "" : "none";
   }
 }
 
@@ -262,15 +366,17 @@ async function fetchFirestoreOrders({ status, limit }) {
   return response.json();
 }
 
-async function checkFirestoreOrderExists(orderKey) {
-  const key = String(orderKey ?? "").trim();
-  if (!key) return null;
-  try {
-    const data = await postJson("/api/firestore/orders/exists", { orderKey: key });
-    return Boolean(data?.exists);
-  } catch {
-    return null;
+async function fetchFirestoreAdminOrders({ storeId, status, limit }) {
+  const url = new URL("/api/firestore/admin/orders", window.location.origin);
+  if (storeId) url.searchParams.set("shopDomain", String(storeId));
+  if (status) url.searchParams.set("status", String(status));
+  if (limit) url.searchParams.set("limit", String(limit));
+  const response = await fetch(url, { cache: "no-store", headers: getAuthHeaders() });
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`${response.status} ${response.statusText} ${text}`.trim());
   }
+  return response.json();
 }
 
 async function ensureFirestoreAssignedRealtime() {
@@ -396,7 +502,7 @@ async function ensureFirestoreAssignedRealtime() {
 }
 
 async function fetchStores() {
-  const url = new URL("/api/stores", window.location.origin);
+  const url = new URL("/api/shops", window.location.origin);
   const response = await fetch(url, { cache: "no-store", headers: getAuthHeaders() });
   if (!response.ok) {
     const text = await response.text().catch(() => "");
@@ -566,6 +672,11 @@ function renderRows(orders) {
     trackingText,
   });
 
+  const createTrackingValue = ({ text }) => ({
+    trackingValue: true,
+    text,
+  });
+
   const createAdminUpdateMenu = ({ orderKey, shipmentStatus, trackingText }) => ({
     adminMenu: true,
     orderKey,
@@ -578,6 +689,18 @@ function renderRows(orders) {
     label,
     action,
     orderKey,
+  });
+
+  const createWeightInput = ({ orderKey, value }) => ({
+    weightInput: true,
+    orderKey,
+    value,
+  });
+
+  const createCourierTypeSelect = ({ orderKey, value }) => ({
+    courierTypeSelect: true,
+    orderKey,
+    value,
   });
 
   const fragment = document.createDocumentFragment();
@@ -604,26 +727,30 @@ function renderRows(orders) {
 
     const effectiveShipmentStatus = getEffectiveShipmentStatus(row);
     const shipmentLabel =
-      effectiveShipmentStatus === "new"
-        ? "New"
-        : effectiveShipmentStatus === "assigned"
-          ? "Assigned"
-          : effectiveShipmentStatus === "in_transit"
-            ? "In Transit"
-            : effectiveShipmentStatus === "delivered"
-              ? "Delivered"
-              : effectiveShipmentStatus === "rto"
-                ? "RTO"
-                : "New";
+      activeRole === "shop" && activeTab === "new" && !isFulfilled
+        ? "Unfulfilled"
+        : effectiveShipmentStatus === "new"
+          ? "New"
+          : effectiveShipmentStatus === "assigned"
+            ? "Assigned"
+            : effectiveShipmentStatus === "in_transit"
+              ? "In Transit"
+              : effectiveShipmentStatus === "delivered"
+                ? "Delivered"
+                : effectiveShipmentStatus === "rto"
+                  ? "RTO"
+                  : "New";
     const shipmentKind =
-      effectiveShipmentStatus === "delivered"
-        ? "ok"
-        : effectiveShipmentStatus === "in_transit" ||
-            effectiveShipmentStatus === "assigned"
-          ? "warn"
-          : effectiveShipmentStatus === "rto"
-            ? "error"
-            : "muted";
+      activeRole === "shop" && activeTab === "new" && !isFulfilled
+        ? "muted"
+        : effectiveShipmentStatus === "delivered"
+          ? "ok"
+          : effectiveShipmentStatus === "in_transit" ||
+              effectiveShipmentStatus === "assigned"
+            ? "warn"
+            : effectiveShipmentStatus === "rto"
+              ? "error"
+              : "muted";
 
     const phone1 = String(shipping.phone1 ?? "").trim();
     const phone2 = String(shipping.phone2 ?? "").trim();
@@ -641,25 +768,61 @@ function renderRows(orders) {
 
     const actionCell =
       activeRole === "shop"
-        ? effectiveShipmentStatus === "new"
-          ? sessionAssignedOrderKeys.has(orderKey)
-            ? createBadge({ label: "Assigned", kind: "warn" })
-            : createActionButton({ label: "Ship Now", action: "ship-now", orderKey })
-          : trackingUrl
-            ? createMenu({ label: "Track", url: trackingUrl, trackingText })
-            : ""
+        ? activeTab === "new"
+          ? createActionButton({ label: "Ship Now", action: "ship-now", orderKey })
+          : effectiveShipmentStatus === "new"
+            ? sessionAssignedOrderKeys.has(orderKey)
+              ? createBadge({ label: "Assigned", kind: "warn" })
+              : createActionButton({ label: "Ship Now", action: "ship-now", orderKey })
+            : trackingUrl
+              ? createMenu({ label: "Track", url: trackingUrl, trackingText })
+              : ""
         : createAdminUpdateMenu({
             orderKey,
             shipmentStatus: effectiveShipmentStatus,
             trackingText,
           });
 
+    const isShopNewTab = activeRole === "shop" && activeTab === "new";
+    const createdAt = formatOrderDate(row?.createdAt);
+    const customerEmail = String(row?.customerEmail ?? "").trim();
+    const phoneNumber = String(shipping.phone1 ?? shipping.phone2 ?? "").trim();
+    const addressLine = [shipping.address1, shipping.address2].filter(Boolean).join(", ");
+    const statePin = [shipping.state, shipping.pinCode].filter(Boolean).join("-");
+    const fullAddress = [addressLine, statePin].filter(Boolean).join(" ");
+
+    const orderDetailsHtml = `<div class="cellStack">
+      <div class="cellPrimary">${escapeHtml(row.orderName ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(createdAt)}</div>
+    </div>`;
+
+    const customerDetailsHtml = `<div class="cellStack">
+      <div class="cellPrimary">${escapeHtml(shipping.fullName ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(phoneNumber)}</div>
+      <div class="cellMuted">${escapeHtml(customerEmail)}</div>
+      <div class="truncate" title="${escapeHtml(fullAddress)}">${escapeHtml(fullAddress)}</div>
+    </div>`;
+
+    const paymentFlag = getPaymentFlag(row?.financialStatus);
+    const paymentHtml = `<div class="cellStack">
+      <div class="cellPrimary mono">${escapeHtml(row.totalPrice ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(paymentFlag)}</div>
+    </div>`;
+
+    const shipForm = getShipForm(orderKey);
+    const weightCell = isShopNewTab
+      ? createWeightInput({ orderKey, value: shipForm.weightKg })
+      : "";
+    const courierTypeCell = isShopNewTab
+      ? createCourierTypeSelect({ orderKey, value: shipForm.courierType })
+      : "";
+
     const cells = [
       { check: true, checked: orderKey && selectedOrderIds.has(orderKey) },
       row.index ?? "",
-      { text: row.orderName ?? "", className: "mono" },
+      isShopNewTab ? { html: orderDetailsHtml } : { text: row.orderName ?? "", className: "mono" },
       { text: row.orderId ?? "", className: "mono" },
-      shipping.fullName ?? "",
+      isShopNewTab ? { html: customerDetailsHtml } : (shipping.fullName ?? ""),
       shipping.address1 ?? "",
       shipping.address2 ?? "",
       shipping.city ?? "",
@@ -667,11 +830,13 @@ function renderRows(orders) {
       { text: shipping.pinCode ?? "", className: "mono" },
       phone1Badge ?? { text: phone1, className: "mono" },
       phone2Badge ?? { text: phone2, className: "mono" },
-      { text: row.totalPrice ?? "", className: "mono" },
+      isShopNewTab ? { html: paymentHtml } : { text: row.totalPrice ?? "", className: "mono" },
       createBadge({ label: fulfillmentLabel, kind: fulfillmentBadgeKind }),
-      trackingBadge ?? { text: trackingText, className: "mono" },
+      trackingBadge ?? createTrackingValue({ text: trackingText }),
       createBadge({ label: shipmentLabel, kind: shipmentKind }),
       courierCell,
+      weightCell,
+      courierTypeCell,
       actionCell,
     ];
 
@@ -720,6 +885,56 @@ function renderRows(orders) {
 
         details.appendChild(menu);
         td.appendChild(details);
+      } else if (value && typeof value === "object" && value.trackingValue) {
+        const text = String(value.text ?? "").trim();
+        const code = getPrimaryTrackingCode(text);
+        const span = document.createElement("span");
+        span.className = "trackingHover mono";
+        span.textContent = text;
+        if (code) span.dataset.trackingCode = code;
+        td.appendChild(span);
+      } else if (value && typeof value === "object" && value.weightInput) {
+        td.className = "colWeight";
+        const wrap = document.createElement("div");
+        wrap.className = "weightWrap";
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.inputMode = "decimal";
+        input.placeholder = "0.0";
+        input.className = "weightInput";
+        input.dataset.role = "weight";
+        input.dataset.orderKey = String(value.orderKey ?? "");
+        input.value = String(value.value ?? "");
+        wrap.appendChild(input);
+
+        const suffix = document.createElement("span");
+        suffix.className = "weightSuffix";
+        suffix.textContent = "Kg";
+        wrap.appendChild(suffix);
+
+        td.appendChild(wrap);
+      } else if (value && typeof value === "object" && value.courierTypeSelect) {
+        td.className = "colCourierType";
+        const select = document.createElement("select");
+        select.className = "courierTypeSelect";
+        select.dataset.role = "courierType";
+        select.dataset.orderKey = String(value.orderKey ?? "");
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = "Select Courier type";
+        placeholder.disabled = true;
+        select.appendChild(placeholder);
+
+        const options = ["Z- Express", "D- Surface", "D- Air"];
+        for (const optValue of options) {
+          const opt = document.createElement("option");
+          opt.value = optValue;
+          opt.textContent = optValue;
+          select.appendChild(opt);
+        }
+        select.value = String(value.value ?? "") || "";
+        td.appendChild(select);
       } else if (value && typeof value === "object" && value.actionButton) {
         const btn = document.createElement("button");
         btn.type = "button";
@@ -903,6 +1118,29 @@ async function refresh() {
   setStatus("Loading…");
 
   try {
+    if (activeRole === "admin") {
+      const storeId = getActiveStoreId();
+      if (!storeId) {
+        allOrders = [];
+        applyFiltersAndSort();
+        setStatus("Select a store.", { kind: "info" });
+        return;
+      }
+
+      const status = activeTab && activeTab !== "all" ? activeTab : "all";
+      const data = await fetchFirestoreAdminOrders({ storeId, status, limit: 250 });
+      const orders = Array.isArray(data?.orders) ? data.orders : [];
+      allOrders = orders;
+
+      const visibleIds = new Set(orders.map((r) => getOrderKey(r)));
+      for (const selectedId of selectedOrderIds) {
+        if (!visibleIds.has(selectedId)) selectedOrderIds.delete(selectedId);
+      }
+
+      applyFiltersAndSort();
+      return;
+    }
+
     if (activeRole === "shop" && activeTab === "assigned") {
       await ensureFirestoreAssignedRealtime();
       allOrders = Array.isArray(firestoreAssignedState.orders)
@@ -946,14 +1184,8 @@ window.addEventListener("DOMContentLoaded", () => {
 
   const url = new URL(window.location.href);
   const tabFromUrl = String(url.searchParams.get("tab") ?? "").trim().toLowerCase();
-  const allowedTabs = new Set([
-    "new",
-    "assigned",
-    "in_transit",
-    "delivered",
-    "rto",
-    "all",
-  ]);
+  const allowedTabs = new Set(["assigned", "in_transit", "delivered", "rto", "all"]);
+  if (activeRole === "shop") allowedTabs.add("new");
   setActiveTab(allowedTabs.has(tabFromUrl) ? tabFromUrl : getDefaultTabForRole(activeRole));
 
   document.querySelectorAll(".tabBtn[data-tab]").forEach((btn) => {
@@ -963,6 +1195,11 @@ window.addEventListener("DOMContentLoaded", () => {
       setActiveTab(tab);
 
       if (activeRole === "shop" && (tab === "assigned" || prevTab === "assigned")) {
+        refresh();
+        return;
+      }
+
+      if (activeRole === "admin") {
         refresh();
         return;
       }
@@ -981,13 +1218,13 @@ window.addEventListener("DOMContentLoaded", () => {
         const defaultStoreId = String(data?.defaultStoreId ?? "").trim();
         const currentStoreId = getActiveStoreId();
         const activeStoreId =
-          currentStoreId || defaultStoreId || String(stores[0]?.id ?? "");
+          currentStoreId || defaultStoreId || String(stores[0]?.shopDomain ?? "");
 
         select.innerHTML = "";
         for (const s of stores) {
           const opt = document.createElement("option");
-          opt.value = s.id;
-          opt.textContent = s.name || s.id;
+          opt.value = String(s.shopDomain ?? "");
+          opt.textContent = String(s.shopDomain ?? "");
           select.appendChild(opt);
         }
         select.value = activeStoreId;
@@ -1050,17 +1287,38 @@ window.addEventListener("DOMContentLoaded", () => {
 
     btn.disabled = true;
     try {
+      for (const row of selected) {
+        const orderKey = getOrderKey(row);
+        const meta = getShipForm(orderKey);
+        if (!String(meta.courierType ?? "").trim()) {
+          throw new Error("Select Courier type before shipping.");
+        }
+        const parsed = parseWeightKg(meta.weightKg);
+        if (!parsed.ok) {
+          throw new Error("Invalid weight. Use e.g. 0.1");
+        }
+      }
+
       await Promise.all(
         selected.map((row) =>
-          postJson("/api/shipments/assign", { orderKey: getOrderKey(row), order: row })
+          (() => {
+            const orderKey = getOrderKey(row);
+            const meta = getShipForm(orderKey);
+            const parsed = parseWeightKg(meta.weightKg);
+            return postJson("/api/shipments/assign", {
+              orderKey,
+              order: row,
+              weightKg: parsed.value,
+              courierType: String(meta.courierType ?? ""),
+            });
+          })()
         )
       );
       for (const row of selected) {
         const key = getOrderKey(row);
-        if (key) {
-          sessionAssignedOrderKeys.add(key);
-          selectedOrderIds.delete(key);
-        }
+        if (!key) continue;
+        if (activeTab !== "new") sessionAssignedOrderKeys.add(key);
+        selectedOrderIds.delete(key);
       }
       setStatus(`Assigned ${selected.length} order(s).`, { kind: "ok" });
       renderRows(currentOrders);
@@ -1122,6 +1380,67 @@ window.addEventListener("DOMContentLoaded", () => {
     syncSelectAllCheckbox();
   });
 
+  const ensureBarcodeTooltip = () => {
+    let el = document.getElementById("barcodeTooltip");
+    if (el) return el;
+    el = document.createElement("div");
+    el.id = "barcodeTooltip";
+    el.className = "barcodeTooltip";
+    el.innerHTML = `<div class="barcodeCard">
+      <img class="barcodeImg" alt="Barcode" />
+      <div class="barcodeText mono"></div>
+    </div>`;
+    document.body.appendChild(el);
+    return el;
+  };
+
+  const hideBarcodeTooltip = () => {
+    const el = document.getElementById("barcodeTooltip");
+    if (el) el.remove();
+  };
+
+  $("rows")?.addEventListener("mouseover", (e) => {
+    const target = e.target;
+    const span = target?.closest?.(".trackingHover");
+    if (!span) return;
+    const code = String(span.dataset.trackingCode ?? "").trim();
+    if (!code) return;
+
+    const url = buildBwipJsCode128Url(code);
+    if (!url) return;
+
+    const tooltip = ensureBarcodeTooltip();
+    const img = tooltip.querySelector(".barcodeImg");
+    const text = tooltip.querySelector(".barcodeText");
+    if (img) img.src = url;
+    if (text) text.textContent = code;
+
+    const rect = span.getBoundingClientRect();
+    const padding = 10;
+    const tooltipWidth = 320;
+    const tooltipHeight = 150;
+
+    let left = rect.left;
+    let top = rect.bottom + padding;
+    if (left + tooltipWidth > window.innerWidth - padding) {
+      left = window.innerWidth - tooltipWidth - padding;
+    }
+    if (top + tooltipHeight > window.innerHeight - padding) {
+      top = rect.top - tooltipHeight - padding;
+    }
+    left = Math.max(padding, left);
+    top = Math.max(padding, top);
+
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+  });
+
+  $("rows")?.addEventListener("mouseout", (e) => {
+    const target = e.target;
+    if (!target?.closest?.(".trackingHover")) return;
+    hideBarcodeTooltip();
+  });
+
   $("rows")?.addEventListener("click", async (e) => {
     const item = e.target?.closest?.("[data-action]");
     if (!item) return;
@@ -1144,17 +1463,21 @@ window.addEventListener("DOMContentLoaded", () => {
       const order = currentOrders.find((r) => getOrderKey(r) === orderKey) ?? null;
       item.disabled = true;
       try {
-        const exists = await checkFirestoreOrderExists(orderKey);
-        if (exists) {
-          sessionAssignedOrderKeys.add(orderKey);
-          setStatus("Already assigned.", { kind: "ok" });
-          renderRows(currentOrders);
-          syncSelectAllCheckbox();
-          return;
+        const meta = getShipForm(orderKey);
+        if (!String(meta.courierType ?? "").trim()) {
+          throw new Error("Select Courier type before shipping.");
         }
-
-        const result = await postJson("/api/shipments/assign", { orderKey, order });
-        sessionAssignedOrderKeys.add(orderKey);
+        const parsed = parseWeightKg(meta.weightKg);
+        if (!parsed.ok) {
+          throw new Error("Invalid weight. Use e.g. 0.1");
+        }
+        const result = await postJson("/api/shipments/assign", {
+          orderKey,
+          order,
+          weightKg: parsed.value,
+          courierType: String(meta.courierType ?? ""),
+        });
+        if (activeTab !== "new") sessionAssignedOrderKeys.add(orderKey);
         const alreadyAssigned = Boolean(result?.alreadyAssigned);
         const collectionId = String(result?.firestore?.collectionId ?? "").trim();
         const docId = String(result?.firestore?.docId ?? "").trim();
@@ -1206,6 +1529,43 @@ window.addEventListener("DOMContentLoaded", () => {
       }
       return;
     }
+  });
+
+  $("rows")?.addEventListener("input", (e) => {
+    if (activeRole !== "shop" || activeTab !== "new") return;
+    const target = e.target;
+    if (!target) return;
+    const role = String(target.dataset?.role ?? "");
+    if (role !== "weight") return;
+    const orderKey = String(target.dataset.orderKey ?? "").trim();
+    if (!orderKey) return;
+
+    // Allow only digits and at most one dot and one digit after dot.
+    const raw = String(target.value ?? "");
+    const cleaned = raw.replace(/[^\d.]/g, "");
+    const dotIndex = cleaned.indexOf(".");
+    if (dotIndex === -1) {
+      target.value = cleaned;
+    } else {
+      const left = cleaned.slice(0, dotIndex).replaceAll(".", "");
+      const right = cleaned.slice(dotIndex + 1).replaceAll(".", "").slice(0, 1);
+      target.value = `${left}.${right}`;
+    }
+
+    const current = getShipForm(orderKey);
+    shipFormState.set(orderKey, { ...current, weightKg: String(target.value ?? "") });
+  });
+
+  $("rows")?.addEventListener("change", (e) => {
+    if (activeRole !== "shop" || activeTab !== "new") return;
+    const target = e.target;
+    if (!target) return;
+    const role = String(target.dataset?.role ?? "");
+    if (role !== "courierType") return;
+    const orderKey = String(target.dataset.orderKey ?? "").trim();
+    if (!orderKey) return;
+    const current = getShipForm(orderKey);
+    shipFormState.set(orderKey, { ...current, courierType: String(target.value ?? "") });
   });
 
   refresh();

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { createShopifyAdminClient } from "../shopify/createShopifyAdminClient.js";
 import { projectOrderRow } from "../shopify/projectOrderRow.js";
 import { resolveStore } from "../config/stores.js";
+import { resolveShopifyAccessToken } from "../shopify/resolveShopifyAccessToken.js";
 
 /**
  * Shopify-related routes.
@@ -19,17 +20,27 @@ export function createShopifyRouter({ env, logger, auth }) {
     return getStoreIdFromRequest(req);
   };
 
-  const getStoreForRequest = (req) => {
+  const getStoreForRequest = async (req) => {
+    const storeId = getStoreIdForRequest(req);
+    const role = String(req.user?.role ?? "").trim().toLowerCase();
+
+    // Shop role: always use Firestore token from `shops/<shopDomain>.shopify.accessToken`.
+    if (role === "shop") {
+      const shopDomain = String(storeId ?? "").trim().toLowerCase();
+      if (!shopDomain) return null;
+      const token = await resolveShopifyAccessToken({ env, shopDomain });
+      return {
+        id: shopDomain,
+        name: shopDomain,
+        domain: shopDomain,
+        apiVersion: env.shopify.apiVersion,
+        token,
+      };
+    }
+
+    // Admin role: keep existing stores.json / env tokens.
     if (env.storesConfig) {
-      const storeId = getStoreIdForRequest(req);
-      if (String(req.user?.role ?? "").trim().toLowerCase() === "shop" && !storeId) {
-        return null;
-      }
-      return resolveStore({
-        storesConfig: env.storesConfig,
-        storeId,
-        env: process.env,
-      });
+      return resolveStore({ storesConfig: env.storesConfig, storeId, env: process.env });
     }
 
     return {
@@ -44,8 +55,12 @@ export function createShopifyRouter({ env, logger, auth }) {
   router.get("/shop", auth.requireAnyRole(["admin", "shop"]), async (req, res, next) => {
     try {
       res.setHeader("Cache-Control", "no-store");
-      const store = getStoreForRequest(req);
+      const store = await getStoreForRequest(req);
       if (!store?.domain || !store?.token) {
+        logger?.warn?.(
+          { storeId: store?.id, storeDomain: store?.domain, hasToken: Boolean(store?.token) },
+          "Shopify store not configured"
+        );
         res.status(400).json({ error: "store_not_configured" });
         return;
       }
@@ -68,8 +83,12 @@ export function createShopifyRouter({ env, logger, auth }) {
   router.get("/debug", auth.requireRole("admin"), async (req, res, next) => {
     try {
       res.setHeader("Cache-Control", "no-store");
-      const store = getStoreForRequest(req);
+      const store = await getStoreForRequest(req);
       if (!store?.domain || !store?.token) {
+        logger?.warn?.(
+          { storeId: store?.id, storeDomain: store?.domain, hasToken: Boolean(store?.token) },
+          "Shopify store not configured"
+        );
         res.status(400).json({ error: "store_not_configured" });
         return;
       }
@@ -127,8 +146,12 @@ export function createShopifyRouter({ env, logger, auth }) {
           ? createdAtMin.toISOString()
           : "";
 
-      const store = getStoreForRequest(req);
+      const store = await getStoreForRequest(req);
       if (!store?.domain || !store?.token) {
+        logger?.warn?.(
+          { storeId: store?.id, storeDomain: store?.domain, hasToken: Boolean(store?.token) },
+          "Shopify store not configured"
+        );
         res.status(400).json({ error: "store_not_configured" });
         return;
       }

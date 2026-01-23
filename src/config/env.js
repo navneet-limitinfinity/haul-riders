@@ -66,6 +66,17 @@ export function loadEnv(rawEnv) {
   const firebaseUsersCollection = String(rawEnv.FIREBASE_USERS_COLLECTION ?? "users").trim() || "users";
   const firebaseShopsCollection = String(rawEnv.FIREBASE_SHOPS_COLLECTION ?? "shops").trim() || "shops";
 
+  const shopifyOauthApiKey = String(rawEnv.SHOPIFY_OAUTH_API_KEY ?? "").trim();
+  const shopifyOauthApiSecretRaw = String(rawEnv.SHOPIFY_OAUTH_API_SECRET ?? "").trim();
+  const shopifyOauthApiSecrets = shopifyOauthApiSecretRaw
+    ? shopifyOauthApiSecretRaw
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [];
+  const shopifyOauthScopes = String(rawEnv.SHOPIFY_OAUTH_SCOPES ?? "read_orders").trim() || "read_orders";
+  const shopifyOauthRedirectUri = String(rawEnv.SHOPIFY_OAUTH_REDIRECT_URI ?? "").trim();
+
   return {
     port,
     host,
@@ -98,6 +109,12 @@ export function loadEnv(rawEnv) {
       apiVersion: shopifyApiVersion,
       timeoutMs: shopifyTimeoutMs,
       maxRetries: shopifyMaxRetries,
+      oauth: {
+        apiKey: shopifyOauthApiKey,
+        apiSecrets: shopifyOauthApiSecrets,
+        scopes: shopifyOauthScopes,
+        redirectUri: shopifyOauthRedirectUri,
+      },
     },
   };
 }
