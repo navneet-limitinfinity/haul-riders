@@ -191,7 +191,7 @@ export function createShipmentsRouter({ env, auth }) {
   router.get(
     "/shipments/label.pdf",
     auth.requireAnyRole([ROLE_ADMIN, ROLE_SHOP]),
-    async (req, res, next) => {
+    async (req, res) => {
       try {
         if (env?.auth?.provider !== "firebase") {
           res.status(400).json({ error: "auth_provider_not_firebase" });
@@ -253,7 +253,19 @@ export function createShipmentsRouter({ env, auth }) {
           res.status(422).json({ error: "order_missing" });
           return;
         }
-        next(error);
+        const message = String(error?.message ?? "").trim();
+        const hint = message.includes("ENOTFOUND www.googleapis.com")
+          ? "firebase_network_dns_blocked"
+          : message.includes("chromium_launch_failed") || message.includes("Failed to launch")
+            ? "chromium_missing_deps_or_sandbox"
+            : "";
+
+        res.status(500).json({
+          error: "label_render_failed",
+          code: String(error?.code ?? ""),
+          message,
+          ...(hint ? { hint } : {}),
+        });
       }
     }
   );

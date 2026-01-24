@@ -93,6 +93,9 @@ npm run orders:latest
 - Shipping label:
   - `SHIP_FROM_*` values used in the label “FROM” block (optional; can also be set per-store in `stores.json` via `shipFrom`)
   - `SHIP_LABEL_LOGO_URL` optional image URL for the label (example: `/static/haul_riders_logo.jpeg`)
+  - Puppeteer/Chromium (for PDF rendering on servers):
+    - `PUPPETEER_EXECUTABLE_PATH` set this if your host blocks Puppeteer’s bundled Chromium download, or if you want to use system Chromium
+    - `PUPPETEER_ARGS` comma-separated Chromium args (optional)
 - Shopify OAuth install (Dev Dashboard apps):
   - `SHOPIFY_OAUTH_API_KEY` (OAuth client id)
   - `SHOPIFY_OAUTH_API_SECRET` (OAuth client secret; comma-separated allowed for rotated secrets)
