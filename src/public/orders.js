@@ -271,6 +271,7 @@ async function downloadShipmentLabelPdf({ orderKey, storeId, filenameHint }) {
   url.searchParams.set("orderKey", String(orderKey ?? "").trim());
   if (storeId) url.searchParams.set("storeId", String(storeId));
 
+  setStatus("Generating label…", { kind: "busy" });
   const res = await fetch(url.toString(), { headers: { ...getAuthHeaders() } });
   if (!res.ok) {
     let msg = `Failed to download label (HTTP ${res.status}).`;
@@ -283,6 +284,7 @@ async function downloadShipmentLabelPdf({ orderKey, storeId, filenameHint }) {
     throw new Error(msg);
   }
 
+  setStatus("Preparing download…", { kind: "busy" });
   const blob = await res.blob();
   const objectUrl = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -293,6 +295,7 @@ async function downloadShipmentLabelPdf({ orderKey, storeId, filenameHint }) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(objectUrl), 15_000);
+  setStatus("Download ready.", { kind: "ok" });
 }
 
 function getDefaultTabForRole(role) {

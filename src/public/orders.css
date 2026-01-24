@@ -649,6 +649,8 @@ body[data-role="admin"] #bulkShip {
   border-bottom: 1px solid var(--border);
   font-size: 13px;
   color: var(--muted);
+  position: relative;
+  min-height: 18px;
 }
 
 .status[data-kind="ok"] {
@@ -657,6 +659,38 @@ body[data-role="admin"] #bulkShip {
 
 .status[data-kind="error"] {
   color: var(--error);
+}
+
+.status[data-kind="busy"] {
+  color: var(--text);
+}
+
+.status[data-kind="busy"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(106, 166, 255, 0.25) 20%,
+    var(--accent) 50%,
+    rgba(106, 166, 255, 0.25) 80%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: statusProgress 900ms linear infinite;
+}
+
+@keyframes statusProgress {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: 0% 0;
+  }
 }
 
 .tableWrap {
