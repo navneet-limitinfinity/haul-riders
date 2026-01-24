@@ -261,14 +261,6 @@ async function main() {
             bold: true
           }
         : null,
-      courierTypeLabel: courierTypeInitial
-        ? {
-            x: courierTypeInitial.x - 20,
-            y: courierTypeInitial.y + courierTypeInitial.size - 10,
-            size: 10,
-            bold: true
-          }
-        : null,
       bottomDate: bottomDate
         ? { x: bottomDate.x, y: bottomDate.y, size: bottomDate.size, bold: false }
         : null,

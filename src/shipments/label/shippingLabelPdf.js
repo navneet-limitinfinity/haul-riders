@@ -334,32 +334,6 @@ export async function generateShippingLabelPdfBuffer({ env, storeId, firestoreDo
     });
   }
 
-  if (courierType && fields.courierTypeLabel) {
-    const labelFont = fields.courierTypeLabel.bold ? fontBold : fontRegular;
-    page.drawText("Courier Type:", {
-      x: fields.courierTypeLabel.x,
-      y: fields.courierTypeLabel.y,
-      size: fields.courierTypeLabel.size,
-      font: labelFont,
-      color: black,
-    });
-    const valueLines = wrapText({
-      text: courierType,
-      font: fontRegular,
-      size: Math.max(8, fields.courierTypeLabel.size - 1),
-      maxWidth: 120,
-    }).slice(0, 1);
-    if (valueLines[0]) {
-      page.drawText(valueLines[0], {
-        x: fields.courierTypeLabel.x,
-        y: fields.courierTypeLabel.y - 12,
-        size: Math.max(8, fields.courierTypeLabel.size - 1),
-        font: fontRegular,
-        color: black,
-      });
-    }
-  }
-
   // Payment flag/note.
   if (paymentFlag && fields.paymentFlag) {
     page.drawText(paymentFlag, {
