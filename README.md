@@ -96,6 +96,16 @@ npm run orders:latest
   - Puppeteer/Chromium (for PDF rendering on servers):
     - `PUPPETEER_EXECUTABLE_PATH` set this if your host blocks Puppeteer’s bundled Chromium download, or if you want to use system Chromium
     - `PUPPETEER_ARGS` comma-separated Chromium args (optional)
+    - `PUPPETEER_DUMPIO=true` prints Chromium stderr/stdout into server logs (useful when you see `chromium_launch_failed` / `socket hang up`)
+    - `PUPPETEER_SINGLE_PROCESS=true` fallback for low-memory hosts (slower but can avoid crashes)
+    - `PUPPETEER_LAUNCH_TIMEOUT_MS=30000` increase if Chromium is slow to start
+
+## Shipping label troubleshooting (server)
+If `/api/shipments/label.pdf` returns `{ code: "chromium_launch_failed" }`, it usually means system dependencies are missing or Chromium is crashing.
+
+Quick checks:
+- Run `ldd <chromium-binary> | grep 'not found'` to see missing shared libraries.
+- Set `PUPPETEER_DUMPIO=true` to capture Chromium crash logs in your service logs.
 - Shopify OAuth install (Dev Dashboard apps):
   - `SHOPIFY_OAUTH_API_KEY` (OAuth client id)
   - `SHOPIFY_OAUTH_API_SECRET` (OAuth client secret; comma-separated allowed for rotated secrets)
