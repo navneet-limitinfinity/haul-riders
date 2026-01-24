@@ -121,8 +121,6 @@ async function loadTemplateAssets() {
   const mapRaw = await fs.readFile(mapPath, "utf8");
   const map = JSON.parse(mapRaw);
 
-  // Resolve relative to repo root (process CWD), not relative to this module path.
-  // This avoids paths like `<repo>/src/src/public/...` when the template path is `src/public/...`.
   const blankPdfPath = path.resolve(process.cwd(), String(map?.template?.blankPdf ?? ""));
   const blankBytes = await fs.readFile(blankPdfPath);
 
@@ -139,6 +137,17 @@ function rectFromMatrix({ rect, bbox }) {
   return { x: rect.x, y: rect.y, width: w, height: h };
 }
 
+let templateAssetsPromise = null;
+
+async function getTemplateAssets() {
+  if (templateAssetsPromise) return templateAssetsPromise;
+  templateAssetsPromise = loadTemplateAssets().catch((error) => {
+    templateAssetsPromise = null;
+    throw error;
+  });
+  return templateAssetsPromise;
+}
+
 export async function generateShippingLabelPdfBuffer({ env, storeId, firestoreDoc }) {
   const data = firestoreDoc && typeof firestoreDoc === "object" ? firestoreDoc : {};
   const order = data.order && typeof data.order === "object" ? data.order : null;
@@ -148,7 +157,7 @@ export async function generateShippingLabelPdfBuffer({ env, storeId, firestoreDo
     throw error;
   }
 
-  const { map, blankBytes } = await loadTemplateAssets();
+  const { map, blankBytes } = await getTemplateAssets();
   const pdfDoc = await PDFDocument.load(blankBytes);
   const page = pdfDoc.getPage(0);
 

@@ -127,6 +127,9 @@ function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
               </label>
               <button id="refresh" class="btn btnPrimary" type="button">Sync Orders</button>
               <button id="bulkShip" class="btn btnPrimary" type="button">Bulk Ship</button>
+              <button id="bulkDownloadLabels" class="btn btnSecondary btnIcon" type="button" disabled title="Download shipping labels (PDF)">
+                <i class="fa-solid fa-download" aria-hidden="true"></i>
+              </button>
               <button id="exportCsv" class="btn btnSecondary" type="button">Export CSV</button>
             </div>
           </div>

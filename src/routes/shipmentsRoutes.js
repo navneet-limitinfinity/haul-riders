@@ -4,6 +4,7 @@ import { ROLE_ADMIN, ROLE_SHOP } from "../auth/roles.js";
 import { getShopCollectionInfo } from "../firestore/shopCollections.js";
 import { toOrderDocId } from "../firestore/ids.js";
 import { generateShippingLabelPdfBuffer } from "../shipments/label/shippingLabelPdf.js";
+import { PDFDocument } from "pdf-lib";
 
 const normalizeShipmentStatus = (value) => {
   const s = String(value ?? "").trim().toLowerCase();
@@ -241,6 +242,89 @@ export function createShipmentsRouter({ env, auth }) {
         }
         const message = String(error?.message ?? "").trim();
         res.status(500).json({ error: "label_render_failed", code: String(error?.code ?? ""), message });
+      }
+    }
+  );
+
+  router.post(
+    "/shipments/labels/bulk.pdf",
+    auth.requireAnyRole([ROLE_ADMIN, ROLE_SHOP]),
+    async (req, res) => {
+      try {
+        if (env?.auth?.provider !== "firebase") {
+          res.status(400).json({ error: "auth_provider_not_firebase" });
+          return;
+        }
+
+        const orderKeysRaw = Array.isArray(req.body?.orderKeys) ? req.body.orderKeys : [];
+        const orderKeys = orderKeysRaw
+          .map((v) => String(v ?? "").trim())
+          .filter(Boolean);
+        if (orderKeys.length === 0) {
+          res.status(400).json({ error: "order_keys_required" });
+          return;
+        }
+        if (orderKeys.length > 50) {
+          res.status(400).json({ error: "order_keys_limit_exceeded", limit: 50 });
+          return;
+        }
+
+        const role = String(req.user?.role ?? "").trim();
+        const storeId =
+          role === ROLE_ADMIN
+            ? String(req.body?.storeId ?? "").trim().toLowerCase()
+            : String(req.user?.storeId ?? "").trim().toLowerCase();
+        if (!storeId) {
+          res.status(400).json({ error: "store_id_required" });
+          return;
+        }
+
+        const admin = await getFirebaseAdmin({ env });
+        const { collectionId, storeId: normalizedStoreId } = getShopCollectionInfo({
+          env,
+          storeId,
+        });
+
+        const missing = [];
+        const docs = [];
+        for (const orderKey of orderKeys) {
+          const docId = toOrderDocId(orderKey);
+          const snap = await admin.firestore().collection(collectionId).doc(docId).get();
+          if (!snap.exists) {
+            missing.push(orderKey);
+            continue;
+          }
+          docs.push({ orderKey, docId, data: snap.data() ?? {} });
+        }
+
+        if (missing.length) {
+          res.status(422).json({ error: "shipment_not_found", missing });
+          return;
+        }
+
+        const merged = await PDFDocument.create();
+        for (const { data } of docs) {
+          const labelBytes = await generateShippingLabelPdfBuffer({
+            env,
+            storeId: normalizedStoreId,
+            firestoreDoc: data,
+          });
+          const labelDoc = await PDFDocument.load(labelBytes);
+          const [page0] = await merged.copyPages(labelDoc, [0]);
+          merged.addPage(page0);
+        }
+
+        const out = await merged.save({ useObjectStreams: false });
+        res.setHeader("Cache-Control", "no-store");
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader(
+          "Content-Disposition",
+          `attachment; filename="shipping_labels_${docs.length}.pdf"`
+        );
+        res.status(200).send(Buffer.from(out));
+      } catch (error) {
+        const message = String(error?.message ?? "").trim();
+        res.status(500).json({ error: "bulk_label_render_failed", code: String(error?.code ?? ""), message });
       }
     }
   );

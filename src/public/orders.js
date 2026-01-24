@@ -298,6 +298,51 @@ async function downloadShipmentLabelPdf({ orderKey, storeId, filenameHint }) {
   setStatus("Download ready.", { kind: "ok" });
 }
 
+function syncBulkDownloadButton() {
+  const btn = $("bulkDownloadLabels");
+  if (!btn) return;
+  const disabled =
+    selectedOrderIds.size === 0 || (activeRole === "shop" && activeTab === "new");
+  btn.disabled = disabled;
+}
+
+async function downloadBulkShipmentLabelsPdf({ orderKeys, storeId }) {
+  const url = new URL("/api/shipments/labels/bulk.pdf", window.location.origin);
+  setStatus(`Generating ${orderKeys.length} label(s)…`, { kind: "busy" });
+
+  const response = await fetch(url.toString(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify({ orderKeys, ...(storeId ? { storeId } : {}) }),
+  });
+
+  if (!response.ok) {
+    let msg = `Failed to download labels (HTTP ${response.status}).`;
+    try {
+      const body = await response.json();
+      if (body?.error) msg = String(body.error);
+      if (Array.isArray(body?.missing) && body.missing.length) {
+        msg = `Missing shipments for ${body.missing.length} order(s).`;
+      }
+    } catch {
+      // ignore parse errors
+    }
+    throw new Error(msg);
+  }
+
+  setStatus("Preparing download…", { kind: "busy" });
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objectUrl;
+  a.download = `shipping_labels_${orderKeys.length}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 15_000);
+  setStatus("Download ready.", { kind: "ok" });
+}
+
 function getDefaultTabForRole(role) {
   if (role === "shop") return "new";
   return "assigned";
@@ -313,6 +358,7 @@ function setActiveTab(nextTab) {
   }
 
   syncNewTabLayout();
+  syncBulkDownloadButton();
 
   const rangeWrap = $("dateRangeWrap");
   if (rangeWrap) {
@@ -601,6 +647,8 @@ function syncSelectAllCheckbox() {
   selectAll.checked = selectedCount === currentOrders.length;
   selectAll.indeterminate =
     selectedCount > 0 && selectedCount < currentOrders.length;
+
+  syncBulkDownloadButton();
 }
 
 function updateMetrics(view) {
@@ -1338,6 +1386,30 @@ window.addEventListener("DOMContentLoaded", () => {
   });
   $("refresh")?.addEventListener("click", refresh);
   $("exportCsv")?.addEventListener("click", exportSelectedToCsv);
+  $("bulkDownloadLabels")?.addEventListener("click", async (e) => {
+    const btn = e.target?.closest?.("button");
+    const orderKeys = Array.from(selectedOrderIds);
+    if (orderKeys.length === 0) {
+      setStatus("Select at least one order to download labels.", { kind: "error" });
+      return;
+    }
+
+    const storeId = activeRole === "admin" ? getActiveStoreId() : "";
+    if (activeRole === "admin" && !storeId) {
+      setStatus("Select a store before downloading labels.", { kind: "error" });
+      return;
+    }
+
+    btn.disabled = true;
+    try {
+      await downloadBulkShipmentLabelsPdf({ orderKeys, storeId });
+    } catch (error) {
+      setStatus(error?.message ?? "Failed to download labels.", { kind: "error" });
+    } finally {
+      btn.disabled = false;
+      syncBulkDownloadButton();
+    }
+  });
   $("bulkShip")?.addEventListener("click", async (e) => {
     const btn = e.target;
     const selected = currentOrders.filter((row) => selectedOrderIds.has(getOrderKey(row)));
@@ -1426,6 +1498,7 @@ window.addEventListener("DOMContentLoaded", () => {
       }
     }
     renderRows(currentOrders);
+    syncBulkDownloadButton();
   });
 
   $("rows")?.addEventListener("change", (e) => {
@@ -1439,6 +1512,7 @@ window.addEventListener("DOMContentLoaded", () => {
     else selectedOrderIds.delete(orderKey);
 
     syncSelectAllCheckbox();
+    syncBulkDownloadButton();
   });
 
   const ensureBarcodeTooltip = () => {
