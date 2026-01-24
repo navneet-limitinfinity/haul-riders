@@ -38,6 +38,13 @@ function getPaymentFlag(financialStatus) {
   return s.toUpperCase();
 }
 
+function getCourierTypeInitial(courierType) {
+  const s = String(courierType ?? "").trim();
+  if (!s) return "";
+  const m = s.match(/[A-Za-z]/);
+  return m?.[0] ? m[0].toUpperCase() : "";
+}
+
 function getBestShipTo(order) {
   const projected = order?.shipping && typeof order.shipping === "object" ? order.shipping : null;
   if (projected) {
@@ -114,8 +121,9 @@ async function loadTemplateAssets() {
   const mapRaw = await fs.readFile(mapPath, "utf8");
   const map = JSON.parse(mapRaw);
 
-  const repoRoot = path.resolve(dir, "..", "..");
-  const blankPdfPath = path.resolve(repoRoot, String(map?.template?.blankPdf ?? ""));
+  // Resolve relative to repo root (process CWD), not relative to this module path.
+  // This avoids paths like `<repo>/src/src/public/...` when the template path is `src/public/...`.
+  const blankPdfPath = path.resolve(process.cwd(), String(map?.template?.blankPdf ?? ""));
   const blankBytes = await fs.readFile(blankPdfPath);
 
   return { map, blankBytes };
@@ -314,6 +322,44 @@ export async function generateShippingLabelPdfBuffer({ env, storeId, firestoreDo
     });
   }
 
+  // Courier-type initial box (below AWB barcode) + label.
+  const courierInitial = getCourierTypeInitial(courierType);
+  if (courierInitial && fields.courierTypeInitial) {
+    page.drawText(courierInitial, {
+      x: fields.courierTypeInitial.x,
+      y: fields.courierTypeInitial.y,
+      size: fields.courierTypeInitial.size,
+      font: fields.courierTypeInitial.bold ? fontBold : fontRegular,
+      color: black,
+    });
+  }
+
+  if (courierType && fields.courierTypeLabel) {
+    const labelFont = fields.courierTypeLabel.bold ? fontBold : fontRegular;
+    page.drawText("Courier Type:", {
+      x: fields.courierTypeLabel.x,
+      y: fields.courierTypeLabel.y,
+      size: fields.courierTypeLabel.size,
+      font: labelFont,
+      color: black,
+    });
+    const valueLines = wrapText({
+      text: courierType,
+      font: fontRegular,
+      size: Math.max(8, fields.courierTypeLabel.size - 1),
+      maxWidth: 120,
+    }).slice(0, 1);
+    if (valueLines[0]) {
+      page.drawText(valueLines[0], {
+        x: fields.courierTypeLabel.x,
+        y: fields.courierTypeLabel.y - 12,
+        size: Math.max(8, fields.courierTypeLabel.size - 1),
+        font: fontRegular,
+        color: black,
+      });
+    }
+  }
+
   // Payment flag/note.
   if (paymentFlag && fields.paymentFlag) {
     page.drawText(paymentFlag, {
@@ -407,4 +453,3 @@ export async function generateShippingLabelPdfBuffer({ env, storeId, firestoreDo
   const bytes = await pdfDoc.save({ useObjectStreams: false });
   return Buffer.from(bytes);
 }
-

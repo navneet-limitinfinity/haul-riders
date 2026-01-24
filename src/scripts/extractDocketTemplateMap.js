@@ -186,6 +186,7 @@ async function main() {
   const weight = items.find((it) => it.text.startsWith("Weight:")) ?? null;
   const bottomDate = allDates.length ? allDates.reduce((best, cur) => (cur.y < best.y ? cur : best)) : null;
   const bottomTime = items.find((it) => it.text.match(/^\d{2}:\d{2}:\d{2}$/)) ?? null;
+  const courierTypeInitial = findText(items, "Z");
 
   const topBarcode = matrices.Xf2 ?? null;
   const bottomBarcode = matrices.Xf1 ?? null;
@@ -251,6 +252,22 @@ async function main() {
         : null,
       weight: weight
         ? { x: weight.x + 55, y: weight.y, size: weight.size, bold: true }
+        : null,
+      courierTypeInitial: courierTypeInitial
+        ? {
+            x: courierTypeInitial.x,
+            y: courierTypeInitial.y,
+            size: courierTypeInitial.size,
+            bold: true
+          }
+        : null,
+      courierTypeLabel: courierTypeInitial
+        ? {
+            x: courierTypeInitial.x - 20,
+            y: courierTypeInitial.y + courierTypeInitial.size - 10,
+            size: 10,
+            bold: true
+          }
         : null,
       bottomDate: bottomDate
         ? { x: bottomDate.x, y: bottomDate.y, size: bottomDate.size, bold: false }
