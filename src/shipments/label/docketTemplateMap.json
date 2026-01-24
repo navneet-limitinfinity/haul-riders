@@ -1,0 +1,128 @@
+{
+  "template": {
+    "samplePdf": "src/public/Sample Docket.pdf",
+    "blankPdf": "src/public/Blank Docket.pdf",
+    "mediaBox": [
+      0,
+      0,
+      493,
+      700
+    ]
+  },
+  "fonts": {
+    "regular": "Helvetica",
+    "bold": "Helvetica-Bold"
+  },
+  "fields": {
+    "shipDate": {
+      "x": 383,
+      "y": 614.82,
+      "size": 10,
+      "bold": true
+    },
+    "shipValue": {
+      "x": 383,
+      "y": 601.82,
+      "size": 10,
+      "bold": true
+    },
+    "fromBlock": {
+      "x": 31,
+      "yTop": 623.5,
+      "size": 9,
+      "lineHeight": 10.5,
+      "maxWidth": 283,
+      "maxLines": 4
+    },
+    "toBlock": {
+      "x": 31,
+      "yTop": 510.57000000000005,
+      "size": 11,
+      "lineHeight": 12.8,
+      "maxWidth": 250,
+      "maxLines": 6
+    },
+    "awbText": {
+      "x": 338,
+      "y": 485.24,
+      "size": 17,
+      "bold": true
+    },
+    "pinBig": {
+      "x": 29,
+      "y": 358.52,
+      "size": 32,
+      "bold": true
+    },
+    "service": {
+      "x": 32,
+      "y": 335.07,
+      "size": 16,
+      "bold": true
+    },
+    "paymentFlag": {
+      "x": 363.1,
+      "y": 201.65,
+      "size": 13,
+      "bold": false
+    },
+    "paymentNote": {
+      "x": 323.5,
+      "y": 181.62,
+      "size": 13,
+      "bold": true
+    },
+    "refNoValue": {
+      "x": 87,
+      "y": 76.05,
+      "size": 12,
+      "bold": false
+    },
+    "weight": {
+      "x": 252.97,
+      "y": 42.34,
+      "size": 14,
+      "bold": true
+    },
+    "bottomDate": {
+      "x": 417.86,
+      "y": 49.63,
+      "size": 10,
+      "bold": false
+    },
+    "bottomTime": {
+      "x": 430.08,
+      "y": 38,
+      "size": 10,
+      "bold": false
+    },
+    "topBarcodeRect": {
+      "x": 283,
+      "y": 504.88,
+      "sx": 1.56,
+      "sy": 1.56
+    },
+    "bottomBarcodeRect": {
+      "x": 79,
+      "y": 118.24,
+      "sx": 1.27,
+      "sy": 1.27
+    }
+  },
+  "xobjects": {
+    "topBarcodeFormName": "Xf2",
+    "topBarcodeFormBbox": [
+      0,
+      0,
+      121,
+      18
+    ],
+    "bottomBarcodeFormName": "Xf1",
+    "bottomBarcodeFormBbox": [
+      0,
+      0,
+      264,
+      40
+    ]
+  }
+}

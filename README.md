@@ -56,7 +56,6 @@ Server will listen on `http://localhost:3000` by default (configurable via `PORT
 - `GET /api/me` → current user (role + storeId)
 - `GET /api/shipments/label.pdf?orderKey=...` → on-demand 4x6 shipping label PDF
   - Admin: `GET /api/shipments/label.pdf?orderKey=...&storeId=...`
-  - Debug: add `&format=html` to preview layout in browser
 - `GET /shop/orders` → shop (client) orders dashboard
 - `GET /admin/orders` → admin orders dashboard
   - Multi-store (admin): `GET /admin/orders?store=<storeId>`
@@ -93,19 +92,7 @@ npm run orders:latest
 - Shipping label:
   - `SHIP_FROM_*` values used in the label “FROM” block (optional; can also be set per-store in `stores.json` via `shipFrom`)
   - `SHIP_LABEL_LOGO_URL` optional image URL for the label (example: `/static/haul_riders_logo.jpeg`)
-  - Puppeteer/Chromium (for PDF rendering on servers):
-    - `PUPPETEER_EXECUTABLE_PATH` set this if your host blocks Puppeteer’s bundled Chromium download, or if you want to use system Chromium
-    - `PUPPETEER_ARGS` comma-separated Chromium args (optional)
-    - `PUPPETEER_DUMPIO=true` prints Chromium stderr/stdout into server logs (useful when you see `chromium_launch_failed` / `socket hang up`)
-    - `PUPPETEER_SINGLE_PROCESS=true` fallback for low-memory hosts (slower but can avoid crashes)
-    - `PUPPETEER_LAUNCH_TIMEOUT_MS=30000` increase if Chromium is slow to start
-
-## Shipping label troubleshooting (server)
-If `/api/shipments/label.pdf` returns `{ code: "chromium_launch_failed" }`, it usually means system dependencies are missing or Chromium is crashing.
-
-Quick checks:
-- Run `ldd <chromium-binary> | grep 'not found'` to see missing shared libraries.
-- Set `PUPPETEER_DUMPIO=true` to capture Chromium crash logs in your service logs.
+  - PDF template: `src/public/Blank Docket.pdf` is used as the background, and dynamic fields are overlaid using coordinates extracted from `src/public/Sample Docket.pdf` into `src/shipments/label/docketTemplateMap.json`.
 - Shopify OAuth install (Dev Dashboard apps):
   - `SHOPIFY_OAUTH_API_KEY` (OAuth client id)
   - `SHOPIFY_OAUTH_API_SECRET` (OAuth client secret; comma-separated allowed for rotated secrets)

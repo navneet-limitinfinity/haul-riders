@@ -4,7 +4,6 @@ import { ROLE_ADMIN, ROLE_SHOP } from "../auth/roles.js";
 import { getShopCollectionInfo } from "../firestore/shopCollections.js";
 import { toOrderDocId } from "../firestore/ids.js";
 import { generateShippingLabelPdfBuffer } from "../shipments/label/shippingLabelPdf.js";
-import { renderShippingLabelHtml } from "../shipments/label/shippingLabelHtml.js";
 
 const normalizeShipmentStatus = (value) => {
   const s = String(value ?? "").trim().toLowerCase();
@@ -226,20 +225,7 @@ export function createShipmentsRouter({ env, auth }) {
           return;
         }
 
-        const format = String(req.query?.format ?? "").trim().toLowerCase();
         const doc = snap.data() ?? {};
-
-        if (format === "html") {
-          const labelHtml = await renderShippingLabelHtml({
-            env,
-            storeId: normalizedStoreId,
-            firestoreDoc: doc,
-          });
-          res.setHeader("Cache-Control", "no-store");
-          res.setHeader("Content-Type", "text/html; charset=utf-8");
-          res.status(200).send(labelHtml);
-          return;
-        }
 
         const pdf = await generateShippingLabelPdfBuffer({ env, storeId: normalizedStoreId, firestoreDoc: doc });
 
@@ -254,18 +240,7 @@ export function createShipmentsRouter({ env, auth }) {
           return;
         }
         const message = String(error?.message ?? "").trim();
-        const hint = message.includes("ENOTFOUND www.googleapis.com")
-          ? "firebase_network_dns_blocked"
-          : message.includes("chromium_launch_failed") || message.includes("Failed to launch")
-            ? "chromium_missing_deps_or_sandbox"
-            : "";
-
-        res.status(500).json({
-          error: "label_render_failed",
-          code: String(error?.code ?? ""),
-          message,
-          ...(hint ? { hint } : {}),
-        });
+        res.status(500).json({ error: "label_render_failed", code: String(error?.code ?? ""), message });
       }
     }
   );

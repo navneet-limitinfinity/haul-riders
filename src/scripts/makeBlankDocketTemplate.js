@@ -155,12 +155,10 @@ async function main() {
   chunks.push(Buffer.from(trailerParts.join(""), "latin1"));
 
   await fs.writeFile(outputPath, Buffer.concat(chunks));
-  // eslint-disable-next-line no-console
   console.log(`Wrote ${outputPath}`);
 }
 
 main().catch((error) => {
-  // eslint-disable-next-line no-console
   console.error(error);
   process.exitCode = 1;
 });
