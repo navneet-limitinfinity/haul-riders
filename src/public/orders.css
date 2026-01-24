@@ -399,6 +399,18 @@ body[data-role="shop"][data-tab="new"] .table td:nth-child(20) {
   object-fit: cover;
 }
 
+.userAvatarIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(106, 166, 255, 0.12);
+}
+
+.userAvatarIcon i {
+  font-size: 14px;
+  color: var(--text);
+}
+
 .userMenuList {
   position: absolute;
   top: 100%;

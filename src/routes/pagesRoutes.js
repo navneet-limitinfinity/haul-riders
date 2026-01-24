@@ -56,19 +56,16 @@ function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
               : ""
           }
 
-          <details class="userMenu" aria-label="User menu">
-            <summary class="userMenuSummary" aria-label="Open user menu">
-              <img
-                class="userAvatar"
-                src="/static/haul_riders_logo.jpeg?v=${assetVersion}"
-                alt="User"
-                decoding="async"
-              />
-            </summary>
-            <div class="userMenuList">
-              <div class="userMenuSection">
-                <strong>${safeUserLabel}</strong>
-              </div>
+	          <details class="userMenu" aria-label="User menu">
+	            <summary class="userMenuSummary" aria-label="Open user menu">
+	              <span class="userAvatar userAvatarIcon" aria-hidden="true">
+	                <i class="fa-solid fa-user" aria-hidden="true"></i>
+	              </span>
+	            </summary>
+	            <div class="userMenuList">
+	              <div class="userMenuSection">
+	                <strong>${safeUserLabel}</strong>
+	              </div>
               <a class="userMenuItem" href="${role === "admin" ? "/admin/orders" : "/shop/orders"}">Dashboard</a>
               <a class="userMenuItem" href="/health">System health</a>
               <a class="userMenuItem" href="mailto:support@haulriders.com">Support</a>
