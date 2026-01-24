@@ -79,6 +79,14 @@ const formatTrackingNumbers = (trackingNumbers) => {
   return trackingNumbers.filter(Boolean).join(", ");
 };
 
+function sanitizeFilename(value) {
+  return String(value ?? "")
+    .trim()
+    .replaceAll(/[^a-z0-9._-]+/gi, "_")
+    .replaceAll(/_+/g, "_")
+    .replaceAll(/^_+|_+$/g, "");
+}
+
 const normalizeFulfillmentStatus = (value) => {
   const s = String(value ?? "").trim().toLowerCase();
   return s || "null";
@@ -256,6 +264,35 @@ function clearAuthClientState() {
 function getAuthHeaders() {
   const token = getIdToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function downloadShipmentLabelPdf({ orderKey, storeId, filenameHint }) {
+  const url = new URL("/api/shipments/label.pdf", window.location.origin);
+  url.searchParams.set("orderKey", String(orderKey ?? "").trim());
+  if (storeId) url.searchParams.set("storeId", String(storeId));
+
+  const res = await fetch(url.toString(), { headers: { ...getAuthHeaders() } });
+  if (!res.ok) {
+    let msg = `Failed to download label (HTTP ${res.status}).`;
+    try {
+      const body = await res.json();
+      if (body?.error) msg = String(body.error);
+    } catch {
+      // ignore parse errors
+    }
+    throw new Error(msg);
+  }
+
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objectUrl;
+  const safe = sanitizeFilename(filenameHint) || "shipping_label";
+  a.download = `${safe}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 15_000);
 }
 
 function getDefaultTabForRole(role) {
@@ -774,9 +811,7 @@ function renderRows(orders) {
             ? sessionAssignedOrderKeys.has(orderKey)
               ? createBadge({ label: "Assigned", kind: "warn" })
               : createActionButton({ label: "Ship Now", action: "ship-now", orderKey })
-            : trackingUrl
-              ? createMenu({ label: "Track", url: trackingUrl, trackingText })
-              : ""
+            : createActionButton({ label: "Download Slip", action: "download-slip", orderKey })
         : createAdminUpdateMenu({
             orderKey,
             shipmentStatus: effectiveShipmentStatus,
@@ -1000,6 +1035,14 @@ function renderRows(orders) {
         saveBtn.dataset.orderKey = String(value.orderKey ?? "");
         saveBtn.textContent = "Save";
         menu.appendChild(saveBtn);
+
+        const downloadBtn = document.createElement("button");
+        downloadBtn.type = "button";
+        downloadBtn.className = "menuItem";
+        downloadBtn.dataset.action = "download-slip";
+        downloadBtn.dataset.orderKey = String(value.orderKey ?? "");
+        downloadBtn.textContent = "Download Slip";
+        menu.appendChild(downloadBtn);
 
         details.appendChild(menu);
         td.appendChild(details);
@@ -1493,6 +1536,29 @@ window.addEventListener("DOMContentLoaded", () => {
         syncSelectAllCheckbox();
       } catch (error) {
         setStatus(error?.message ?? "Failed to assign shipment.", { kind: "error" });
+      } finally {
+        item.disabled = false;
+      }
+      return;
+    }
+
+    if (action === "download-slip") {
+      const orderKey = String(item.dataset.orderKey ?? "").trim();
+      if (!orderKey) return;
+      const row = currentOrders.find((r) => getOrderKey(r) === orderKey) ?? null;
+      const filenameHint = row?.orderName ? `label_${row.orderName}` : `label_${orderKey}`;
+
+      const storeId = activeRole === "admin" ? getActiveStoreId() : "";
+      if (activeRole === "admin" && !storeId) {
+        setStatus("Select a store before downloading label.", { kind: "error" });
+        return;
+      }
+
+      item.disabled = true;
+      try {
+        await downloadShipmentLabelPdf({ orderKey, storeId, filenameHint });
+      } catch (error) {
+        setStatus(error?.message ?? "Failed to download label.", { kind: "error" });
       } finally {
         item.disabled = false;
       }

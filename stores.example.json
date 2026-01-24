@@ -6,7 +6,17 @@
       "name": "Vaidiki Store",
       "domain": "64dd6e-2.myshopify.com",
       "apiVersion": "2025-10",
-      "tokenEnvVar": "SHOPIFY_TOKEN_VAIDIKI"
+      "tokenEnvVar": "SHOPIFY_TOKEN_VAIDIKI",
+      "shipFrom": {
+        "name": "Your Brand Name",
+        "address1": "Address line 1",
+        "address2": "Address line 2",
+        "city": "City",
+        "state": "State",
+        "pinCode": "000000",
+        "country": "IN",
+        "phone": "9999999999"
+      }
     }
   ]
 }

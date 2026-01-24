@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 
 const isNonEmptyString = (v) => typeof v === "string" && v.trim().length > 0;
+const toOptionalTrimmedString = (v) => (isNonEmptyString(v) ? String(v).trim() : "");
 
 const normalizeStoreId = (id) => String(id ?? "").trim().toLowerCase();
 const normalizeDomain = (domain) => String(domain ?? "").trim().toLowerCase();
@@ -28,6 +29,19 @@ export async function loadStoresConfig({ filePath }) {
     const tokenEnvVar = isNonEmptyString(s?.tokenEnvVar)
       ? String(s.tokenEnvVar).trim()
       : "";
+    const shipFromRaw = s?.shipFrom && typeof s.shipFrom === "object" ? s.shipFrom : null;
+    const shipFrom = shipFromRaw
+      ? {
+          name: toOptionalTrimmedString(shipFromRaw?.name),
+          address1: toOptionalTrimmedString(shipFromRaw?.address1),
+          address2: toOptionalTrimmedString(shipFromRaw?.address2),
+          city: toOptionalTrimmedString(shipFromRaw?.city),
+          state: toOptionalTrimmedString(shipFromRaw?.state),
+          pinCode: toOptionalTrimmedString(shipFromRaw?.pinCode),
+          country: toOptionalTrimmedString(shipFromRaw?.country) || "IN",
+          phone: toOptionalTrimmedString(shipFromRaw?.phone),
+        }
+      : null;
 
     if (!id) throw new Error("stores.json: each store requires a non-empty `id`");
     if (!domain)
@@ -37,7 +51,7 @@ export async function loadStoresConfig({ filePath }) {
         `stores.json: store '${id}' requires a non-empty \`apiVersion\``
       );
 
-    return { id, name: name || id, domain, apiVersion, token, tokenEnvVar };
+    return { id, name: name || id, domain, apiVersion, token, tokenEnvVar, shipFrom };
   });
 
   const seen = new Set();
@@ -87,5 +101,6 @@ export function resolveStore({ storesConfig, storeId, env }) {
     domain: store.domain,
     apiVersion: store.apiVersion,
     token,
+    shipFrom: store.shipFrom ?? null,
   };
 }

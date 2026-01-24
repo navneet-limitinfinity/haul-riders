@@ -54,6 +54,9 @@ Server will listen on `http://localhost:3000` by default (configurable via `PORT
 - `GET /login` → login page (Firebase Auth when configured)
 - `POST /api/auth/sessionLogin` → exchanges Firebase ID token for an HTTP-only session cookie
 - `GET /api/me` → current user (role + storeId)
+- `GET /api/shipments/label.pdf?orderKey=...` → on-demand 4x6 shipping label PDF
+  - Admin: `GET /api/shipments/label.pdf?orderKey=...&storeId=...`
+  - Debug: add `&format=html` to preview layout in browser
 - `GET /shop/orders` → shop (client) orders dashboard
 - `GET /admin/orders` → admin orders dashboard
   - Multi-store (admin): `GET /admin/orders?store=<storeId>`
@@ -87,6 +90,9 @@ npm run orders:latest
 - `TRUST_PROXY` set to `true` when running behind Nginx/Apache (default `false`)
 - `SHOPIFY_TIMEOUT_MS` request timeout in milliseconds (default `10000`)
 - `SHOPIFY_MAX_RETRIES` retries for transient Shopify errors (default `2`, range `0..5`)
+- Shipping label:
+  - `SHIP_FROM_*` values used in the label “FROM” block (optional; can also be set per-store in `stores.json` via `shipFrom`)
+  - `SHIP_LABEL_LOGO_URL` optional image URL for the label (example: `/static/haul_riders_logo.jpeg`)
 - Shopify OAuth install (Dev Dashboard apps):
   - `SHOPIFY_OAUTH_API_KEY` (OAuth client id)
   - `SHOPIFY_OAUTH_API_SECRET` (OAuth client secret; comma-separated allowed for rotated secrets)

@@ -77,6 +77,19 @@ export function loadEnv(rawEnv) {
   const shopifyOauthScopes = String(rawEnv.SHOPIFY_OAUTH_SCOPES ?? "read_orders").trim() || "read_orders";
   const shopifyOauthRedirectUri = String(rawEnv.SHOPIFY_OAUTH_REDIRECT_URI ?? "").trim();
 
+  const shipFrom = {
+    name: String(rawEnv.SHIP_FROM_NAME ?? "").trim(),
+    address1: String(rawEnv.SHIP_FROM_ADDRESS1 ?? "").trim(),
+    address2: String(rawEnv.SHIP_FROM_ADDRESS2 ?? "").trim(),
+    city: String(rawEnv.SHIP_FROM_CITY ?? "").trim(),
+    state: String(rawEnv.SHIP_FROM_STATE ?? "").trim(),
+    pinCode: String(rawEnv.SHIP_FROM_PIN ?? "").trim(),
+    country: String(rawEnv.SHIP_FROM_COUNTRY ?? "IN").trim(),
+    phone: String(rawEnv.SHIP_FROM_PHONE ?? "").trim(),
+  };
+
+  const shipLabelLogoUrl = String(rawEnv.SHIP_LABEL_LOGO_URL ?? "").trim();
+
   return {
     port,
     host,
@@ -116,5 +129,7 @@ export function loadEnv(rawEnv) {
         redirectUri: shopifyOauthRedirectUri,
       },
     },
+    shipFrom,
+    shipLabelLogoUrl,
   };
 }

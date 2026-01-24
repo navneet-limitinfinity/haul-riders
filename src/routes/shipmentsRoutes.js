@@ -1,7 +1,10 @@
 import { Router } from "express";
 import { getFirebaseAdmin } from "../auth/firebaseAdmin.js";
+import { ROLE_ADMIN, ROLE_SHOP } from "../auth/roles.js";
 import { getShopCollectionInfo } from "../firestore/shopCollections.js";
 import { toOrderDocId } from "../firestore/ids.js";
+import { generateShippingLabelPdfBuffer } from "../shipments/label/shippingLabelPdf.js";
+import { renderShippingLabelHtml } from "../shipments/label/shippingLabelHtml.js";
 
 const normalizeShipmentStatus = (value) => {
   const s = String(value ?? "").trim().toLowerCase();
@@ -184,6 +187,76 @@ export function createShipmentsRouter({ env, auth }) {
       next(error);
     }
   });
+
+  router.get(
+    "/shipments/label.pdf",
+    auth.requireAnyRole([ROLE_ADMIN, ROLE_SHOP]),
+    async (req, res, next) => {
+      try {
+        if (env?.auth?.provider !== "firebase") {
+          res.status(400).json({ error: "auth_provider_not_firebase" });
+          return;
+        }
+
+        const orderKey = String(req.query?.orderKey ?? "").trim();
+        if (!orderKey) {
+          res.status(400).json({ error: "order_key_required" });
+          return;
+        }
+
+        const role = String(req.user?.role ?? "").trim();
+        const storeId =
+          role === ROLE_ADMIN
+            ? String(req.query?.storeId ?? "").trim().toLowerCase()
+            : String(req.user?.storeId ?? "").trim().toLowerCase();
+        if (!storeId) {
+          res.status(400).json({ error: "store_id_required" });
+          return;
+        }
+
+        const admin = await getFirebaseAdmin({ env });
+        const { collectionId, storeId: normalizedStoreId } = getShopCollectionInfo({
+          env,
+          storeId,
+        });
+        const docId = toOrderDocId(orderKey);
+        const snap = await admin.firestore().collection(collectionId).doc(docId).get();
+        if (!snap.exists) {
+          res.status(404).json({ error: "shipment_not_found" });
+          return;
+        }
+
+        const format = String(req.query?.format ?? "").trim().toLowerCase();
+        const doc = snap.data() ?? {};
+
+        if (format === "html") {
+          const labelHtml = await renderShippingLabelHtml({
+            env,
+            storeId: normalizedStoreId,
+            firestoreDoc: doc,
+          });
+          res.setHeader("Cache-Control", "no-store");
+          res.setHeader("Content-Type", "text/html; charset=utf-8");
+          res.status(200).send(labelHtml);
+          return;
+        }
+
+        const pdf = await generateShippingLabelPdfBuffer({ env, storeId: normalizedStoreId, firestoreDoc: doc });
+
+        const filenameSafe = `label_${docId}.pdf`;
+        res.setHeader("Cache-Control", "no-store");
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename="${filenameSafe}"`);
+        res.status(200).send(pdf);
+      } catch (error) {
+        if (error?.code === "order_missing") {
+          res.status(422).json({ error: "order_missing" });
+          return;
+        }
+        next(error);
+      }
+    }
+  );
 
   return router;
 }
