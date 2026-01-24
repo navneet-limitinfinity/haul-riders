@@ -976,10 +976,20 @@ function renderRows(orders) {
       } else if (value && typeof value === "object" && value.actionButton) {
         const btn = document.createElement("button");
         btn.type = "button";
-        btn.className = "btn btnPrimary";
-        btn.dataset.action = String(value.action ?? "");
+        const action = String(value.action ?? "");
+        btn.className = action === "download-slip" ? "btn btnPrimary btnIcon" : "btn btnPrimary";
+        btn.dataset.action = action;
         btn.dataset.orderKey = String(value.orderKey ?? "");
-        btn.textContent = String(value.label ?? "");
+        if (action === "download-slip") {
+          btn.title = "Download Shipping label";
+          btn.ariaLabel = "Download Shipping label";
+          const icon = document.createElement("i");
+          icon.className = "fa-solid fa-download";
+          icon.setAttribute("aria-hidden", "true");
+          btn.appendChild(icon);
+        } else {
+          btn.textContent = String(value.label ?? "");
+        }
         td.appendChild(btn);
       } else if (value && typeof value === "object" && value.adminMenu) {
         const details = document.createElement("details");
@@ -1041,10 +1051,15 @@ function renderRows(orders) {
 
         const downloadBtn = document.createElement("button");
         downloadBtn.type = "button";
-        downloadBtn.className = "menuItem";
+        downloadBtn.className = "menuItem btnIcon";
         downloadBtn.dataset.action = "download-slip";
         downloadBtn.dataset.orderKey = String(value.orderKey ?? "");
-        downloadBtn.textContent = "Download Slip";
+        downloadBtn.title = "Download Shipping label";
+        downloadBtn.ariaLabel = "Download Shipping label";
+        const icon = document.createElement("i");
+        icon.className = "fa-solid fa-download";
+        icon.setAttribute("aria-hidden", "true");
+        downloadBtn.appendChild(icon);
         menu.appendChild(downloadBtn);
 
         details.appendChild(menu);

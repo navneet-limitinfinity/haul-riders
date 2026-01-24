@@ -24,6 +24,8 @@ function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Orders</title>
     <link rel="stylesheet" href="/static/orders.css?v=${assetVersion}" />
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/fontawesome.min.css?v=${assetVersion}" />
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/solid.min.css?v=${assetVersion}" />
     <link rel="icon" type="image/png" href="/static/icon.png?v=${assetVersion}" />
     <script src="/static/orders.js?v=${assetVersion}" defer></script>
   </head>

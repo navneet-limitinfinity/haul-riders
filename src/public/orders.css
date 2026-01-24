@@ -923,3 +923,16 @@ body[data-role="shop"] .table td:nth-child(17) {
     width: 180px;
   }
 }
+
+
+.btnIcon {
+  padding: 10px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btnIcon i {
+  font-size: 14px;
+  line-height: 1;
+}
