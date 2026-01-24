@@ -115,6 +115,120 @@
       "sy": 1.27
     }
   },
+  "fixedText": [
+    {
+      "key": "from",
+      "text": "FROM:",
+      "x": 31,
+      "y": 632.5,
+      "size": 10,
+      "bold": false
+    },
+    {
+      "key": "to",
+      "text": "TO:",
+      "x": 30,
+      "y": 523.57,
+      "size": 12,
+      "bold": true
+    },
+    {
+      "key": "shipDateLabel",
+      "text": "Ship Date :",
+      "x": 324,
+      "y": 614.82,
+      "size": 10,
+      "bold": false
+    },
+    {
+      "key": "shipValueLabel",
+      "text": "Ship value :",
+      "x": 324,
+      "y": 601.82,
+      "size": 10,
+      "bold": false
+    },
+    {
+      "key": "invNoLabel",
+      "text": "Inv No :",
+      "x": 324,
+      "y": 588.82,
+      "size": 10,
+      "bold": false
+    },
+    {
+      "key": "invDateLabel",
+      "text": "Inv Date :",
+      "x": 324,
+      "y": 575.82,
+      "size": 10,
+      "bold": false
+    },
+    {
+      "key": "billSenderLabel",
+      "text": "Bill Sender :",
+      "x": 324,
+      "y": 560.82,
+      "size": 10,
+      "bold": false
+    },
+    {
+      "key": "modeLabel",
+      "text": "Mode:",
+      "x": 32,
+      "y": 309.57,
+      "size": 16,
+      "bold": true
+    },
+    {
+      "key": "productDescription",
+      "text": "Product Description:",
+      "x": 31,
+      "y": 286.76,
+      "size": 16,
+      "bold": true
+    },
+    {
+      "key": "ewayBill",
+      "text": "E-Way Bill:",
+      "x": 395.32,
+      "y": 337.05,
+      "size": 12,
+      "bold": true
+    },
+    {
+      "key": "refNo",
+      "text": "Ref. No:",
+      "x": 32,
+      "y": 76.05,
+      "size": 12,
+      "bold": true
+    },
+    {
+      "key": "lv",
+      "text": "LV : 0",
+      "x": 436,
+      "y": 75.55,
+      "size": 12,
+      "bold": true
+    },
+    {
+      "key": "pcs",
+      "text": "Pcs: 001  OF  001",
+      "x": 346.82,
+      "y": 310.31,
+      "size": 14,
+      "bold": true
+    },
+    {
+      "key": "weightLabel",
+      "text": "Weight:",
+      "x": 197.97,
+      "y": 42.34,
+      "size": 14,
+      "bold": false
+    }
+  ],
   "xobjects": {
     "topBarcodeFormName": "Xf2",
     "topBarcodeFormBbox": [

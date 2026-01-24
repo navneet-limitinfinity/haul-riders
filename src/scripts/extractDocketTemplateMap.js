@@ -146,6 +146,14 @@ function findText(items, needle) {
   return items.find((it) => it.text === needle) ?? null;
 }
 
+function findAnyText(items, needles) {
+  for (const n of needles) {
+    const hit = findText(items, n);
+    if (hit) return hit;
+  }
+  return null;
+}
+
 async function main() {
   const input = "src/public/Sample Docket.pdf";
   const output = "src/shipments/label/docketTemplateMap.json";
@@ -166,7 +174,7 @@ async function main() {
   const matrices = extractXObjectMatrices(content);
 
   const fromLabel = findText(items, "FROM:");
-  const toLabel = findText(items, "TO:");
+  const toLabel = findAnyText(items, ["TO:", "TO :"]);
   const shipDateLabel = findText(items, "Ship Date :");
   const allDates = items.filter((it) => it.text.match(/^\d{2}-\d{2}-\d{4}$/));
   const shipDateValue =
@@ -183,10 +191,19 @@ async function main() {
   const paymentFlag = findText(items, "Prepaid");
   const paymentNote = findText(items, "Don't collect money");
   const refNo = findText(items, "Ref. No:");
-  const weight = items.find((it) => it.text.startsWith("Weight:")) ?? null;
+  const weightLabel = items.find((it) => it.text.startsWith("Weight:")) ?? null;
+  const weight = weightLabel;
   const bottomDate = allDates.length ? allDates.reduce((best, cur) => (cur.y < best.y ? cur : best)) : null;
   const bottomTime = items.find((it) => it.text.match(/^\d{2}:\d{2}:\d{2}$/)) ?? null;
   const courierTypeInitial = findText(items, "Z");
+  const lv = findText(items, "LV : 0");
+  const modeLabel = findText(items, "Mode:");
+  const pcsLabel = findText(items, "Pcs: 001  OF  001");
+  const ewayLabel = findText(items, "E-Way Bill:");
+  const productDescLabel = findText(items, "Product Description:");
+  const invNoLabel = findText(items, "Inv No :");
+  const invDateLabel = findText(items, "Inv Date :");
+  const billSenderLabel = findText(items, "Bill Sender :");
 
   const topBarcode = matrices.Xf2 ?? null;
   const bottomBarcode = matrices.Xf1 ?? null;
@@ -272,6 +289,31 @@ async function main() {
         ? { x: bottomBarcode.e, y: bottomBarcode.f, sx: bottomBarcode.a, sy: bottomBarcode.d }
         : null,
     },
+    fixedText: [
+      fromLabel ? { key: "from", text: fromLabel.text, x: fromLabel.x, y: fromLabel.y, size: fromLabel.size, bold: fromLabel.font === "F2" } : null,
+      toLabel ? { key: "to", text: "TO:", x: toLabel.x, y: toLabel.y, size: toLabel.size, bold: toLabel.font === "F2" } : null,
+      shipDateLabel ? { key: "shipDateLabel", text: shipDateLabel.text, x: shipDateLabel.x, y: shipDateLabel.y, size: shipDateLabel.size, bold: shipDateLabel.font === "F2" } : null,
+      shipValueLabel ? { key: "shipValueLabel", text: shipValueLabel.text, x: shipValueLabel.x, y: shipValueLabel.y, size: shipValueLabel.size, bold: shipValueLabel.font === "F2" } : null,
+      invNoLabel ? { key: "invNoLabel", text: invNoLabel.text, x: invNoLabel.x, y: invNoLabel.y, size: invNoLabel.size, bold: invNoLabel.font === "F2" } : null,
+      invDateLabel ? { key: "invDateLabel", text: invDateLabel.text, x: invDateLabel.x, y: invDateLabel.y, size: invDateLabel.size, bold: invDateLabel.font === "F2" } : null,
+      billSenderLabel ? { key: "billSenderLabel", text: billSenderLabel.text, x: billSenderLabel.x, y: billSenderLabel.y, size: billSenderLabel.size, bold: billSenderLabel.font === "F2" } : null,
+      modeLabel ? { key: "modeLabel", text: modeLabel.text, x: modeLabel.x, y: modeLabel.y, size: modeLabel.size, bold: modeLabel.font === "F2" } : null,
+      productDescLabel ? { key: "productDescription", text: productDescLabel.text, x: productDescLabel.x, y: productDescLabel.y, size: productDescLabel.size, bold: productDescLabel.font === "F2" } : null,
+      ewayLabel ? { key: "ewayBill", text: ewayLabel.text, x: ewayLabel.x, y: ewayLabel.y, size: ewayLabel.size, bold: ewayLabel.font === "F2" } : null,
+      refNo ? { key: "refNo", text: refNo.text, x: refNo.x, y: refNo.y, size: refNo.size, bold: refNo.font === "F2" } : null,
+      lv ? { key: "lv", text: lv.text, x: lv.x, y: lv.y, size: lv.size, bold: lv.font === "F2" } : null,
+      pcsLabel ? { key: "pcs", text: pcsLabel.text, x: pcsLabel.x, y: pcsLabel.y, size: pcsLabel.size, bold: pcsLabel.font === "F2" } : null,
+      weightLabel
+        ? {
+            key: "weightLabel",
+            text: "Weight:",
+            x: weightLabel.x,
+            y: weightLabel.y,
+            size: weightLabel.size,
+            bold: weightLabel.font === "F2",
+          }
+        : null,
+    ].filter(Boolean),
     xobjects: {
       topBarcodeFormName: "Xf2",
       topBarcodeFormBbox: [0, 0, 121, 18],

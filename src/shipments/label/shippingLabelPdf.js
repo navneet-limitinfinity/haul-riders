@@ -177,6 +177,17 @@ export async function generateShippingLabelPdfBuffer({ env, storeId, firestoreDo
     weightKgRaw == null || Number.isNaN(Number(weightKgRaw)) ? "0.0" : String(weightKgRaw);
 
   const fields = map?.fields ?? {};
+  const fixedText = Array.isArray(map?.fixedText) ? map.fixedText : [];
+
+  // Render fixed labels (field names) from the template map.
+  for (const t of fixedText) {
+    if (!t || typeof t !== "object") continue;
+    const text = String(t.text ?? "").trim();
+    if (!text) continue;
+    const font = t.bold ? fontBold : fontRegular;
+    const size = Number(t.size ?? 10) || 10;
+    page.drawText(text, { x: Number(t.x ?? 0), y: Number(t.y ?? 0), size, font, color: black });
+  }
 
   // Top-right metadata.
   if (fields.shipDate) {
@@ -395,7 +406,8 @@ export async function generateShippingLabelPdfBuffer({ env, storeId, firestoreDo
 
   // Weight + bottom date/time.
   if (fields.weight) {
-    page.drawText(`Weight: 1/${weightKg}`, {
+    // Label "Weight:" is part of fixedText; here we render only the value.
+    page.drawText(`1/${weightKg}`, {
       x: fields.weight.x,
       y: fields.weight.y,
       size: fields.weight.size,
