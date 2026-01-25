@@ -132,37 +132,81 @@ Notes:
 ## Deploy to server without source code (Docker image)
 This repo publishes a Docker image to GHCR (`ghcr.io/<owner>/<repo>`) on every push to `main` (see `.github/workflows/docker-image.yml`).
 
+### 1) Install Docker on Ubuntu
+```bash
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker $USER
+newgrp docker
+docker --version
+docker compose version
+```
+
+### 2) Create server directory (no source code)
 On your server, you only need a small folder like:
 ```
 /opt/haul-riders/
   .env
   shipments_state.json
   secrets/firebase-admin.json
-  deploy/docker-compose.image.yml
+  docker-compose.yml
 ```
 
-1) Create the folder + files:
+### 3) Create the folder + files
 ```bash
-sudo mkdir -p /opt/haul-riders/deploy /opt/haul-riders/secrets
+sudo mkdir -p /opt/haul-riders/secrets
 sudo nano /opt/haul-riders/.env
 sudo nano /opt/haul-riders/secrets/firebase-admin.json
-sudo nano /opt/haul-riders/deploy/docker-compose.image.yml
 sudo touch /opt/haul-riders/shipments_state.json
 ```
 
-2) In `/opt/haul-riders/.env` set:
-- `HAUL_RIDERS_IMAGE=ghcr.io/<owner>/<repo>:latest`
-- `FIREBASE_ADMIN_CREDENTIALS_FILE=/run/secrets/firebase-admin.json`
-- your other env vars (Shopify, auth, etc)
-
-3) Start:
+### 4) Create `/opt/haul-riders/docker-compose.yml`
 ```bash
-cd /opt/haul-riders
-docker compose -f deploy/docker-compose.image.yml up -d
-docker compose -f deploy/docker-compose.image.yml logs -f --tail=200
+sudo tee /opt/haul-riders/docker-compose.yml >/dev/null <<'YML'
+services:
+  haul-riders:
+    image: ghcr.io/<owner>/<repo>:latest
+    ports:
+      - "3000:3000"
+    env_file:
+      - /opt/haul-riders/.env
+    volumes:
+      - /opt/haul-riders/shipments_state.json:/app/shipments_state.json
+      - /opt/haul-riders/secrets/firebase-admin.json:/run/secrets/firebase-admin.json:ro
+    restart: unless-stopped
+YML
 ```
 
-If the GitHub repo/package is private, log in once on the server so it can pull from GHCR:
+### 5) Configure `/opt/haul-riders/.env`
+Minimum required for Firebase login:
+- `AUTH_PROVIDER=firebase`
+- `FIREBASE_WEB_CONFIG_JSON={...}` (Firebase Console → Project settings → Web app config)
+- `FIREBASE_ADMIN_CREDENTIALS_FILE=/run/secrets/firebase-admin.json`
+
+Also set your Shopify values (`SHOPIFY_STORE`, `SHOPIFY_TOKEN`) and any multi-store values if used.
+
+### 6) Fix secret file permissions (required)
+The container runs as a non-root user. Ensure it can read the service account file:
+```bash
+sudo chown 1000:1000 /opt/haul-riders/secrets/firebase-admin.json
+sudo chmod 600 /opt/haul-riders/secrets/firebase-admin.json
+```
+
+If your server user is not UID 1000, use the UID that matches your Docker host user:
+```bash
+id -u
+```
+
+### 7) Start + verify
+```bash
+cd /opt/haul-riders
+docker compose -f /opt/haul-riders/docker-compose.yml pull
+docker compose -f /opt/haul-riders/docker-compose.yml up -d
+docker compose -f /opt/haul-riders/docker-compose.yml logs -f --tail=200
+curl -s http://localhost:3000/health
+```
+
+### If GHCR image is private
+Log in once on the server so it can pull from GHCR:
 ```bash
 docker login ghcr.io -u <github-username> -p <PAT-with-packages:read>
 ```
