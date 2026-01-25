@@ -15,7 +15,6 @@ ENV NODE_ENV=production
 COPY --from=deps --chown=node:node /app/node_modules ./node_modules
 COPY --chown=node:node package.json ./
 COPY --chown=node:node src ./src
-COPY --chown=node:node shipments_state.json ./shipments_state.json
 COPY --chown=node:node stores.example.json ./stores.example.json
 
 USER node
