@@ -1,13 +1,11 @@
 services:
   haul-riders:
-    build: .
+    image: ${HAUL_RIDERS_IMAGE}
     ports:
       - "3000:3000"
     env_file:
       - .env
     volumes:
       - ./shipments_state.json:/app/shipments_state.json
-      # Mount your Firebase Admin service account JSON (do not commit it).
       - ./secrets/firebase-admin.json:/run/secrets/firebase-admin.json:ro
-
     restart: unless-stopped

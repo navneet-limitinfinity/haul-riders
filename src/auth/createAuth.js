@@ -121,7 +121,14 @@ export function createAuth({ env, logger }) {
       }
 
       if (env.auth.provider === "firebase") {
-        req.user = await resolveUserFromFirebase({ env, logger, req });
+        try {
+          req.user = await resolveUserFromFirebase({ env, logger, req });
+        } catch (error) {
+          // Treat auth failures as unauthenticated, not as a server error.
+          // This avoids breaking all routes when Firebase is temporarily unavailable or misconfigured.
+          logger?.warn?.({ error }, "Failed to resolve user from Firebase");
+          req.user = null;
+        }
         next();
         return;
       }

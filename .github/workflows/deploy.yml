@@ -1,4 +1,4 @@
-name: Deploy Node API
+name: Deploy (pull Docker image)
 
 on:
   push:
@@ -16,7 +16,12 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            cd your-node-project
-            git pull
-            npm install
-            sudo systemctl restart haul-rider
+            set -euo pipefail
+            cd /opt/haul-riders
+
+            # If repo/package is private, ensure you've logged in once:
+            # docker login ghcr.io -u <github-username> -p <PAT-with-packages:read>
+
+            docker compose -f deploy/docker-compose.image.yml pull
+            docker compose -f deploy/docker-compose.image.yml up -d
+            docker image prune -f

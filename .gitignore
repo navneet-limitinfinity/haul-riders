@@ -17,3 +17,4 @@ stores.json
 shipments_state.json
 haul-riders-firebase-adminsdk-*.json
 tmp_label_test.pdf
+secrets/

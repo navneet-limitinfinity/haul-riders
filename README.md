@@ -113,10 +113,58 @@ npm run orders:latest
       - `FIREBASE_ADMIN_CREDENTIALS_JSON` (service account JSON)
       - or `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`
 
-## Run with Docker (optional)
-Build and run:
+## Run with Docker (recommended for production)
+1) Create `.env` (or set env vars via your orchestrator):
 ```bash
-docker compose up --build
+cp .env.example .env
+```
+
+2) Build and run:
+```bash
+docker compose up -d --build
+```
+
+Notes:
+- `docker-compose.yml` binds `./shipments_state.json` into the container so state persists across restarts.
+- If you use Firebase Admin via file, set `FIREBASE_ADMIN_CREDENTIALS_FILE` to a path inside the container (example: `/run/secrets/firebase-admin.json`) and mount it as a volume/secret.
+- If you use multi-store, mount your `stores.json` and set `STORES_FILE=/app/stores.json`.
+
+## Deploy to server without source code (Docker image)
+This repo publishes a Docker image to GHCR (`ghcr.io/<owner>/<repo>`) on every push to `main` (see `.github/workflows/docker-image.yml`).
+
+On your server, you only need a small folder like:
+```
+/opt/haul-riders/
+  .env
+  shipments_state.json
+  secrets/firebase-admin.json
+  deploy/docker-compose.image.yml
+```
+
+1) Create the folder + files:
+```bash
+sudo mkdir -p /opt/haul-riders/deploy /opt/haul-riders/secrets
+sudo nano /opt/haul-riders/.env
+sudo nano /opt/haul-riders/secrets/firebase-admin.json
+sudo nano /opt/haul-riders/deploy/docker-compose.image.yml
+sudo touch /opt/haul-riders/shipments_state.json
+```
+
+2) In `/opt/haul-riders/.env` set:
+- `HAUL_RIDERS_IMAGE=ghcr.io/<owner>/<repo>:latest`
+- `FIREBASE_ADMIN_CREDENTIALS_FILE=/run/secrets/firebase-admin.json`
+- your other env vars (Shopify, auth, etc)
+
+3) Start:
+```bash
+cd /opt/haul-riders
+docker compose -f deploy/docker-compose.image.yml up -d
+docker compose -f deploy/docker-compose.image.yml logs -f --tail=200
+```
+
+If the GitHub repo/package is private, log in once on the server so it can pull from GHCR:
+```bash
+docker login ghcr.io -u <github-username> -p <PAT-with-packages:read>
 ```
 
 ## Deployment notes (private server + domain)
@@ -162,6 +210,11 @@ sudo cp deploy/systemd/haul-riders.service /etc/systemd/system/haul-riders.servi
 sudo systemctl daemon-reload
 sudo systemctl enable --now haul-riders
 sudo systemctl status haul-riders
+```
+
+Logs:
+```bash
+sudo journalctl -u haul-riders -f
 ```
 
 ### Reverse proxy (Nginx)

@@ -17,8 +17,8 @@ export function buildRoutes({ env, logger }) {
   const router = Router();
   const auth = createAuth({ env, logger });
 
-  router.use(auth.attachUser);
   router.use(createHealthRouter());
+  router.use(auth.attachUser);
   router.use(createAuthRouter({ env }));
   router.use(createPagesRouter({ env, auth }));
   router.use("/api", createAuthApiRouter({ auth, env, logger }));
