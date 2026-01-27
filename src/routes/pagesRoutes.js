@@ -210,7 +210,7 @@ function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
 }
 
 function renderBulkUploadPage({ userLabel }) {
-  const assetVersion = "2";
+  const assetVersion = "3";
   const safeUserLabel = escapeHtml(userLabel);
 
   return html`<!doctype html>
@@ -218,12 +218,12 @@ function renderBulkUploadPage({ userLabel }) {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Bulk CSV upload</title>
-    <link rel="stylesheet" href="/static/orders.css?v=28" />
-    <link rel="stylesheet" href="/static/vendor/fontawesome/css/fontawesome.min.css?v=28" />
-    <link rel="stylesheet" href="/static/vendor/fontawesome/css/solid.min.css?v=28" />
+    <title>Bulk tools</title>
+    <link rel="stylesheet" href="/static/orders.css?v=29" />
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/fontawesome.min.css?v=29" />
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/solid.min.css?v=29" />
     <link rel="stylesheet" href="/static/bulk-upload.css?v=${assetVersion}" />
-    <link rel="icon" type="image/png" href="/static/icon.png?v=28" />
+    <link rel="icon" type="image/png" href="/static/icon.png?v=29" />
     <script src="/static/bulk-upload.js?v=${assetVersion}" defer></script>
   </head>
   <body data-role="admin">
@@ -232,13 +232,13 @@ function renderBulkUploadPage({ userLabel }) {
         <div class="brand">
           <img
             class="brandLogo"
-            src="/static/haul_riders_logo.jpeg?v=28"
+            src="/static/haul_riders_logo.jpeg?v=29"
             alt="Haul Riders"
             decoding="async"
           />
           <div class="brandText">
             <div class="brandTitle">Haul Riders</div>
-            <div class="brandSub">Bulk CSV upload</div>
+            <div class="brandSub">Bulk tools</div>
           </div>
         </div>
 
@@ -267,95 +267,110 @@ function renderBulkUploadPage({ userLabel }) {
       <section class="panel">
         <div class="panelHeader bulkHeader">
           <div class="panelTitle">
-            <h1>Upload assigned orders (CSV)</h1>
-            <div class="panelHint">Adds orders directly to Firestore and shows them in the “Assigned” tab.</div>
+            <h1>Bulk tools</h1>
+            <div class="panelHint">Upload CSVs to create orders or update shipment status.</div>
           </div>
 
-          <a class="btn btnSecondary" href="/static/sample_bulk_orders.csv" download>
-            Download sample CSV
-          </a>
-          <a class="btn btnSecondary" href="/static/sample_bulk_orders_50.csv" download>
-            Download 50-row test CSV
-          </a>
-          <a class="btn btnSecondary" href="/static/sample_status_update.csv" download>
-            Download status update sample
-          </a>
-          <a class="btn btnSecondary" href="/static/sample_status_update_50.csv" download>
-            Download status update 50-row
-          </a>
+          <div class="controls bulkActions">
+            <a class="btn btnSecondary btnIcon" href="/static/sample_status_update.csv" download>
+              <i class="fa-solid fa-file-arrow-down" aria-hidden="true"></i>
+              Status update sample
+            </a>
+            <a class="btn btnSecondary btnIcon" href="/static/sample_bulk_orders.csv" download>
+              <i class="fa-solid fa-file-arrow-down" aria-hidden="true"></i>
+              Order upload sample
+            </a>
+          </div>
         </div>
 
-        <div class="bulkCard">
-          <div class="bulkRow">
-            <label class="field">
-              <span>Store (required)</span>
-              <select id="storeId" class="storeSelect" aria-label="Select store"></select>
-            </label>
-          </div>
-
-          <div class="bulkRow">
-            <label class="field">
-              <span>CSV file</span>
-              <input id="csvFile" type="file" accept=".csv,text/csv" />
-            </label>
-            <button id="uploadBtn" class="btn btnPrimary" type="button">Upload</button>
-          </div>
-
-          <div id="uploadStatus" class="status" aria-live="polite"></div>
-
-          <div class="progressWrap" aria-label="Upload progress">
-            <div class="progressBar">
-              <div id="progressFill" class="progressFill" style="width: 0%"></div>
+        <div class="bulkBody">
+          <div class="bulkCard bulkCardPrimary" id="status-upload">
+            <div class="bulkCardHeader">
+              <div>
+                <div class="bulkCardTitle">Update shipment status (CSV)</div>
+                <div class="bulkCardHint">Matches rows by Tracking Number and updates shipment status.</div>
+              </div>
             </div>
-            <div id="progressText" class="progressText">0%</div>
-          </div>
 
-          <details class="bulkDetails">
-            <summary>Required CSV columns</summary>
-            <ul class="bulkList">
-              <li><code>orderKey</code> (unique id; any string)</li>
-              <li><code>orderName</code> (include <code>#</code>, e.g. <code>#1001</code>)</li>
-              <li><code>fullName</code>, <code>phone1</code>, <code>address1</code>, <code>city</code>, <code>state</code>, <code>pinCode</code></li>
-              <li><code>totalPrice</code>, <code>financialStatus</code> (e.g. <code>paid</code> or <code>pending</code>)</li>
-            </ul>
-            <div class="bulkHint">
-              Optional: <code>awbNumber</code>, <code>courierType</code>, <code>weightKg</code>, <code>customerEmail</code>, <code>address2</code>, <code>phone2</code>.
+            <div class="bulkGrid">
+              <label class="field bulkFieldWide">
+                <span>Store</span>
+                <select id="storeId" class="storeSelect" aria-label="Select store"></select>
+              </label>
+              <label class="field bulkFieldWide">
+                <span>Status CSV file</span>
+                <input id="statusCsvFile" type="file" accept=".csv,text/csv" />
+              </label>
+              <button id="statusUploadBtn" class="btn btnPrimary bulkBtnFull" type="button">
+                <i class="fa-solid fa-file-arrow-up" aria-hidden="true"></i>
+                Update Status
+              </button>
             </div>
-          </details>
+
+            <div id="statusUploadStatus" class="status" aria-live="polite"></div>
+
+            <div class="progressWrap" aria-label="Status update progress">
+              <div class="progressBar">
+                <div id="statusProgressFill" class="progressFill" style="width: 0%"></div>
+              </div>
+              <div id="statusProgressText" class="progressText">0%</div>
+            </div>
+
+            <details class="bulkDetails">
+              <summary>CSV columns</summary>
+              <ul class="bulkList">
+                <li><code>Tracking Numbers</code> (or <code>trackingNumber</code>)</li>
+                <li><code>Shipments Status</code> (or <code>shipmentStatus</code>)</li>
+              </ul>
+              <div class="bulkHint">
+                RTO values supported: <code>RTO Initiated</code>, <code>RTO Delivered</code>.
+              </div>
+            </details>
+          </div>
 
           <hr class="bulkDivider" />
 
-          <div id="status-upload" class="bulkRow">
-            <div class="bulkSectionTitle">Update shipment status by Tracking Number (CSV)</div>
-          </div>
-
-          <div class="bulkRow">
-            <label class="field">
-              <span>Status CSV file (2 columns)</span>
-              <input id="statusCsvFile" type="file" accept=".csv,text/csv" />
-            </label>
-            <button id="statusUploadBtn" class="btn btnPrimary" type="button">Update Status</button>
-          </div>
-
-          <div id="statusUploadStatus" class="status" aria-live="polite"></div>
-
-          <div class="progressWrap" aria-label="Status update progress">
-            <div class="progressBar">
-              <div id="statusProgressFill" class="progressFill" style="width: 0%"></div>
+          <div class="bulkCard">
+            <div class="bulkCardHeader">
+              <div>
+                <div class="bulkCardTitle">Upload assigned orders (CSV)</div>
+                <div class="bulkCardHint">Creates/updates orders in Firestore so they appear in the “Assigned” tab.</div>
+              </div>
             </div>
-            <div id="statusProgressText" class="progressText">0%</div>
-          </div>
 
-          <details class="bulkDetails">
-            <summary>Status CSV columns</summary>
-            <ul class="bulkList">
-              <li><code>Tracking Numbers</code> (or <code>trackingNumber</code>)</li>
-              <li><code>Shipments Status</code> (or <code>shipmentStatus</code>)</li>
-            </ul>
-            <div class="bulkHint">
-              RTO values supported: <code>RTO Initiated</code>, <code>RTO Delivered</code>.
+            <div class="bulkGrid">
+              <label class="field bulkFieldWide">
+                <span>Order CSV file</span>
+                <input id="csvFile" type="file" accept=".csv,text/csv" />
+              </label>
+              <button id="uploadBtn" class="btn btnSecondary bulkBtnFull" type="button">
+                <i class="fa-solid fa-file-arrow-up" aria-hidden="true"></i>
+                Upload Orders
+              </button>
             </div>
-          </details>
+
+            <div id="uploadStatus" class="status" aria-live="polite"></div>
+
+            <div class="progressWrap" aria-label="Upload progress">
+              <div class="progressBar">
+                <div id="progressFill" class="progressFill" style="width: 0%"></div>
+              </div>
+              <div id="progressText" class="progressText">0%</div>
+            </div>
+
+            <details class="bulkDetails">
+              <summary>CSV columns</summary>
+              <ul class="bulkList">
+                <li><code>orderKey</code> (unique id; any string)</li>
+                <li><code>orderName</code> (include <code>#</code>, e.g. <code>#1001</code>)</li>
+                <li><code>fullName</code>, <code>phone1</code>, <code>address1</code>, <code>city</code>, <code>state</code>, <code>pinCode</code></li>
+                <li><code>totalPrice</code>, <code>financialStatus</code> (e.g. <code>paid</code> or <code>pending</code>)</li>
+              </ul>
+              <div class="bulkHint">
+                Optional: <code>awbNumber</code>, <code>courierType</code>, <code>weightKg</code>, <code>customerEmail</code>, <code>address2</code>, <code>phone2</code>.
+              </div>
+            </details>
+          </div>
         </div>
       </section>
     </main>

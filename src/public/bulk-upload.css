@@ -1,26 +1,81 @@
 .bulkHeader {
-  gap: 10px;
+  align-items: end;
+}
+
+.bulkActions {
+  justify-content: flex-end;
+}
+
+.bulkBody {
+  padding: 16px;
 }
 
 .bulkCard {
-  margin-top: 16px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 12px;
-  padding: 16px;
-  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.02);
 }
 
-.bulkRow {
+.bulkCardPrimary {
+  border-color: rgba(106, 166, 255, 0.45);
+  background: rgba(106, 166, 255, 0.06);
+  box-shadow: 0 12px 26px rgba(37, 99, 235, 0.12);
+}
+
+.bulkCardHeader {
   display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 12px;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
-.bulkRow .field {
-  min-width: 280px;
-  flex: 1;
+.bulkCardTitle {
+  font-weight: 900;
+  letter-spacing: 0.15px;
+  font-size: 15px;
+}
+
+.bulkCardHint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.bulkGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr;
+  align-items: end;
+}
+
+@media (min-width: 900px) {
+  .bulkGrid {
+    grid-template-columns: 1fr 260px;
+  }
+
+  .bulkGrid .bulkFieldWide {
+    grid-column: 1 / 2;
+  }
+
+  .bulkGrid .bulkBtnFull {
+    grid-column: 2 / 3;
+  }
+}
+
+.bulkBtnFull {
+  width: 100%;
+}
+
+.bulkCard .field input[type="file"] {
+  width: 100%;
+  min-width: 260px;
+}
+
+.bulkCard select {
+  width: 100%;
+  max-width: 420px;
 }
 
 .progressWrap {
@@ -34,13 +89,14 @@
   flex: 1;
   height: 10px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
   overflow: hidden;
 }
 
 .progressFill {
   height: 100%;
-  background: #2563eb;
+  background: var(--accent);
   width: 0%;
   transition: width 180ms ease;
 }
@@ -49,6 +105,7 @@
   min-width: 44px;
   text-align: right;
   font-variant-numeric: tabular-nums;
+  color: var(--muted);
 }
 
 .bulkDetails {
@@ -56,13 +113,9 @@
 }
 
 .bulkDivider {
-  margin: 16px 0;
+  margin: 18px 0;
   border: none;
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
-}
-
-.bulkSectionTitle {
-  font-weight: 700;
+  border-top: 1px solid var(--border);
 }
 
 .bulkList {
@@ -71,12 +124,12 @@
 
 .bulkHint {
   margin-top: 10px;
-  color: rgba(0, 0, 0, 0.7);
+  color: var(--muted);
   font-size: 13px;
 }
 
 code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
-    "Courier New", monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
   font-size: 0.95em;
 }
