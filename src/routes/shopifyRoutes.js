@@ -4,6 +4,8 @@ import { projectOrderRow } from "../shopify/projectOrderRow.js";
 import { resolveStore } from "../config/stores.js";
 import { resolveShopifyAccessToken } from "../shopify/resolveShopifyAccessToken.js";
 
+const normalizeDomain = (domain) => String(domain ?? "").trim().toLowerCase();
+
 /**
  * Shopify-related routes.
  * This is intentionally small now; you can add coupon/discount endpoints later.
@@ -22,11 +24,11 @@ export function createShopifyRouter({ env, logger, auth }) {
 
   const getStoreForRequest = async (req) => {
     const storeId = getStoreIdForRequest(req);
-    const role = String(req.user?.role ?? "").trim().toLowerCase();
 
-    // Shop role: always use Firestore token from `shops/<shopDomain>.shopify.accessToken`.
-    if (role === "shop") {
-      const shopDomain = String(storeId ?? "").trim().toLowerCase();
+    // Firebase mode: always read token from Firestore `shops/<shopDomain>.shopify.accessToken`.
+    // This avoids relying on server env for Shopify credentials.
+    if (env?.auth?.provider === "firebase") {
+      const shopDomain = normalizeDomain(storeId);
       if (!shopDomain) return null;
       const token = await resolveShopifyAccessToken({ env, shopDomain });
       return {
