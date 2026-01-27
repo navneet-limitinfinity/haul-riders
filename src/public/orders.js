@@ -832,22 +832,25 @@ function renderRows(orders) {
         : createBadge({ label: "Not Added", kind: "muted" });
 
     const effectiveShipmentStatus = getEffectiveShipmentStatus(row);
+    const rawShipmentStatus = String(row?.shipmentStatus ?? "").trim();
     const shipmentLabel =
       activeRole === "shop" && activeTab === "new" && !isFulfilled
         ? "Unfulfilled"
-        : effectiveShipmentStatus === "new"
-          ? "New"
-          : effectiveShipmentStatus === "assigned"
-            ? "Assigned"
-            : effectiveShipmentStatus === "in_transit"
-              ? "In Transit"
-              : effectiveShipmentStatus === "delivered"
-                ? "Delivered"
-                : effectiveShipmentStatus === "rto" ||
-                    effectiveShipmentStatus === "rto_initiated" ||
-                    effectiveShipmentStatus === "rto_delivered"
-                  ? "RTO"
-                  : "New";
+        : activeRole === "admin" && activeTab === "in_transit" && rawShipmentStatus
+          ? rawShipmentStatus
+          : effectiveShipmentStatus === "new"
+            ? "New"
+            : effectiveShipmentStatus === "assigned"
+              ? "Assigned"
+              : effectiveShipmentStatus === "in_transit"
+                ? "In Transit"
+                : effectiveShipmentStatus === "delivered"
+                  ? "Delivered"
+                  : effectiveShipmentStatus === "rto" ||
+                      effectiveShipmentStatus === "rto_initiated" ||
+                      effectiveShipmentStatus === "rto_delivered"
+                    ? "RTO"
+                    : "New";
     const shipmentKind =
       activeRole === "shop" && activeTab === "new" && !isFulfilled
         ? "muted"

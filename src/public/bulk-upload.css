@@ -10,6 +10,29 @@
   padding: 16px;
 }
 
+.bulkToolbar {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 14px;
+}
+
+.bulkStoreField select {
+  width: min(520px, 100%);
+}
+
+.bulkColumns {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+
+@media (min-width: 1100px) {
+  .bulkColumns {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 .bulkCard {
   border: 1px solid var(--border);
   border-radius: 16px;
@@ -32,9 +55,9 @@
 }
 
 .bulkCardTitle {
-  font-weight: 900;
+  font-weight: 750;
   letter-spacing: 0.15px;
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .bulkCardHint {
@@ -43,7 +66,7 @@
   color: var(--muted);
 }
 
-.bulkGrid {
+.bulkForm {
   display: grid;
   gap: 12px;
   grid-template-columns: 1fr;
@@ -51,17 +74,14 @@
 }
 
 @media (min-width: 900px) {
-  .bulkGrid {
-    grid-template-columns: 1fr 260px;
+  .bulkForm {
+    grid-template-columns: 1fr 240px;
   }
+}
 
-  .bulkGrid .bulkFieldWide {
-    grid-column: 1 / 2;
-  }
-
-  .bulkGrid .bulkBtnFull {
-    grid-column: 2 / 3;
-  }
+.bulkFields {
+  display: grid;
+  gap: 12px;
 }
 
 .bulkBtnFull {
@@ -110,12 +130,6 @@
 
 .bulkDetails {
   margin-top: 12px;
-}
-
-.bulkDivider {
-  margin: 18px 0;
-  border: none;
-  border-top: 1px solid var(--border);
 }
 
 .bulkList {

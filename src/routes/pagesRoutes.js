@@ -284,6 +284,14 @@ function renderBulkUploadPage({ userLabel }) {
         </div>
 
         <div class="bulkBody">
+          <div class="bulkToolbar">
+            <label class="field bulkStoreField">
+              <span>Store (required)</span>
+              <select id="storeId" class="storeSelect" aria-label="Select store"></select>
+            </label>
+          </div>
+
+          <div class="bulkColumns">
           <div class="bulkCard bulkCardPrimary" id="status-upload">
             <div class="bulkCardHeader">
               <div>
@@ -292,15 +300,13 @@ function renderBulkUploadPage({ userLabel }) {
               </div>
             </div>
 
-            <div class="bulkGrid">
-              <label class="field bulkFieldWide">
-                <span>Store</span>
-                <select id="storeId" class="storeSelect" aria-label="Select store"></select>
-              </label>
-              <label class="field bulkFieldWide">
-                <span>Status CSV file</span>
-                <input id="statusCsvFile" type="file" accept=".csv,text/csv" />
-              </label>
+            <div class="bulkForm">
+              <div class="bulkFields">
+                <label class="field">
+                  <span>Status CSV file</span>
+                  <input id="statusCsvFile" type="file" accept=".csv,text/csv" />
+                </label>
+              </div>
               <button id="statusUploadBtn" class="btn btnPrimary bulkBtnFull" type="button">
                 <i class="fa-solid fa-file-arrow-up" aria-hidden="true"></i>
                 Update Status
@@ -328,8 +334,6 @@ function renderBulkUploadPage({ userLabel }) {
             </details>
           </div>
 
-          <hr class="bulkDivider" />
-
           <div class="bulkCard">
             <div class="bulkCardHeader">
               <div>
@@ -338,11 +342,13 @@ function renderBulkUploadPage({ userLabel }) {
               </div>
             </div>
 
-            <div class="bulkGrid">
-              <label class="field bulkFieldWide">
-                <span>Order CSV file</span>
-                <input id="csvFile" type="file" accept=".csv,text/csv" />
-              </label>
+            <div class="bulkForm">
+              <div class="bulkFields">
+                <label class="field">
+                  <span>Order CSV file</span>
+                  <input id="csvFile" type="file" accept=".csv,text/csv" />
+                </label>
+              </div>
               <button id="uploadBtn" class="btn btnSecondary bulkBtnFull" type="button">
                 <i class="fa-solid fa-file-arrow-up" aria-hidden="true"></i>
                 Upload Orders
@@ -370,6 +376,7 @@ function renderBulkUploadPage({ userLabel }) {
                 Optional: <code>awbNumber</code>, <code>courierType</code>, <code>weightKg</code>, <code>customerEmail</code>, <code>address2</code>, <code>phone2</code>.
               </div>
             </details>
+          </div>
           </div>
         </div>
       </section>
