@@ -1276,16 +1276,28 @@ async function refresh() {
       return;
     }
 
-    if (activeRole === "shop" && activeTab === "assigned") {
-      await ensureFirestoreAssignedRealtime();
-      allOrders = Array.isArray(firestoreAssignedState.orders)
-        ? firestoreAssignedState.orders
-        : [];
-      applyFiltersAndSort();
-      if (firestoreAssignedState.ready) {
-        setStatus(`Loaded ${allOrders.length} assigned order(s).`, { kind: "ok" });
+    if (activeRole === "shop") {
+      if (activeTab === "assigned") {
+        await ensureFirestoreAssignedRealtime();
+        allOrders = Array.isArray(firestoreAssignedState.orders)
+          ? firestoreAssignedState.orders
+          : [];
+        applyFiltersAndSort();
+        if (firestoreAssignedState.ready) {
+          setStatus(`Loaded ${allOrders.length} assigned order(s).`, { kind: "ok" });
+        }
+        return;
       }
-      return;
+
+      if (["in_transit", "delivered", "rto", "all"].includes(activeTab)) {
+        const status = activeTab === "all" ? "all" : activeTab;
+        const data = await fetchFirestoreOrders({ status, limit: 250 });
+        const orders = Array.isArray(data?.orders) ? data.orders : [];
+        allOrders = orders;
+        applyFiltersAndSort();
+        setStatus(`Loaded ${orders.length} order(s).`, { kind: "ok" });
+        return;
+      }
     }
 
     const data = await fetchLatestOrders({ limit, since });
@@ -1377,35 +1389,37 @@ window.addEventListener("DOMContentLoaded", () => {
       .catch(() => {});
   }
 
-  fetchShop()
-    .then((data) => {
-      const shop = data?.shop ?? {};
-      const storeName = String(shop?.name ?? "").trim();
-      const storeDomain = String(shop?.myshopify_domain ?? "").trim();
-      const storeEl = $("storeName");
-      if (!storeEl) return;
+  if (activeRole === "admin") {
+    fetchShop()
+      .then((data) => {
+        const shop = data?.shop ?? {};
+        const storeName = String(shop?.name ?? "").trim();
+        const storeDomain = String(shop?.myshopify_domain ?? "").trim();
+        const storeEl = $("storeName");
+        if (!storeEl) return;
 
-      if (storeName || storeDomain) {
-        storeEl.textContent = "";
-        const nameSpan = document.createElement("span");
-        nameSpan.className = "storeNameMain";
-        nameSpan.textContent = storeName || "Unknown";
-        storeEl.appendChild(nameSpan);
+        if (storeName || storeDomain) {
+          storeEl.textContent = "";
+          const nameSpan = document.createElement("span");
+          nameSpan.className = "storeNameMain";
+          nameSpan.textContent = storeName || "Unknown";
+          storeEl.appendChild(nameSpan);
 
-        if (storeDomain) {
-          const domainSpan = document.createElement("span");
-          domainSpan.className = "storeNameDomain";
-          domainSpan.textContent = storeDomain;
-          storeEl.appendChild(domainSpan);
+          if (storeDomain) {
+            const domainSpan = document.createElement("span");
+            domainSpan.className = "storeNameDomain";
+            domainSpan.textContent = storeDomain;
+            storeEl.appendChild(domainSpan);
+          }
+        } else {
+          storeEl.textContent = "Unknown";
         }
-      } else {
-        storeEl.textContent = "Unknown";
-      }
-    })
-    .catch(() => {
-      const storeEl = $("storeName");
-      if (storeEl) storeEl.textContent = "Unknown";
-    });
+      })
+      .catch(() => {
+        const storeEl = $("storeName");
+        if (storeEl) storeEl.textContent = "Unknown";
+      });
+  }
 
   $("dateRange")?.addEventListener("change", (e) => {
     setDateRange(e.target?.value);

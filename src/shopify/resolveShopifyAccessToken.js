@@ -11,11 +11,27 @@ async function readAccessTokenFromShopsDoc({ firestore, shopsCollection, shopDom
   if (!snap.exists) return "";
   const data = snap.data() ?? {};
 
-  // Expected structure:
-  // shops/<shopDomain> { shopify: { accessToken: "..." } }
+  // Supported structures (historical + current):
+  // - shops/<shopDomain> { shopify: { accessToken: "..." } }
+  // - shops/<shopDomain> { accessToken: "..." }
+  // - shops/<shopDomain> { shopifyAccessToken: "..." }
   const shopify = data.shopify && typeof data.shopify === "object" ? data.shopify : null;
-  const token = shopify ? shopify.accessToken : "";
-  return String(token ?? "").trim();
+  const direct = String(data.accessToken ?? "").trim();
+  const legacy = String(data.shopifyAccessToken ?? "").trim();
+  const nested = String(shopify?.accessToken ?? "").trim();
+  if (nested) return nested;
+  if (direct) return direct;
+  if (legacy) return legacy;
+
+  // Fallback: shops/<shopDomain>/shopify/config { accessToken: "..." }
+  try {
+    const configSnap = await docRef.collection("shopify").doc("config").get();
+    if (!configSnap.exists) return "";
+    const config = configSnap.data() ?? {};
+    return String(config?.accessToken ?? "").trim();
+  } catch {
+    return "";
+  }
 }
 
 export async function resolveShopifyAccessToken({ env, shopDomain }) {

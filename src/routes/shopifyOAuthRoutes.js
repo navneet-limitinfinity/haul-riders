@@ -188,6 +188,9 @@ export function createShopifyOAuthRouter({ env, logger }) {
           shopDomain: shop,
           accessToken: token,
           shopifyAccessToken: token,
+          shopify: {
+            accessToken: token,
+          },
           scopes,
           apiVersion: env?.shopify?.apiVersion ?? "2025-10",
           installedAt: nowIso,
