@@ -55,6 +55,16 @@
   margin-top: 12px;
 }
 
+.bulkDivider {
+  margin: 16px 0;
+  border: none;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.bulkSectionTitle {
+  font-weight: 700;
+}
+
 .bulkList {
   margin: 8px 0 0 18px;
 }

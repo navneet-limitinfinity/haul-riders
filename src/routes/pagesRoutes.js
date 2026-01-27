@@ -265,6 +265,12 @@ function renderBulkUploadPage({ userLabel }) {
           <a class="btn btnSecondary" href="/static/sample_bulk_orders_50.csv" download>
             Download 50-row test CSV
           </a>
+          <a class="btn btnSecondary" href="/static/sample_status_update.csv" download>
+            Download status update sample
+          </a>
+          <a class="btn btnSecondary" href="/static/sample_status_update_50.csv" download>
+            Download status update 50-row
+          </a>
         </div>
 
         <div class="bulkCard">
@@ -302,6 +308,40 @@ function renderBulkUploadPage({ userLabel }) {
             </ul>
             <div class="bulkHint">
               Optional: <code>awbNumber</code>, <code>courierType</code>, <code>weightKg</code>, <code>customerEmail</code>, <code>address2</code>, <code>phone2</code>.
+            </div>
+          </details>
+
+          <hr class="bulkDivider" />
+
+          <div class="bulkRow">
+            <div class="bulkSectionTitle">Update shipment status by Tracking Number (CSV)</div>
+          </div>
+
+          <div class="bulkRow">
+            <label class="field">
+              <span>Status CSV file (2 columns)</span>
+              <input id="statusCsvFile" type="file" accept=".csv,text/csv" />
+            </label>
+            <button id="statusUploadBtn" class="btn btnPrimary" type="button">Update Status</button>
+          </div>
+
+          <div id="statusUploadStatus" class="status" aria-live="polite"></div>
+
+          <div class="progressWrap" aria-label="Status update progress">
+            <div class="progressBar">
+              <div id="statusProgressFill" class="progressFill" style="width: 0%"></div>
+            </div>
+            <div id="statusProgressText" class="progressText">0%</div>
+          </div>
+
+          <details class="bulkDetails">
+            <summary>Status CSV columns</summary>
+            <ul class="bulkList">
+              <li><code>Tracking Numbers</code> (or <code>trackingNumber</code>)</li>
+              <li><code>Shipments Status</code> (or <code>shipmentStatus</code>)</li>
+            </ul>
+            <div class="bulkHint">
+              RTO values supported: <code>RTO Initiated</code>, <code>RTO Delivered</code>.
             </div>
           </details>
         </div>

@@ -108,6 +108,31 @@ function parseCsvBuffer(buffer) {
   });
 }
 
+function normalizeShipmentStatus(value) {
+  const s = String(value ?? "").trim().toLowerCase();
+  if (!s) return "";
+  if (s === "new") return "new";
+  if (s === "assigned") return "assigned";
+  if (s === "delivered") return "delivered";
+  if (s === "in_transit" || s === "in transit") return "in_transit";
+  if (s === "rto") return "rto";
+
+  if (s.includes("rto") && s.includes("initi")) return "rto_initiated";
+  if (s.includes("rto") && s.includes("deliver")) return "rto_delivered";
+  if (s.includes("deliver")) return "delivered";
+  if (s.includes("transit")) return "in_transit";
+  if (s.includes("assign")) return "assigned";
+  return s.replaceAll(/\s+/g, "_");
+}
+
+function pickFirstValue(row, keys) {
+  for (const key of Array.isArray(keys) ? keys : []) {
+    const v = String(row?.[key] ?? "").trim();
+    if (v) return v;
+  }
+  return "";
+}
+
 export function createBulkOrdersRouter({ env, auth }) {
   const router = Router();
 
@@ -244,6 +269,7 @@ export function createBulkOrdersRouter({ env, auth }) {
                   order,
                   shipment,
                   shipmentStatus: "assigned",
+                  ...(awbNumber ? { trackingNumber: awbNumber } : {}),
                   event: "bulk_csv_upload",
                   requestedBy: {
                     uid: String(req.user?.uid ?? ""),
@@ -278,6 +304,182 @@ export function createBulkOrdersRouter({ env, auth }) {
     }
   );
 
+  router.post(
+    "/admin/bulk-status/upload",
+    auth.requireRole("admin"),
+    upload.single("file"),
+    async (req, res) => {
+      if (env?.auth?.provider !== "firebase") {
+        res.status(400).json({ error: "auth_provider_not_firebase" });
+        return;
+      }
+
+      const storeId = String(req.body?.storeId ?? "").trim().toLowerCase();
+      if (!storeId) {
+        res.status(400).json({ error: "store_id_required" });
+        return;
+      }
+
+      const file = req.file;
+      if (!file?.buffer) {
+        res.status(400).json({ error: "csv_file_required" });
+        return;
+      }
+
+      let rows;
+      try {
+        rows = parseCsvBuffer(file.buffer);
+      } catch (error) {
+        res.status(400).json({ error: "invalid_csv", message: String(error?.message ?? "") });
+        return;
+      }
+
+      if (!Array.isArray(rows) || rows.length === 0) {
+        res.status(400).json({ error: "csv_empty" });
+        return;
+      }
+      if (rows.length > 1000) {
+        res.status(400).json({ error: "csv_too_large", limit: 1000 });
+        return;
+      }
+
+      const job = createJob({ total: rows.length });
+      job.type = "bulk_status";
+      res.status(202).json({ jobId: job.jobId, total: job.total });
+
+      setImmediate(async () => {
+        const current = jobs.get(job.jobId);
+        if (!current) return;
+
+        try {
+          const admin = await getFirebaseAdmin({ env });
+          const { collectionId, displayName, storeId: normalizedStoreId } = getShopCollectionInfo({
+            env,
+            storeId,
+          });
+          const firestore = admin.firestore();
+
+          for (let i = 0; i < rows.length; i += 1) {
+            const row = rows[i];
+
+            const trackingNumber = pickFirstValue(row, [
+              "trackingNumber",
+              "Tracking Number",
+              "Tracking Numbers",
+              "tracking_numbers",
+            ]);
+            const shipmentStatusRaw = pickFirstValue(row, [
+              "shipmentStatus",
+              "Shipment status",
+              "Shipments Status",
+              "shipmentsStatus",
+            ]);
+
+            if (!trackingNumber || !shipmentStatusRaw) {
+              current.failed += 1;
+              current.errors.push(
+                `Row ${i + 2}: missing trackingNumber or shipmentStatus`
+              );
+              current.processed += 1;
+              continue;
+            }
+
+            const shipmentStatus = normalizeShipmentStatus(shipmentStatusRaw);
+            if (!shipmentStatus) {
+              current.failed += 1;
+              current.errors.push(`Row ${i + 2}: invalid shipmentStatus`);
+              current.processed += 1;
+              continue;
+            }
+
+            const updatedAt = nowIso();
+
+            let matches = [];
+            try {
+              const q1 = await firestore
+                .collection(collectionId)
+                .where("trackingNumber", "==", trackingNumber)
+                .limit(5)
+                .get();
+              matches = q1.docs;
+              if (matches.length === 0) {
+                const q2 = await firestore
+                  .collection(collectionId)
+                  .where("shipment.trackingNumber", "==", trackingNumber)
+                  .limit(5)
+                  .get();
+                matches = q2.docs;
+              }
+              if (matches.length === 0) {
+                const q3 = await firestore
+                  .collection(collectionId)
+                  .where("shipment.awbNumber", "==", trackingNumber)
+                  .limit(5)
+                  .get();
+                matches = q3.docs;
+              }
+            } catch (error) {
+              current.failed += 1;
+              current.errors.push(
+                `Row ${i + 2}: query failed (${String(error?.message ?? error ?? "")})`
+              );
+              current.processed += 1;
+              continue;
+            }
+
+            if (matches.length === 0) {
+              current.failed += 1;
+              current.errors.push(`Row ${i + 2}: tracking not found (${trackingNumber})`);
+              current.processed += 1;
+              continue;
+            }
+
+            try {
+              for (const docSnap of matches) {
+                await docSnap.ref.set(
+                  {
+                    storeId: normalizedStoreId,
+                    shopName: displayName,
+                    shipmentStatus,
+                    trackingNumber,
+                    shipment: {
+                      shipmentStatus,
+                      trackingNumber,
+                      updatedAt,
+                    },
+                    event: "bulk_status_csv",
+                    updatedBy: {
+                      uid: String(req.user?.uid ?? ""),
+                      email: String(req.user?.email ?? ""),
+                      role: String(req.user?.role ?? ""),
+                    },
+                    updatedAt,
+                  },
+                  { merge: true }
+                );
+              }
+              current.updated += matches.length;
+            } catch (error) {
+              current.failed += 1;
+              current.errors.push(
+                `Row ${i + 2}: update failed (${String(error?.message ?? error ?? "")})`
+              );
+            } finally {
+              current.processed += 1;
+            }
+          }
+
+          current.status = "done";
+          current.finishedAt = nowIso();
+        } catch (error) {
+          current.status = "failed";
+          current.message = String(error?.message ?? "bulk_status_failed");
+          current.finishedAt = nowIso();
+        }
+      });
+    }
+  );
+
   router.get(
     "/admin/bulk-orders/jobs/:jobId",
     auth.requireRole("admin"),
@@ -295,4 +497,3 @@ export function createBulkOrdersRouter({ env, auth }) {
 
   return router;
 }
-

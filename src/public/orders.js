@@ -22,9 +22,13 @@ const normalizeShipmentStatus = (value) => {
   if (s === "in_transit" || s === "in transit") return "in_transit";
   if (s === "delivered") return "delivered";
   if (s === "rto") return "rto";
+  if (s === "rto_initiated" || s === "rto initiated") return "rto_initiated";
+  if (s === "rto_delivered" || s === "rto delivered") return "rto_delivered";
 
   if (s === "fulfilled") return "delivered";
   if (s === "unfulfilled") return "new";
+  if (s.includes("rto") && s.includes("initi")) return "rto_initiated";
+  if (s.includes("rto") && s.includes("deliver")) return "rto_delivered";
   if (s.includes("deliver")) return "delivered";
   if (s.includes("transit")) return "in_transit";
   if (s.includes("rto")) return "rto";
@@ -673,7 +677,21 @@ function applyFiltersAndSort() {
   let view = allOrders;
 
   if (activeTab && activeTab !== "all") {
-    view = view.filter((row) => getEffectiveShipmentStatus(row) === activeTab);
+    if (activeTab === "in_transit") {
+      const excluded = new Set([
+        "assigned",
+        "delivered",
+        "rto",
+        "rto_initiated",
+        "rto_delivered",
+      ]);
+      view = view.filter((row) => !excluded.has(getEffectiveShipmentStatus(row)));
+    } else if (activeTab === "rto") {
+      const allowed = new Set(["rto", "rto_initiated", "rto_delivered"]);
+      view = view.filter((row) => allowed.has(getEffectiveShipmentStatus(row)));
+    } else {
+      view = view.filter((row) => getEffectiveShipmentStatus(row) === activeTab);
+    }
   }
 
   if (fulfillmentFilter !== "all") {
@@ -825,7 +843,9 @@ function renderRows(orders) {
               ? "In Transit"
               : effectiveShipmentStatus === "delivered"
                 ? "Delivered"
-                : effectiveShipmentStatus === "rto"
+                : effectiveShipmentStatus === "rto" ||
+                    effectiveShipmentStatus === "rto_initiated" ||
+                    effectiveShipmentStatus === "rto_delivered"
                   ? "RTO"
                   : "New";
     const shipmentKind =
@@ -836,7 +856,9 @@ function renderRows(orders) {
           : effectiveShipmentStatus === "in_transit" ||
               effectiveShipmentStatus === "assigned"
             ? "warn"
-            : effectiveShipmentStatus === "rto"
+            : effectiveShipmentStatus === "rto" ||
+                effectiveShipmentStatus === "rto_initiated" ||
+                effectiveShipmentStatus === "rto_delivered"
               ? "error"
               : "muted";
 
@@ -1065,7 +1087,8 @@ function renderRows(orders) {
           { value: "assigned", label: "Assigned" },
           { value: "in_transit", label: "In Transit" },
           { value: "delivered", label: "Delivered" },
-          { value: "rto", label: "RTO" },
+          { value: "rto_initiated", label: "RTO Initiated" },
+          { value: "rto_delivered", label: "RTO Delivered" },
         ];
         for (const o of options) {
           const opt = document.createElement("option");

@@ -14,8 +14,12 @@ const normalizeShipmentStatus = (value) => {
   if (s === "in_transit" || s === "in transit") return "in_transit";
   if (s === "delivered") return "delivered";
   if (s === "rto") return "rto";
+  if (s === "rto_initiated" || s === "rto initiated") return "rto_initiated";
+  if (s === "rto_delivered" || s === "rto delivered") return "rto_delivered";
   if (s === "fulfilled") return "delivered";
   if (s === "unfulfilled") return "new";
+  if (s.includes("rto") && s.includes("initi")) return "rto_initiated";
+  if (s.includes("rto") && s.includes("deliver")) return "rto_delivered";
   if (s.includes("deliver")) return "delivered";
   if (s.includes("transit")) return "in_transit";
   if (s.includes("rto")) return "rto";

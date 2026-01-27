@@ -6,6 +6,58 @@ import { toOrderDocId } from "../firestore/ids.js";
 export function createFirestoreOrdersRouter({ env, auth }) {
   const router = Router();
 
+  const normalizeShipmentStatus = (value) => {
+    const s = String(value ?? "").trim().toLowerCase();
+    if (!s) return "";
+    if (s === "assigned") return "assigned";
+    if (s === "delivered") return "delivered";
+    if (s === "in_transit" || s === "in transit") return "in_transit";
+    if (s === "rto") return "rto";
+    if (s === "rto_initiated" || s === "rto initiated") return "rto_initiated";
+    if (s === "rto_delivered" || s === "rto delivered") return "rto_delivered";
+    if (s.includes("rto") && s.includes("initi")) return "rto_initiated";
+    if (s.includes("rto") && s.includes("deliver")) return "rto_delivered";
+    if (s.includes("deliver")) return "delivered";
+    if (s.includes("transit")) return "in_transit";
+    if (s.includes("assign")) return "assigned";
+    return s.replaceAll(/\s+/g, "_");
+  };
+
+  const getAdminQueryForStatus = ({ query, status, limit }) => {
+    if (!status || status === "all") {
+      return query.orderBy("requestedAt", "desc").limit(limit);
+    }
+
+    if (status === "assigned") {
+      return query.where("shipmentStatus", "==", "assigned").limit(limit);
+    }
+
+    if (status === "delivered") {
+      return query.where("shipmentStatus", "==", "delivered").limit(limit);
+    }
+
+    if (status === "rto") {
+      return query
+        .where("shipmentStatus", "in", ["rto", "rto_initiated", "rto_delivered"])
+        .limit(limit);
+    }
+
+    if (status === "in_transit") {
+      // Firestore 'not-in' doesn't match missing fields; our docs always set shipmentStatus.
+      return query
+        .where("shipmentStatus", "not-in", [
+          "assigned",
+          "delivered",
+          "rto",
+          "rto_initiated",
+          "rto_delivered",
+        ])
+        .limit(limit);
+    }
+
+    return query.where("shipmentStatus", "==", status).limit(limit);
+  };
+
   const toStoreIdFromShopDomain = (domain) => {
     const raw = String(domain ?? "").trim().toLowerCase();
     if (!raw) return "";
@@ -30,6 +82,7 @@ export function createFirestoreOrdersRouter({ env, auth }) {
       }
 
       const status = String(req.query?.status ?? "assigned").trim().toLowerCase();
+      const statusNorm = normalizeShipmentStatus(status) || (status === "all" ? "all" : "");
       const limit = Math.max(
         1,
         Math.min(250, Number.parseInt(req.query?.limit ?? "200", 10) || 200)
@@ -41,12 +94,12 @@ export function createFirestoreOrdersRouter({ env, auth }) {
         storeId: storeId || shopDomain,
       });
 
-      let query = admin.firestore().collection(collectionId);
-      if (status && status !== "all") {
-        query = query.where("shipmentStatus", "==", status).limit(limit);
-      } else {
-        query = query.orderBy("requestedAt", "desc").limit(limit);
-      }
+      const baseQuery = admin.firestore().collection(collectionId);
+      const query = getAdminQueryForStatus({
+        query: baseQuery,
+        status: statusNorm || "assigned",
+        limit,
+      });
 
       const snap = await query.get();
       const rows = snap.docs.map((doc) => {
@@ -76,7 +129,7 @@ export function createFirestoreOrdersRouter({ env, auth }) {
       res.json({
         shopName: displayName,
         storeId: normalizedStoreId,
-        status,
+        status: statusNorm || "assigned",
         count: orders.length,
         orders,
       });
@@ -134,6 +187,7 @@ export function createFirestoreOrdersRouter({ env, auth }) {
       }
 
       const status = String(req.query?.status ?? "assigned").trim().toLowerCase();
+      const statusNorm = normalizeShipmentStatus(status) || (status === "all" ? "all" : "");
       const limit = Math.max(
         1,
         Math.min(250, Number.parseInt(req.query?.limit ?? "100", 10) || 100)
@@ -142,14 +196,12 @@ export function createFirestoreOrdersRouter({ env, auth }) {
       const admin = await getFirebaseAdmin({ env });
       const { collectionId, displayName } = getShopCollectionInfo({ env, storeId });
 
-      let query = admin.firestore().collection(collectionId);
-      if (status && status !== "all") {
-        // Avoid composite-index requirement (where + orderBy) by sorting in-memory.
-        query = query.where("shipmentStatus", "==", status).limit(limit);
-      } else {
-        // Simple query (no composite index) while still giving stable ordering.
-        query = query.orderBy("requestedAt", "desc").limit(limit);
-      }
+      const baseQuery = admin.firestore().collection(collectionId);
+      const query = getAdminQueryForStatus({
+        query: baseQuery,
+        status: statusNorm || "assigned",
+        limit,
+      });
 
       const snap = await query.get();
       const rows = snap.docs.map((doc) => {
@@ -176,7 +228,13 @@ export function createFirestoreOrdersRouter({ env, auth }) {
       );
 
       res.setHeader("Cache-Control", "no-store");
-      res.json({ shopName: displayName, storeId, status, count: orders.length, orders });
+      res.json({
+        shopName: displayName,
+        storeId,
+        status: statusNorm || "assigned",
+        count: orders.length,
+        orders,
+      });
     } catch (error) {
       next(error);
     }
