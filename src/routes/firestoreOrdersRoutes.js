@@ -29,16 +29,29 @@ export function createFirestoreOrdersRouter({ env, auth }) {
     }
 
     if (status === "assigned") {
-      return query.where("shipmentStatus", "==", "assigned").limit(limit);
+      return query
+        .where("shipmentStatus", "in", ["assigned", "Assigned", "ASSIGNED"])
+        .limit(limit);
     }
 
     if (status === "delivered") {
-      return query.where("shipmentStatus", "==", "delivered").limit(limit);
+      return query
+        .where("shipmentStatus", "in", ["delivered", "Delivered", "DELIVERED"])
+        .limit(limit);
     }
 
     if (status === "rto") {
       return query
-        .where("shipmentStatus", "in", ["rto", "rto_initiated", "rto_delivered"])
+        .where("shipmentStatus", "in", [
+          "rto",
+          "RTO",
+          "rto_initiated",
+          "rto initiated",
+          "RTO Initiated",
+          "rto_delivered",
+          "rto delivered",
+          "RTO Delivered",
+        ])
         .limit(limit);
     }
 
