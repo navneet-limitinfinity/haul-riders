@@ -4,6 +4,7 @@ import { createHealthRouter } from "./healthRoutes.js";
 import { createAuthApiRouter } from "./authApiRoutes.js";
 import { createAuthRouter } from "./authRoutes.js";
 import { createFirestoreOrdersRouter } from "./firestoreOrdersRoutes.js";
+import { createBulkOrdersRouter } from "./bulkOrdersRoutes.js";
 import { createPagesRouter } from "./pagesRoutes.js";
 import { createShipmentsRouter } from "./shipmentsRoutes.js";
 import { createShopifyRouter } from "./shopifyRoutes.js";
@@ -22,6 +23,7 @@ export function buildRoutes({ env, logger }) {
   router.use(createAuthRouter({ env }));
   router.use(createPagesRouter({ env, auth }));
   router.use("/api", createAuthApiRouter({ auth, env, logger }));
+  router.use("/api", createBulkOrdersRouter({ env, auth }));
   router.use("/api", createFirestoreOrdersRouter({ env, auth }));
   router.use(
     "/api",

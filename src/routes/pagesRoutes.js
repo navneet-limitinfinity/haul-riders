@@ -67,7 +67,7 @@ function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
 	                <strong>${safeUserLabel}</strong>
 	              </div>
               <a class="userMenuItem" href="${role === "admin" ? "/admin/orders" : "/shop/orders"}">Dashboard</a>
-              <a class="userMenuItem" href="/health">System health</a>
+              ${role === "admin" ? html`<a class="userMenuItem" href="/admin/bulk-upload">Bulk CSV upload</a>` : ""}
               <a class="userMenuItem" href="mailto:support@haulriders.com">Support</a>
               <button type="button" class="userMenuItem userMenuButton" data-action="logout">
                 Logout
@@ -197,6 +197,120 @@ function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
 </html>`;
 }
 
+function renderBulkUploadPage({ userLabel }) {
+  const assetVersion = "1";
+  const safeUserLabel = escapeHtml(userLabel);
+
+  return html`<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bulk CSV upload</title>
+    <link rel="stylesheet" href="/static/orders.css?v=28" />
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/fontawesome.min.css?v=28" />
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/solid.min.css?v=28" />
+    <link rel="stylesheet" href="/static/bulk-upload.css?v=${assetVersion}" />
+    <link rel="icon" type="image/png" href="/static/icon.png?v=28" />
+    <script src="/static/bulk-upload.js?v=${assetVersion}" defer></script>
+  </head>
+  <body data-role="admin">
+    <header class="topbar">
+      <div class="topbarInner">
+        <div class="brand">
+          <img
+            class="brandLogo"
+            src="/static/haul_riders_logo.jpeg?v=28"
+            alt="Haul Riders"
+            decoding="async"
+          />
+          <div class="brandText">
+            <div class="brandTitle">Haul Riders</div>
+            <div class="brandSub">Bulk CSV upload</div>
+          </div>
+        </div>
+
+        <div class="topbarActions">
+          <details class="userMenu" aria-label="User menu">
+            <summary class="userMenuSummary" aria-label="Open user menu">
+              <span class="userAvatar userAvatarIcon" aria-hidden="true">
+                <i class="fa-solid fa-user" aria-hidden="true"></i>
+              </span>
+            </summary>
+            <div class="userMenuList">
+              <div class="userMenuSection">
+                <strong>${safeUserLabel}</strong>
+              </div>
+              <a class="userMenuItem" href="/admin/orders">Dashboard</a>
+              <button type="button" class="userMenuItem userMenuButton" data-action="logout">
+                Logout
+              </button>
+            </div>
+          </details>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="panel">
+        <div class="panelHeader bulkHeader">
+          <div class="panelTitle">
+            <h1>Upload assigned orders (CSV)</h1>
+            <div class="panelHint">Adds orders directly to Firestore and shows them in the “Assigned” tab.</div>
+          </div>
+
+          <a class="btn btnSecondary" href="/static/sample_bulk_orders.csv" download>
+            Download sample CSV
+          </a>
+          <a class="btn btnSecondary" href="/static/sample_bulk_orders_50.csv" download>
+            Download 50-row test CSV
+          </a>
+        </div>
+
+        <div class="bulkCard">
+          <div class="bulkRow">
+            <label class="field">
+              <span>Store (required)</span>
+              <select id="storeId" class="storeSelect" aria-label="Select store"></select>
+            </label>
+          </div>
+
+          <div class="bulkRow">
+            <label class="field">
+              <span>CSV file</span>
+              <input id="csvFile" type="file" accept=".csv,text/csv" />
+            </label>
+            <button id="uploadBtn" class="btn btnPrimary" type="button">Upload</button>
+          </div>
+
+          <div id="uploadStatus" class="status" aria-live="polite"></div>
+
+          <div class="progressWrap" aria-label="Upload progress">
+            <div class="progressBar">
+              <div id="progressFill" class="progressFill" style="width: 0%"></div>
+            </div>
+            <div id="progressText" class="progressText">0%</div>
+          </div>
+
+          <details class="bulkDetails">
+            <summary>Required CSV columns</summary>
+            <ul class="bulkList">
+              <li><code>orderKey</code> (unique id; any string)</li>
+              <li><code>orderName</code> (include <code>#</code>, e.g. <code>#1001</code>)</li>
+              <li><code>fullName</code>, <code>phone1</code>, <code>address1</code>, <code>city</code>, <code>state</code>, <code>pinCode</code></li>
+              <li><code>totalPrice</code>, <code>financialStatus</code> (e.g. <code>paid</code> or <code>pending</code>)</li>
+            </ul>
+            <div class="bulkHint">
+              Optional: <code>awbNumber</code>, <code>courierType</code>, <code>weightKg</code>, <code>customerEmail</code>, <code>address2</code>, <code>phone2</code>.
+            </div>
+          </details>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>`;
+}
+
 export function createPagesRouter({ env, auth } = {}) {
   const router = Router();
 
@@ -216,6 +330,12 @@ export function createPagesRouter({ env, auth } = {}) {
     const userLabel = String(req.user?.email ?? env?.adminName ?? "Admin").trim() || "Admin";
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(renderOrdersPage({ role: "admin", userLabel, storeId: "", firestoreCollectionId: "" }));
+  });
+
+  router.get("/admin/bulk-upload", auth.requireRole("admin"), (req, res) => {
+    const userLabel = String(req.user?.email ?? env?.adminName ?? "Admin").trim() || "Admin";
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(renderBulkUploadPage({ userLabel }));
   });
 
   return router;

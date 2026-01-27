@@ -1,0 +1,72 @@
+.bulkHeader {
+  gap: 10px;
+}
+
+.bulkCard {
+  margin-top: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  padding: 16px;
+  background: #fff;
+}
+
+.bulkRow {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.bulkRow .field {
+  min-width: 280px;
+  flex: 1;
+}
+
+.progressWrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.progressBar {
+  flex: 1;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: #2563eb;
+  width: 0%;
+  transition: width 180ms ease;
+}
+
+.progressText {
+  min-width: 44px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.bulkDetails {
+  margin-top: 12px;
+}
+
+.bulkList {
+  margin: 8px 0 0 18px;
+}
+
+.bulkHint {
+  margin-top: 10px;
+  color: rgba(0, 0, 0, 0.7);
+  font-size: 13px;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  font-size: 0.95em;
+}

@@ -1,0 +1,2 @@
+orderKey,orderName,createdAt,financialStatus,totalPrice,customerEmail,fullName,phone1,phone2,address1,address2,city,state,pinCode,courierType,weightKg,awbNumber,trackingCompany
+bulk_test_0001,#BULK-0001,2026-01-25T10:00:00.000Z,paid,999.00,test.customer@example.com,Test Customer,9876543210,,606 5k phase 2 Mohan tulsi Vihar,,Badlapur,Maharashtra,421503,Z- Express,0.1,Z742020840,DTDC
