@@ -12,7 +12,7 @@ const escapeHtml = (value) =>
     .replaceAll("'", "&#39;");
 
 function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
-  const assetVersion = "28";
+  const assetVersion = "29";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
   const safeFirestoreCollectionId = escapeHtml(firestoreCollectionId);
@@ -127,6 +127,18 @@ function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
               </label>
               <button id="refresh" class="btn btnPrimary" type="button">Sync Orders</button>
               <button id="bulkShip" class="btn btnPrimary" type="button">Bulk Ship</button>
+              ${
+                role === "admin"
+                  ? html`<button
+                      id="bulkStatusUpload"
+                      class="btn btnSecondary btnIcon"
+                      type="button"
+                      title="Bulk status update (CSV)"
+                    >
+                      <i class="fa-solid fa-file-arrow-up" aria-hidden="true"></i>
+                    </button>`
+                  : ""
+              }
               <button id="bulkDownloadLabels" class="btn btnSecondary btnIcon" type="button" disabled title="Download shipping labels (PDF)">
                 <i class="fa-solid fa-download" aria-hidden="true"></i>
               </button>
@@ -198,7 +210,7 @@ function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
 }
 
 function renderBulkUploadPage({ userLabel }) {
-  const assetVersion = "1";
+  const assetVersion = "2";
   const safeUserLabel = escapeHtml(userLabel);
 
   return html`<!doctype html>
@@ -313,7 +325,7 @@ function renderBulkUploadPage({ userLabel }) {
 
           <hr class="bulkDivider" />
 
-          <div class="bulkRow">
+          <div id="status-upload" class="bulkRow">
             <div class="bulkSectionTitle">Update shipment status by Tracking Number (CSV)</div>
           </div>
 

@@ -1751,6 +1751,13 @@ window.addEventListener("DOMContentLoaded", () => {
 
   refresh();
 
+  const bulkStatusBtn = $("bulkStatusUpload");
+  if (bulkStatusBtn) {
+    bulkStatusBtn.addEventListener("click", () => {
+      window.location.assign("/admin/bulk-upload#status-upload");
+    });
+  }
+
   const userMenu = document.querySelector(".userMenu");
   userMenu?.addEventListener("click", (e) => {
     const target = e.target;
