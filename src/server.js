@@ -47,18 +47,22 @@ async function main() {
   const appEnv = { ...env, storesConfig };
 
   if (!storesConfig) {
-    if (!env.shopify.storeDomain) {
-      logger.warn(
-        { envVar: "SHOPIFY_STORE" },
-        "Missing Shopify store domain; Shopify routes will fail until set"
-      );
-    }
+    // Shopify credentials are resolved from Firestore when AUTH_PROVIDER=firebase.
+    // Only warn about env vars when not using Firebase token storage.
+    if (env.auth.provider !== "firebase") {
+      if (!env.shopify.storeDomain) {
+        logger.warn(
+          { envVar: "SHOPIFY_STORE" },
+          "Missing Shopify store domain; Shopify routes will fail until set"
+        );
+      }
 
-    if (!env.shopify.accessToken) {
-      logger.warn(
-        { envVar: "SHOPIFY_TOKEN" },
-        "Missing Shopify access token; Shopify routes will fail until set"
-      );
+      if (!env.shopify.accessToken) {
+        logger.warn(
+          { envVar: "SHOPIFY_TOKEN" },
+          "Missing Shopify access token; Shopify routes will fail until set"
+        );
+      }
     }
   }
 

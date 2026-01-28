@@ -1,7 +1,6 @@
 import { Router } from "express";
 import { createShopifyAdminClient } from "../shopify/createShopifyAdminClient.js";
 import { projectOrderRow } from "../shopify/projectOrderRow.js";
-import { resolveStore } from "../config/stores.js";
 import { resolveShopifyAccessToken } from "../shopify/resolveShopifyAccessToken.js";
 
 const normalizeDomain = (domain) => String(domain ?? "").trim().toLowerCase();
@@ -25,32 +24,19 @@ export function createShopifyRouter({ env, logger, auth }) {
   const getStoreForRequest = async (req) => {
     const storeId = getStoreIdForRequest(req);
 
-    // Firebase mode: always read token from Firestore `shops/<shopDomain>.shopify.accessToken`.
-    // This avoids relying on server env for Shopify credentials.
-    if (env?.auth?.provider === "firebase") {
-      const shopDomain = normalizeDomain(storeId);
-      if (!shopDomain) return null;
-      const token = await resolveShopifyAccessToken({ env, shopDomain });
-      return {
-        id: shopDomain,
-        name: shopDomain,
-        domain: shopDomain,
-        apiVersion: env.shopify.apiVersion,
-        token,
-      };
-    }
+    // Always read token from Firestore `shops/<shopDomain>` when using Firebase auth.
+    // This removes dependency on SHOPIFY_STORE/SHOPIFY_TOKEN env vars.
+    if (env?.auth?.provider !== "firebase") return null;
 
-    // Admin role: keep existing stores.json / env tokens.
-    if (env.storesConfig) {
-      return resolveStore({ storesConfig: env.storesConfig, storeId, env: process.env });
-    }
-
+    const shopDomain = normalizeDomain(storeId);
+    if (!shopDomain) return null;
+    const token = await resolveShopifyAccessToken({ env, shopDomain });
     return {
-      id: "default",
-      name: "default",
-      domain: env.shopify.storeDomain,
+      id: shopDomain,
+      name: shopDomain,
+      domain: shopDomain,
       apiVersion: env.shopify.apiVersion,
-      token: env.shopify.accessToken,
+      token,
     };
   };
 
