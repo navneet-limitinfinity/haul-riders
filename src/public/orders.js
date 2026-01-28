@@ -900,7 +900,7 @@ function renderRows(orders) {
     const shipmentLabel =
       activeRole === "shop" && activeTab === "new" && !isFulfilled
         ? "Unfulfilled"
-        : activeRole === "admin" && activeTab === "in_transit" && rawShipmentStatus
+        : activeTab === "in_transit" && rawShipmentStatus
           ? rawShipmentStatus
           : effectiveShipmentStatus === "new"
             ? "New"
@@ -947,7 +947,9 @@ function renderRows(orders) {
       activeRole === "shop"
         ? activeTab === "new"
           ? createActionButton({ label: "Ship Now", action: "ship-now", orderKey })
-          : effectiveShipmentStatus === "new"
+          : activeTab === "in_transit"
+            ? createActionButton({ label: "Download Slip", action: "download-slip", orderKey })
+            : effectiveShipmentStatus === "new"
             ? sessionAssignedOrderKeys.has(orderKey)
               ? createBadge({ label: "Assigned", kind: "warn" })
               : createActionButton({ label: "Ship Now", action: "ship-now", orderKey })
