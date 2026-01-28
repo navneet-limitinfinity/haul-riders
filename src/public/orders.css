@@ -665,6 +665,44 @@ body[data-role="admin"] #bulkShip {
   min-height: 18px;
 }
 
+.pageProgress {
+  height: 3px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.pageProgress.isActive {
+  opacity: 1;
+}
+
+.pageProgressBar {
+  height: 100%;
+  width: 60%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(106, 166, 255, 0.25) 20%,
+    var(--accent) 50%,
+    rgba(106, 166, 255, 0.25) 80%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: pageProgress 900ms linear infinite;
+  transform: translateX(-100%);
+}
+
+@keyframes pageProgress {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
 .status[data-kind="ok"] {
   color: var(--ok);
 }

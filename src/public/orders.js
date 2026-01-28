@@ -3,6 +3,7 @@ const $ = (id) => document.getElementById(id);
 let allOrders = [];
 let currentOrders = [];
 const selectedOrderIds = new Set();
+let loadingCount = 0;
 
 const getOrderKey = (row) => String(row?.orderKey ?? row?.orderId ?? "");
 
@@ -624,6 +625,14 @@ function setStatus(message, { kind = "info" } = {}) {
   if (!el) return;
   el.dataset.kind = kind;
   el.textContent = message;
+}
+
+function setLoading(isLoading) {
+  if (isLoading) loadingCount += 1;
+  else loadingCount = Math.max(0, loadingCount - 1);
+  const el = $("pageProgress");
+  if (!el) return;
+  el.classList.toggle("isActive", loadingCount > 0);
 }
 
 function setMetric(id, value) {
@@ -1251,6 +1260,7 @@ async function refresh() {
   const limit = SHOPIFY_MAX_LIMIT;
   const since = getSinceIsoForRange(getDateRange());
   setStatus("Loading…");
+  setLoading(true);
 
   try {
     if (activeRole === "admin") {
@@ -1320,6 +1330,8 @@ async function refresh() {
     applyFiltersAndSort();
   } catch (error) {
     setStatus(error?.message ?? "Failed to load orders.", { kind: "error" });
+  } finally {
+    setLoading(false);
   }
 }
 

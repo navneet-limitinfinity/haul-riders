@@ -12,7 +12,7 @@ const escapeHtml = (value) =>
     .replaceAll("'", "&#39;");
 
 function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
-  const assetVersion = "29";
+  const assetVersion = "30";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
   const safeFirestoreCollectionId = escapeHtml(firestoreCollectionId);
@@ -164,6 +164,10 @@ function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
             <div class="metricLabel">Tracking assigned</div>
             <div id="metricTracking" class="metricValue">—</div>
           </div>
+        </div>
+
+        <div id="pageProgress" class="pageProgress" aria-hidden="true">
+          <div class="pageProgressBar"></div>
         </div>
 
         <div id="status" class="status" aria-live="polite"></div>
