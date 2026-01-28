@@ -7,6 +7,49 @@ let loadingCount = 0;
 
 const getOrderKey = (row) => String(row?.orderKey ?? row?.orderId ?? "");
 
+const tabOrdersCache = new Map();
+
+function getTabCacheKey({ role, storeId, tab }) {
+  return `haul_orders_cache:v1:${String(role ?? "")}:${String(storeId ?? "")}:${String(tab ?? "")}`;
+}
+
+function readCachedOrders({ role, storeId, tab }) {
+  const key = getTabCacheKey({ role, storeId, tab });
+  const mem = tabOrdersCache.get(key);
+  if (mem) return mem;
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.orders)) return null;
+    tabOrdersCache.set(key, parsed);
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedOrders({ role, storeId, tab, orders }) {
+  const key = getTabCacheKey({ role, storeId, tab });
+  const payload = {
+    savedAt: new Date().toISOString(),
+    orders: Array.isArray(orders) ? orders : [],
+  };
+  tabOrdersCache.set(key, payload);
+  try {
+    sessionStorage.setItem(key, JSON.stringify(payload));
+  } catch {
+    // ignore quota errors
+  }
+}
+
+function pruneSelectionToVisible(orders) {
+  const visibleIds = new Set((Array.isArray(orders) ? orders : []).map((r) => getOrderKey(r)));
+  for (const selectedId of selectedOrderIds) {
+    if (!visibleIds.has(selectedId)) selectedOrderIds.delete(selectedId);
+  }
+}
+
 const escapeHtml = (value) =>
   String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -557,6 +600,12 @@ async function ensureFirestoreAssignedRealtime() {
         }
         firestoreAssignedState.orders = rows;
         firestoreAssignedState.ready = true;
+        writeCachedOrders({
+          role: "shop",
+          storeId: getStoreIdForRequests(),
+          tab: "assigned",
+          orders: rows,
+        });
 
         if (activeRole === "shop" && activeTab === "assigned") {
           allOrders = rows;
@@ -575,6 +624,12 @@ async function ensureFirestoreAssignedRealtime() {
           }
           firestoreAssignedState.orders = orders;
           firestoreAssignedState.ready = true;
+          writeCachedOrders({
+            role: "shop",
+            storeId: getStoreIdForRequests(),
+            tab: "assigned",
+            orders,
+          });
           if (activeRole === "shop" && activeTab === "assigned") {
             allOrders = orders;
             applyFiltersAndSort();
@@ -1256,9 +1311,22 @@ function exportSelectedToCsv() {
   setStatus(`Exported ${selected.length} order(s) to CSV.`, { kind: "ok" });
 }
 
-async function refresh() {
+async function refresh({ forceNetwork = false } = {}) {
   const limit = SHOPIFY_MAX_LIMIT;
   const since = getSinceIsoForRange(getDateRange());
+
+  const cacheStoreId = activeRole === "admin" ? getActiveStoreId() : getStoreIdForRequests();
+  if (!forceNetwork) {
+    const cached = readCachedOrders({ role: activeRole, storeId: cacheStoreId, tab: activeTab });
+    if (cached?.orders) {
+      allOrders = cached.orders;
+      pruneSelectionToVisible(allOrders);
+      applyFiltersAndSort();
+      setStatus(`Loaded ${allOrders.length} order(s).`, { kind: "ok" });
+      return;
+    }
+  }
+
   setStatus("Loading…");
   setLoading(true);
 
@@ -1269,6 +1337,7 @@ async function refresh() {
         allOrders = [];
         applyFiltersAndSort();
         setStatus("Select a store.", { kind: "info" });
+        writeCachedOrders({ role: "admin", storeId: "", tab: activeTab, orders: [] });
         return;
       }
 
@@ -1277,21 +1346,23 @@ async function refresh() {
       const orders = Array.isArray(data?.orders) ? data.orders : [];
       allOrders = orders;
 
-      const visibleIds = new Set(orders.map((r) => getOrderKey(r)));
-      for (const selectedId of selectedOrderIds) {
-        if (!visibleIds.has(selectedId)) selectedOrderIds.delete(selectedId);
-      }
+      pruneSelectionToVisible(orders);
+      writeCachedOrders({ role: "admin", storeId, tab: activeTab, orders });
 
       applyFiltersAndSort();
       return;
     }
 
     if (activeRole === "shop") {
+      const storeId = getStoreIdForRequests();
       if (activeTab === "assigned") {
         await ensureFirestoreAssignedRealtime();
-        allOrders = Array.isArray(firestoreAssignedState.orders)
+        const orders = Array.isArray(firestoreAssignedState.orders)
           ? firestoreAssignedState.orders
           : [];
+        allOrders = orders;
+        pruneSelectionToVisible(orders);
+        writeCachedOrders({ role: "shop", storeId, tab: "assigned", orders });
         applyFiltersAndSort();
         if (firestoreAssignedState.ready) {
           setStatus(`Loaded ${allOrders.length} assigned order(s).`, { kind: "ok" });
@@ -1304,6 +1375,8 @@ async function refresh() {
         const data = await fetchFirestoreOrders({ status, limit: 250 });
         const orders = Array.isArray(data?.orders) ? data.orders : [];
         allOrders = orders;
+        pruneSelectionToVisible(orders);
+        writeCachedOrders({ role: "shop", storeId, tab: activeTab, orders });
         applyFiltersAndSort();
         setStatus(`Loaded ${orders.length} order(s).`, { kind: "ok" });
         return;
@@ -1322,10 +1395,8 @@ async function refresh() {
 
     allOrders = orders;
 
-    const visibleIds = new Set(orders.map((r) => getOrderKey(r)));
-    for (const selectedId of selectedOrderIds) {
-      if (!visibleIds.has(selectedId)) selectedOrderIds.delete(selectedId);
-    }
+    pruneSelectionToVisible(orders);
+    writeCachedOrders({ role: activeRole, storeId: cacheStoreId, tab: activeTab, orders });
 
     applyFiltersAndSort();
   } catch (error) {
@@ -1350,20 +1421,8 @@ window.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll(".tabBtn[data-tab]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const tab = String(btn.dataset.tab ?? "");
-      const prevTab = activeTab;
       setActiveTab(tab);
-
-      if (activeRole === "shop" && (tab === "assigned" || prevTab === "assigned")) {
-        refresh();
-        return;
-      }
-
-      if (activeRole === "admin") {
-        refresh();
-        return;
-      }
-
-      applyFiltersAndSort();
+      refresh({ forceNetwork: false });
     });
   });
 
@@ -1436,7 +1495,7 @@ window.addEventListener("DOMContentLoaded", () => {
   $("dateRange")?.addEventListener("change", (e) => {
     setDateRange(e.target?.value);
   });
-  $("refresh")?.addEventListener("click", refresh);
+  $("refresh")?.addEventListener("click", () => refresh({ forceNetwork: true }));
   $("exportCsv")?.addEventListener("click", exportSelectedToCsv);
   $("bulkDownloadLabels")?.addEventListener("click", async (e) => {
     const btn = e.target?.closest?.("button");
@@ -1730,7 +1789,7 @@ window.addEventListener("DOMContentLoaded", () => {
       try {
         await postJson("/api/shipments/update", { orderKey, storeId, shipmentStatus, trackingNumber });
         setStatus("Shipment updated.", { kind: "ok" });
-        await refresh();
+        await refresh({ forceNetwork: true });
       } catch (error) {
         setStatus(error?.message ?? "Failed to update shipment.", { kind: "error" });
       } finally {
