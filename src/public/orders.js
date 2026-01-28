@@ -897,11 +897,27 @@ function renderRows(orders) {
 
     const effectiveShipmentStatus = getEffectiveShipmentStatus(row);
     const rawShipmentStatus = String(row?.shipmentStatus ?? "").trim();
+    const beautifyStatus = (value) => {
+      const raw = String(value ?? "").trim();
+      if (!raw) return "";
+      return raw
+        .replaceAll("_", " ")
+        .split(" ")
+        .map((w) => (w ? w[0].toUpperCase() + w.slice(1).toLowerCase() : ""))
+        .join(" ")
+        .trim();
+    };
+
+    const inTransitLabel =
+      activeTab === "in_transit" && rawShipmentStatus
+        ? beautifyStatus(rawShipmentStatus)
+        : "";
+
     const shipmentLabel =
       activeRole === "shop" && activeTab === "new" && !isFulfilled
         ? "Unfulfilled"
-        : activeTab === "in_transit" && rawShipmentStatus
-          ? rawShipmentStatus
+        : inTransitLabel
+          ? inTransitLabel
           : effectiveShipmentStatus === "new"
             ? "New"
             : effectiveShipmentStatus === "assigned"
@@ -918,6 +934,10 @@ function renderRows(orders) {
     const shipmentKind =
       activeRole === "shop" && activeTab === "new" && !isFulfilled
         ? "muted"
+        : inTransitLabel &&
+            (inTransitLabel.toLowerCase().includes("destination") ||
+              inTransitLabel.toLowerCase().includes("transit"))
+          ? "ok"
         : effectiveShipmentStatus === "delivered"
           ? "ok"
           : effectiveShipmentStatus === "in_transit" ||
