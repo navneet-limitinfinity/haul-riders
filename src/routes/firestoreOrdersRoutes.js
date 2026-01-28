@@ -6,6 +6,13 @@ import { toOrderDocId } from "../firestore/ids.js";
 export function createFirestoreOrdersRouter({ env, auth }) {
   const router = Router();
 
+  const getDocShipmentStatusRaw = (data) => {
+    const direct = String(data?.shipmentStatus ?? "").trim();
+    if (direct) return direct;
+    const nested = data?.shipment && typeof data.shipment === "object" ? data.shipment : null;
+    return String(nested?.shipmentStatus ?? "").trim();
+  };
+
   const normalizeShipmentStatus = (value) => {
     const s = String(value ?? "").trim().toLowerCase();
     if (!s) return "";
@@ -23,52 +30,75 @@ export function createFirestoreOrdersRouter({ env, auth }) {
     return s.replaceAll(/\s+/g, "_");
   };
 
-  const getAdminQueryForStatus = ({ query, status, limit }) => {
-    if (!status || status === "all") {
-      return query.orderBy("requestedAt", "desc").limit(limit);
-    }
-
-    if (status === "assigned") {
-      return query
-        .where("shipmentStatus", "in", ["assigned", "Assigned", "ASSIGNED"])
-        .limit(limit);
-    }
-
-    if (status === "delivered") {
-      return query
-        .where("shipmentStatus", "in", ["delivered", "Delivered", "DELIVERED"])
-        .limit(limit);
-    }
-
+  const getStatusVariants = (status) => {
+    if (status === "assigned") return ["assigned", "Assigned", "ASSIGNED"];
+    if (status === "delivered") return ["delivered", "Delivered", "DELIVERED"];
     if (status === "rto") {
-      return query
-        .where("shipmentStatus", "in", [
-          "rto",
-          "RTO",
-          "rto_initiated",
-          "rto initiated",
-          "RTO Initiated",
-          "rto_delivered",
-          "rto delivered",
-          "RTO Delivered",
-        ])
-        .limit(limit);
+      return [
+        "rto",
+        "RTO",
+        "rto_initiated",
+        "rto initiated",
+        "RTO Initiated",
+        "rto_delivered",
+        "rto delivered",
+        "RTO Delivered",
+      ];
+    }
+    return [status];
+  };
+
+  const fetchDocsForStatus = async ({ firestore, collectionId, status, limit }) => {
+    const col = firestore.collection(collectionId);
+    const statusNorm = String(status ?? "").trim().toLowerCase();
+
+    if (!statusNorm || statusNorm === "all") {
+      return col.orderBy("requestedAt", "desc").limit(limit).get();
     }
 
-    if (status === "in_transit") {
-      // Firestore 'not-in' doesn't match missing fields; our docs always set shipmentStatus.
-      return query
-        .where("shipmentStatus", "not-in", [
-          "assigned",
-          "delivered",
-          "rto",
-          "rto_initiated",
-          "rto_delivered",
-        ])
-        .limit(limit);
+    if (statusNorm === "in_transit") {
+      // Use in-memory filtering so we catch docs where status might be stored under `shipment.shipmentStatus`.
+      const excluded = new Set(["assigned", "delivered", "rto", "rto_initiated", "rto_delivered"]);
+      const snap = await col.orderBy("requestedAt", "desc").limit(limit).get();
+      const filteredDocs = snap.docs.filter((d) => {
+        const data = d.data() ?? {};
+        const raw = getDocShipmentStatusRaw(data);
+        const norm = normalizeShipmentStatus(raw);
+        return norm && !excluded.has(norm);
+      });
+      return { docs: filteredDocs };
     }
 
-    return query.where("shipmentStatus", "==", status).limit(limit);
+    const variants = getStatusVariants(statusNorm);
+    if (variants.length === 1) {
+      const [v] = variants;
+      const [a, b] = await Promise.all([
+        col.where("shipmentStatus", "==", v).limit(limit).get(),
+        col.where("shipment.shipmentStatus", "==", v).limit(limit).get(),
+      ]);
+      const seen = new Set();
+      const docs = [];
+      for (const d of [...a.docs, ...b.docs]) {
+        if (seen.has(d.id)) continue;
+        seen.add(d.id);
+        docs.push(d);
+      }
+      return { docs };
+    }
+
+    // Firestore 'in' supports up to 10 values; our variant lists are <= 8.
+    const [a, b] = await Promise.all([
+      col.where("shipmentStatus", "in", variants).limit(limit).get(),
+      col.where("shipment.shipmentStatus", "in", variants).limit(limit).get(),
+    ]);
+    const seen = new Set();
+    const docs = [];
+    for (const d of [...a.docs, ...b.docs]) {
+      if (seen.has(d.id)) continue;
+      seen.add(d.id);
+      docs.push(d);
+    }
+    return { docs };
   };
 
   const toStoreIdFromShopDomain = (domain) => {
@@ -107,18 +137,19 @@ export function createFirestoreOrdersRouter({ env, auth }) {
         storeId: storeId || shopDomain,
       });
 
-      const baseQuery = admin.firestore().collection(collectionId);
-      const query = getAdminQueryForStatus({
-        query: baseQuery,
+      const firestore = admin.firestore();
+      const snap = await fetchDocsForStatus({
+        firestore,
+        collectionId,
         status: statusNorm || "assigned",
         limit,
       });
+      const docs = Array.isArray(snap?.docs) ? snap.docs : [];
 
-      const snap = await query.get();
-      const rows = snap.docs.map((doc) => {
+      const rows = docs.map((doc) => {
         const data = doc.data() ?? {};
         const order = data.order && typeof data.order === "object" ? data.order : null;
-        const shipmentStatus = String(data.shipmentStatus ?? "").trim();
+        const shipmentStatus = getDocShipmentStatusRaw(data);
         const orderKey = String(data.orderKey ?? doc.id).trim();
         const requestedAt = String(data.requestedAt ?? data.updatedAt ?? "").trim();
         return {
@@ -209,18 +240,19 @@ export function createFirestoreOrdersRouter({ env, auth }) {
       const admin = await getFirebaseAdmin({ env });
       const { collectionId, displayName } = getShopCollectionInfo({ env, storeId });
 
-      const baseQuery = admin.firestore().collection(collectionId);
-      const query = getAdminQueryForStatus({
-        query: baseQuery,
+      const firestore = admin.firestore();
+      const snap = await fetchDocsForStatus({
+        firestore,
+        collectionId,
         status: statusNorm || "assigned",
         limit,
       });
+      const docs = Array.isArray(snap?.docs) ? snap.docs : [];
 
-      const snap = await query.get();
-      const rows = snap.docs.map((doc) => {
+      const rows = docs.map((doc) => {
         const data = doc.data() ?? {};
         const order = data.order && typeof data.order === "object" ? data.order : null;
-        const shipmentStatus = String(data.shipmentStatus ?? "").trim();
+        const shipmentStatus = getDocShipmentStatusRaw(data);
         const orderKey = String(data.orderKey ?? doc.id).trim();
         const requestedAt = String(data.requestedAt ?? "").trim();
         return {
