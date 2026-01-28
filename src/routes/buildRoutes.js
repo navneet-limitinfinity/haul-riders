@@ -8,7 +8,6 @@ import { createBulkOrdersRouter } from "./bulkOrdersRoutes.js";
 import { createPagesRouter } from "./pagesRoutes.js";
 import { createShipmentsRouter } from "./shipmentsRoutes.js";
 import { createShopifyRouter } from "./shopifyRoutes.js";
-import { createStoresRouter } from "./storesRoutes.js";
 import { createShopsRouter } from "./shopsRoutes.js";
 
 /**
@@ -25,10 +24,6 @@ export function buildRoutes({ env, logger }) {
   router.use("/api", createAuthApiRouter({ auth, env, logger }));
   router.use("/api", createBulkOrdersRouter({ env, auth }));
   router.use("/api", createFirestoreOrdersRouter({ env, auth }));
-  router.use(
-    "/api",
-    createStoresRouter({ storesConfig: env.storesConfig ?? null, auth })
-  );
   router.use("/api", createShopsRouter({ env, auth }));
   router.use("/api", createShipmentsRouter({ env, auth }));
   router.use("/api/shopify", createShopifyRouter({ env, logger, auth }));

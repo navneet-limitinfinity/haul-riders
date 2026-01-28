@@ -28,9 +28,8 @@ cp .env.example .env
 ```
 
 3) Edit `.env` and set:
-- `SHOPIFY_STORE` (example: `your-store.myshopify.com`)
-- `SHOPIFY_TOKEN` (your Admin API access token)
-  - Alternatively, for multi-store, set `STORES_FILE` and use a per-store token env var.
+- Firebase auth + config (see `.env.example`)
+- Shopify OAuth credentials (if using `/oauth/install`)
 
 ## Run locally
 Development (auto-reload):
@@ -61,13 +60,9 @@ Server will listen on `http://localhost:3000` by default (configurable via `PORT
   - Multi-store (admin): `GET /admin/orders?store=<storeId>`
 
 ## Multi-store setup (single server, multiple shops)
-1) Create a stores config file (copy `stores.example.json` to `stores.json`).
-2) Add `stores.json` to `.gitignore` (already ignored by default).
-3) In `.env`, set `STORES_FILE=./stores.json`.
-4) Provide tokens:
-   - Recommended: in `stores.json` use `tokenEnvVar` per store (ex: `SHOPIFY_TOKEN_VAIDIKI`) and set those env vars in `.env`.
-   - Alternatively (less recommended): put `token` directly in `stores.json`.
-5) Start the server and switch stores using the dropdown in the header or `?store=...`.
+All shops are stored in Firestore collection `shops` (doc id is the shop domain like `abc.myshopify.com`).
+- The admin dashboard loads the store dropdown from Firestore (`GET /api/shops`).
+- Shopify access tokens are stored in Firestore by the OAuth flow (`/oauth/install` → `/oauth/callback`).
 
 ## Troubleshooting
 ### “Only a few orders show up”
@@ -90,7 +85,7 @@ npm run orders:latest
 - `SHOPIFY_TIMEOUT_MS` request timeout in milliseconds (default `10000`)
 - `SHOPIFY_MAX_RETRIES` retries for transient Shopify errors (default `2`, range `0..5`)
 - Shipping label:
-  - `SHIP_FROM_*` values used in the label “FROM” block (optional; can also be set per-store in `stores.json` via `shipFrom`)
+  - `SHIP_FROM_*` values used in the label “FROM” block (optional; can also be set per shop in Firestore `shops/<shopDomain>.shipFrom`)
   - `SHIP_LABEL_LOGO_URL` optional image URL for the label (example: `/static/haul_riders_logo.jpeg`)
   - PDF template: `src/public/Blank Docket.pdf` is used as the background, and dynamic fields are overlaid using coordinates extracted from `src/public/Sample Docket.pdf` into `src/shipments/label/docketTemplateMap.json`.
 - Shopify OAuth install (Dev Dashboard apps):

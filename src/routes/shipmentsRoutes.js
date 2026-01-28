@@ -76,7 +76,6 @@ export function createShipmentsRouter({ env, auth }) {
 
       const admin = await getFirebaseAdmin({ env });
       const { collectionId, displayName, storeId: normalizedStoreId } = getShopCollectionInfo({
-        env,
         storeId,
       });
       const docId = toOrderDocId(orderKey);
@@ -149,7 +148,6 @@ export function createShipmentsRouter({ env, auth }) {
 
       const admin = await getFirebaseAdmin({ env });
       const { collectionId, displayName, storeId: normalizedStoreId } = getShopCollectionInfo({
-        env,
         storeId,
       });
       const docId = toOrderDocId(orderKey);
@@ -219,10 +217,7 @@ export function createShipmentsRouter({ env, auth }) {
         }
 
         const admin = await getFirebaseAdmin({ env });
-        const { collectionId, storeId: normalizedStoreId } = getShopCollectionInfo({
-          env,
-          storeId,
-        });
+        const { collectionId } = getShopCollectionInfo({ storeId });
         const docId = toOrderDocId(orderKey);
         const snap = await admin.firestore().collection(collectionId).doc(docId).get();
         if (!snap.exists) {
@@ -232,7 +227,11 @@ export function createShipmentsRouter({ env, auth }) {
 
         const doc = snap.data() ?? {};
 
-        const pdf = await generateShippingLabelPdfBuffer({ env, storeId: normalizedStoreId, firestoreDoc: doc });
+        const pdf = await generateShippingLabelPdfBuffer({
+          env,
+          shopDomain: storeId,
+          firestoreDoc: doc,
+        });
 
         const filenameSafe = `label_${docId}.pdf`;
         res.setHeader("Cache-Control", "no-store");
@@ -284,10 +283,7 @@ export function createShipmentsRouter({ env, auth }) {
         }
 
         const admin = await getFirebaseAdmin({ env });
-        const { collectionId, storeId: normalizedStoreId } = getShopCollectionInfo({
-          env,
-          storeId,
-        });
+        const { collectionId } = getShopCollectionInfo({ storeId });
 
         const missing = [];
         const docs = [];
@@ -310,7 +306,7 @@ export function createShipmentsRouter({ env, auth }) {
         for (const { data } of docs) {
           const labelBytes = await generateShippingLabelPdfBuffer({
             env,
-            storeId: normalizedStoreId,
+            shopDomain: storeId,
             firestoreDoc: data,
           });
           const labelDoc = await PDFDocument.load(labelBytes);

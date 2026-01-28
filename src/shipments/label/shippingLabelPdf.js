@@ -148,7 +148,7 @@ async function getTemplateAssets() {
   return templateAssetsPromise;
 }
 
-export async function generateShippingLabelPdfBuffer({ env, storeId, firestoreDoc }) {
+export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestoreDoc }) {
   const data = firestoreDoc && typeof firestoreDoc === "object" ? firestoreDoc : {};
   const order = data.order && typeof data.order === "object" ? data.order : null;
   if (!order) {
@@ -169,7 +169,7 @@ export async function generateShippingLabelPdfBuffer({ env, storeId, firestoreDo
   const shipDate = formatDateDDMMYYYY(now);
   const shipTime = formatTimeHHMMSS(now);
 
-  const shipFrom = resolveShipFrom({ env, storeId });
+  const shipFrom = await resolveShipFrom({ env, shopDomain });
   const shipTo = getBestShipTo(order) ?? {};
   const pin = String(shipTo?.pinCode ?? "").trim();
 

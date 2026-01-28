@@ -2,7 +2,6 @@ import "dotenv/config";
 
 import { createApp } from "./app.js";
 import { loadEnv } from "./config/env.js";
-import { loadStoresConfig } from "./config/stores.js";
 import { startHttpServer } from "./http/startHttpServer.js";
 import { createLogger } from "./logging/createLogger.js";
 
@@ -27,44 +26,7 @@ async function main() {
     process.exit(1);
   });
 
-  let storesConfig = null;
-  if (env.storesFile) {
-    try {
-      storesConfig = await loadStoresConfig({ filePath: env.storesFile });
-      logger.info(
-        { storesFile: env.storesFile, storeCount: storesConfig.stores.length },
-        "Loaded multi-store config"
-      );
-    } catch (error) {
-      logger.error(
-        { error, storesFile: env.storesFile },
-        "Failed to load STORES_FILE"
-      );
-      process.exit(1);
-    }
-  }
-
-  const appEnv = { ...env, storesConfig };
-
-  if (!storesConfig) {
-    // Shopify credentials are resolved from Firestore when AUTH_PROVIDER=firebase.
-    // Only warn about env vars when not using Firebase token storage.
-    if (env.auth.provider !== "firebase") {
-      if (!env.shopify.storeDomain) {
-        logger.warn(
-          { envVar: "SHOPIFY_STORE" },
-          "Missing Shopify store domain; Shopify routes will fail until set"
-        );
-      }
-
-      if (!env.shopify.accessToken) {
-        logger.warn(
-          { envVar: "SHOPIFY_TOKEN" },
-          "Missing Shopify access token; Shopify routes will fail until set"
-        );
-      }
-    }
-  }
+  const appEnv = env;
 
   const app = createApp({ env: appEnv, logger });
   const server = await startHttpServer({ app, env: appEnv, logger });

@@ -133,7 +133,6 @@ export function createFirestoreOrdersRouter({ env, auth }) {
 
       const admin = await getFirebaseAdmin({ env });
       const { collectionId, displayName, storeId: normalizedStoreId } = getShopCollectionInfo({
-        env,
         storeId: storeId || shopDomain,
       });
 
@@ -205,7 +204,7 @@ export function createFirestoreOrdersRouter({ env, auth }) {
         }
 
         const admin = await getFirebaseAdmin({ env });
-        const { collectionId } = getShopCollectionInfo({ env, storeId });
+        const { collectionId } = getShopCollectionInfo({ storeId });
         const docId = toOrderDocId(orderKey);
 
         const snap = await admin.firestore().collection(collectionId).doc(docId).get();
@@ -238,7 +237,7 @@ export function createFirestoreOrdersRouter({ env, auth }) {
       );
 
       const admin = await getFirebaseAdmin({ env });
-      const { collectionId, displayName } = getShopCollectionInfo({ env, storeId });
+      const { collectionId, displayName } = getShopCollectionInfo({ storeId });
 
       const firestore = admin.firestore();
       const snap = await fetchDocsForStatus({

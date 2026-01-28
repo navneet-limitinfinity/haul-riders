@@ -395,7 +395,7 @@ export function createPagesRouter({ env, auth } = {}) {
   router.get("/shop/orders", auth.requireRole("shop"), (req, res) => {
     const userLabel = String(req.user?.email ?? "Shop").trim() || "Shop";
     const storeId = String(req.user?.storeId ?? "").trim();
-    const firestoreCollectionId = getShopCollectionInfo({ env, storeId }).collectionId;
+    const firestoreCollectionId = getShopCollectionInfo({ storeId }).collectionId;
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(renderOrdersPage({ role: "shop", userLabel, storeId, firestoreCollectionId }));
   });

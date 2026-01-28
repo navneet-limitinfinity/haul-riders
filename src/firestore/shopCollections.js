@@ -18,18 +18,15 @@ export function toFirestoreCollectionId(value) {
   return cleaned || "shop";
 }
 
-export function getShopCollectionInfo({ env, storeId }) {
+export function getShopCollectionInfo({ storeId }) {
   const id = String(storeId ?? "").trim().toLowerCase();
-  const stores = env?.storesConfig?.stores ?? [];
-  const store = id ? stores.find((s) => String(s?.id ?? "").trim().toLowerCase() === id) : null;
-
-  // Firestore collection id should be the shopDomain key (e.g. `abc`), derived from:
-  // - users/<uid>.storeId (full domain: `abc.myshopify.com`) OR
-  // - internal id (e.g. `64dd6e-2`) resolved from stores.json domain.
+  // Firestore collection id should be the shop domain key (e.g. `abc`) derived from:
+  // - users/<uid>.storeId (full domain: `abc.myshopify.com`)
+  // - query params for admin (full domain)
   const looksLikeDomain = id.includes(".");
-  const storeKey = store ? toDomainKey(store.domain) || id : looksLikeDomain ? toDomainKey(id) : id;
+  const storeKey = looksLikeDomain ? toDomainKey(id) : id;
 
-  const displayName = normalizeWhitespace(store?.name || storeKey || "Shop");
+  const displayName = normalizeWhitespace(storeKey || "Shop");
   const collectionId = toFirestoreCollectionId(storeKey || displayName);
   return { collectionId, displayName, storeId: storeKey };
 }

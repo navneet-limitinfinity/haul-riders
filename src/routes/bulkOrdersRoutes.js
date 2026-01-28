@@ -187,7 +187,6 @@ export function createBulkOrdersRouter({ env, auth }) {
         try {
           const admin = await getFirebaseAdmin({ env });
           const { collectionId, displayName, storeId: normalizedStoreId } = getShopCollectionInfo({
-            env,
             storeId,
           });
           const firestore = admin.firestore();
@@ -354,7 +353,6 @@ export function createBulkOrdersRouter({ env, auth }) {
         try {
           const admin = await getFirebaseAdmin({ env });
           const { collectionId, displayName, storeId: normalizedStoreId } = getShopCollectionInfo({
-            env,
             storeId,
           });
           const firestore = admin.firestore();
