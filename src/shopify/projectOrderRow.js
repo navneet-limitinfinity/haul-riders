@@ -8,6 +8,27 @@ const getFirstFulfillment = (order) => {
   return fulfillments[0];
 };
 
+const buildProductDescription = (order) => {
+  const items = Array.isArray(order?.line_items) ? order.line_items : [];
+  const parts = [];
+  for (const item of items) {
+    const title = String(item?.title ?? "").trim();
+    if (!title) continue;
+    const qtyRaw = item?.quantity;
+    const qty =
+      qtyRaw == null ? null : Number.isFinite(Number(qtyRaw)) ? Number(qtyRaw) : null;
+    parts.push(qty && qty > 1 ? `${title} x${qty}` : title);
+  }
+  if (parts.length === 0) return "";
+  return parts.join(", ");
+};
+
+const resolveFulfillmentCenter = (order, firstFulfillment) => {
+  const locationId = firstFulfillment?.location_id ?? order?.location_id ?? "";
+  const locationName = firstFulfillment?.location?.name ?? "";
+  return String(locationName || locationId || "").trim();
+};
+
 const uniqueStrings = (values) => {
   const out = [];
   const seen = new Set();
@@ -88,6 +109,10 @@ export const projectOrderRow = ({ order, index, overrides = null }) => {
   ).trim();
 
   const customerEmail = String(order?.email ?? order?.customer?.email ?? "").trim();
+  const productDescription = buildProductDescription(order);
+  const fulfillmentCenter = resolveFulfillmentCenter(order, firstFulfillment);
+  const invoiceValue = order?.total_price ?? "";
+  const paymentStatus = order?.financial_status ?? "";
 
   return {
     index: index + 1,
@@ -100,6 +125,10 @@ export const projectOrderRow = ({ order, index, overrides = null }) => {
     financialStatus: order?.financial_status ?? "",
     shipping,
     totalPrice: order?.total_price,
+    invoiceValue,
+    paymentStatus,
+    productDescription,
+    fulfillmentCenter,
     fulfillmentStatus: order?.fulfillment_status,
     trackingNumbers,
     trackingNumbersText,

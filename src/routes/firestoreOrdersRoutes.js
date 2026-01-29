@@ -149,12 +149,16 @@ export function createFirestoreOrdersRouter({ env, auth }) {
         const data = doc.data() ?? {};
         const order = data.order && typeof data.order === "object" ? data.order : null;
         const shipmentStatus = getDocShipmentStatusRaw(data);
+        const trackingNumber =
+          String(data.trackingNumber ?? "").trim() ||
+          String(data?.shipment?.trackingNumber ?? "").trim();
         const orderKey = String(data.orderKey ?? doc.id).trim();
         const requestedAt = String(data.requestedAt ?? data.updatedAt ?? "").trim();
         return {
           ...(order ?? {}),
           orderKey,
           shipmentStatus: shipmentStatus || "assigned",
+          trackingNumber,
           firestore: {
             shopName: String(data.shopName ?? displayName),
             requestedAt,
@@ -252,12 +256,16 @@ export function createFirestoreOrdersRouter({ env, auth }) {
         const data = doc.data() ?? {};
         const order = data.order && typeof data.order === "object" ? data.order : null;
         const shipmentStatus = getDocShipmentStatusRaw(data);
+        const trackingNumber =
+          String(data.trackingNumber ?? "").trim() ||
+          String(data?.shipment?.trackingNumber ?? "").trim();
         const orderKey = String(data.orderKey ?? doc.id).trim();
         const requestedAt = String(data.requestedAt ?? "").trim();
         return {
           ...(order ?? {}),
           orderKey,
           shipmentStatus: shipmentStatus || "assigned",
+          trackingNumber,
           firestore: {
             shopName: String(data.shopName ?? displayName),
             requestedAt,
@@ -279,6 +287,72 @@ export function createFirestoreOrdersRouter({ env, auth }) {
         count: orders.length,
         orders,
       });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post("/firestore/orders/update-shipping", auth.requireRole("shop"), async (req, res, next) => {
+    try {
+      if (env?.auth?.provider !== "firebase") {
+        res.status(400).json({ error: "auth_provider_not_firebase" });
+        return;
+      }
+
+      const orderKey = String(req.body?.orderKey ?? "").trim();
+      if (!orderKey) {
+        res.status(400).json({ error: "order_key_required" });
+        return;
+      }
+
+      const shipping = req.body?.shipping && typeof req.body.shipping === "object" ? req.body.shipping : null;
+      if (!shipping) {
+        res.status(400).json({ error: "shipping_required" });
+        return;
+      }
+
+      const storeId = String(req.user?.storeId ?? "").trim().toLowerCase();
+      if (!storeId) {
+        res.status(400).json({ error: "store_id_required" });
+        return;
+      }
+
+      const normalize = (v) => String(v ?? "").trim();
+
+      const admin = await getFirebaseAdmin({ env });
+      const { collectionId } = getShopCollectionInfo({ storeId });
+      const docId = toOrderDocId(orderKey);
+      const updatedAt = new Date().toISOString();
+
+      await admin
+        .firestore()
+        .collection(collectionId)
+        .doc(docId)
+        .set(
+          {
+            orderKey,
+            docId,
+            storeId,
+            order: {
+              shipping: {
+                fullName: normalize(shipping.fullName),
+                address1: normalize(shipping.address1),
+                address2: normalize(shipping.address2),
+                city: normalize(shipping.city),
+                state: normalize(shipping.state),
+                pinCode: normalize(shipping.pinCode),
+                phone1: normalize(shipping.phone1),
+                phone2: normalize(shipping.phone2),
+              },
+            },
+            event: "shop_edit",
+            updatedAt,
+          },
+          { merge: true }
+        );
+
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ ok: true, orderKey, updatedAt });
     } catch (error) {
       next(error);
     }

@@ -1,54 +1,86 @@
 const $ = (id) => document.getElementById(id);
 
+const DEFAULT_HEADER_HTML = `<tr>
+  <th class="colCheck">
+    <input id="selectAll" type="checkbox" aria-label="Select all" />
+  </th>
+  <th>#</th>
+  <th class="colSortable" data-sort-key="orderName">
+    Order Name <span class="sortIndicator" aria-hidden="true"></span>
+  </th>
+  <th>Order ID</th>
+  <th>Full Name</th>
+  <th>Address 1</th>
+  <th>Address 2</th>
+  <th>City</th>
+  <th>State</th>
+  <th>PIN Code</th>
+  <th>Phone 1</th>
+  <th>Phone 2</th>
+  <th>Total Price</th>
+  <th class="colSortable" data-sort-key="fulfillmentStatus">
+    Fulfillment Status <span class="sortIndicator" aria-hidden="true"></span>
+  </th>
+  <th>Tracking Numbers</th>
+  <th>Shipments Status</th>
+  <th>Courier Partner</th>
+  <th>Weight</th>
+  <th>Courier Type</th>
+  <th>Action</th>
+</tr>`;
+
+const NEW_TAB_HEADER_HTML = `<tr>
+  <th class="colCheck">
+    <input id="selectAll" type="checkbox" aria-label="Select all" />
+  </th>
+  <th class="colSortable" data-sort-key="createdAt">
+    Order Details <span class="sortIndicator" aria-hidden="true"></span>
+  </th>
+  <th>Customer Details</th>
+  <th>Pincode</th>
+  <th>Phone No.</th>
+  <th>Invoice Details</th>
+  <th>Fulfillment Center</th>
+  <th>Weight</th>
+  <th>Courier Type</th>
+  <th>Action</th>
+</tr>`;
+
+const ASSIGNED_TAB_HEADER_HTML = `<tr>
+  <th class="colCheck">
+    <input id="selectAll" type="checkbox" aria-label="Select all" />
+  </th>
+  <th>Order ID</th>
+  <th>Order Date</th>
+  <th>Full Name</th>
+  <th>Address</th>
+  <th>Pincode</th>
+  <th>Phone No.</th>
+  <th>Invoice Value</th>
+  <th>Payment Status</th>
+  <th>Product Description</th>
+  <th>Fulfillment Status</th>
+  <th>Shipment Status</th>
+  <th>Tracking No.</th>
+  <th>Action</th>
+</tr>`;
+
 let allOrders = [];
 let currentOrders = [];
 const selectedOrderIds = new Set();
+function pruneSelectionToVisible(orders) {
+  const allowed = new Set();
+  for (const row of orders ?? []) {
+    const key = getOrderKey(row);
+    if (key) allowed.add(key);
+  }
+  for (const key of Array.from(selectedOrderIds)) {
+    if (!allowed.has(key)) selectedOrderIds.delete(key);
+  }
+}
 let loadingCount = 0;
 
 const getOrderKey = (row) => String(row?.orderKey ?? row?.orderId ?? "");
-
-const tabOrdersCache = new Map();
-
-function getTabCacheKey({ role, storeId, tab }) {
-  return `haul_orders_cache:v1:${String(role ?? "")}:${String(storeId ?? "")}:${String(tab ?? "")}`;
-}
-
-function readCachedOrders({ role, storeId, tab }) {
-  const key = getTabCacheKey({ role, storeId, tab });
-  const mem = tabOrdersCache.get(key);
-  if (mem) return mem;
-  try {
-    const raw = sessionStorage.getItem(key);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || !Array.isArray(parsed.orders)) return null;
-    tabOrdersCache.set(key, parsed);
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function writeCachedOrders({ role, storeId, tab, orders }) {
-  const key = getTabCacheKey({ role, storeId, tab });
-  const payload = {
-    savedAt: new Date().toISOString(),
-    orders: Array.isArray(orders) ? orders : [],
-  };
-  tabOrdersCache.set(key, payload);
-  try {
-    sessionStorage.setItem(key, JSON.stringify(payload));
-  } catch {
-    // ignore quota errors
-  }
-}
-
-function pruneSelectionToVisible(orders) {
-  const visibleIds = new Set((Array.isArray(orders) ? orders : []).map((r) => getOrderKey(r)));
-  for (const selectedId of selectedOrderIds) {
-    if (!visibleIds.has(selectedId)) selectedOrderIds.delete(selectedId);
-  }
-}
 
 const escapeHtml = (value) =>
   String(value ?? "")
@@ -229,6 +261,149 @@ let firestoreAssignedState = {
 };
 const sessionAssignedOrderKeys = new Set();
 const shipFormState = new Map();
+const assignedEditState = new Map();
+const assignedProductsRequested = new Set();
+let assignedProductsInFlight = null;
+const assignedServiceableByPin = new Map();
+let assignedServiceableInFlight = null;
+const assignedEditMode = new Set();
+const assignedEditMeta = new Map();
+
+function getAssignedEdits(row) {
+  const orderKey = getOrderKey(row);
+  const key = String(orderKey ?? "").trim();
+  if (!key) {
+    const shipping = row?.shipping ?? {};
+    return {
+      fullName: String(shipping.fullName ?? ""),
+      address1: String(shipping.address1 ?? ""),
+      address2: String(shipping.address2 ?? ""),
+      city: String(shipping.city ?? ""),
+      state: String(shipping.state ?? ""),
+      pinCode: String(shipping.pinCode ?? ""),
+      phone1: String(shipping.phone1 ?? ""),
+      phone2: String(shipping.phone2 ?? ""),
+    };
+  }
+
+  const existing = assignedEditState.get(key);
+  if (existing) return existing;
+  const shipping = row?.shipping ?? {};
+  const initial = {
+    fullName: String(shipping.fullName ?? ""),
+    address1: String(shipping.address1 ?? ""),
+    address2: String(shipping.address2 ?? ""),
+    city: String(shipping.city ?? ""),
+    state: String(shipping.state ?? ""),
+    pinCode: String(shipping.pinCode ?? ""),
+    phone1: String(shipping.phone1 ?? ""),
+    phone2: String(shipping.phone2 ?? ""),
+  };
+  assignedEditState.set(key, initial);
+  return initial;
+}
+
+function buildDtdcTrackingUrl(trackingNumber) {
+  const tn = String(trackingNumber ?? "").trim();
+  if (!tn) return "";
+  return `https://txk.dtdc.com/ctbs-tracking/customerInterface.tr?submitName=showCITrackingDetails&cType=Consignment&cnNo=${encodeURIComponent(
+    tn
+  )}`;
+}
+
+async function hydrateAssignedProductDescriptions(orders) {
+  if (!Array.isArray(orders) || orders.length === 0) return;
+  if (assignedProductsInFlight) return;
+
+  const missingIds = [];
+  for (const row of orders) {
+    const existing =
+      String(row?.productDescription ?? "").trim() ||
+      String(row?.productDiscription ?? "").trim() ||
+      String(row?.product_description ?? "").trim();
+    if (existing) continue;
+    const id = String(row?.orderId ?? "").trim();
+    if (!/^\d+$/.test(id)) continue;
+    if (assignedProductsRequested.has(id)) continue;
+    missingIds.push(id);
+    assignedProductsRequested.add(id);
+  }
+
+  if (missingIds.length === 0) return;
+
+  assignedProductsInFlight = (async () => {
+    try {
+      const data = await fetchShopifyOrderProducts({ orderIds: missingIds });
+      const products = data?.products && typeof data.products === "object" ? data.products : {};
+      let changed = false;
+      for (const row of orders) {
+        const existing =
+          String(row?.productDescription ?? "").trim() ||
+          String(row?.productDiscription ?? "").trim() ||
+          String(row?.product_description ?? "").trim();
+        if (existing) continue;
+        const id = String(row?.orderId ?? "").trim();
+        const desc = String(products?.[id] ?? "").trim();
+        if (!desc) continue;
+        row.productDescription = desc;
+        changed = true;
+      }
+      if (changed && activeRole === "shop" && activeTab === "assigned") {
+        applyFiltersAndSort();
+      }
+    } finally {
+      assignedProductsInFlight = null;
+    }
+  })();
+}
+
+async function fetchServiceablePincodes({ pincodes }) {
+  const response = await fetch("/api/pincodes/serviceable", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify({ pincodes: Array.isArray(pincodes) ? pincodes : [] }),
+  });
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`${response.status} ${response.statusText} ${text}`.trim());
+  }
+  return response.json();
+}
+
+function normalizePincode(pin) {
+  return String(pin ?? "").replaceAll(/\D/g, "").slice(0, 6);
+}
+
+async function hydrateAssignedServiceablePins(orders) {
+  if (!Array.isArray(orders) || orders.length === 0) return;
+  if (assignedServiceableInFlight) return;
+
+  const pins = [];
+  for (const row of orders) {
+    const edits = getAssignedEdits(row);
+    const pin = normalizePincode(edits.pinCode);
+    if (!pin) continue;
+    if (assignedServiceableByPin.has(pin)) continue;
+    pins.push(pin);
+  }
+
+  if (pins.length === 0) return;
+
+  assignedServiceableInFlight = (async () => {
+    try {
+      const data = await fetchServiceablePincodes({ pincodes: pins });
+      const map = data?.serviceable && typeof data.serviceable === "object" ? data.serviceable : {};
+      for (const pin of pins) {
+        assignedServiceableByPin.set(pin, Boolean(map?.[pin]));
+      }
+      if (activeRole === "shop" && activeTab === "assigned") {
+        applyFiltersAndSort();
+      }
+    } finally {
+      assignedServiceableInFlight = null;
+    }
+  })();
+}
 
 function getShipForm(orderKey) {
   const key = String(orderKey ?? "").trim();
@@ -253,36 +428,75 @@ function parseWeightKg(value) {
   return { ok: true, value: n };
 }
 
-function setHeaderText(th, text) {
-  if (!th) return;
-  const indicator = th.querySelector?.(".sortIndicator") ?? null;
-  if (indicator) {
-    th.textContent = "";
-    th.append(document.createTextNode(`${String(text ?? "")} `));
-    th.append(indicator);
-    return;
-  }
-  th.textContent = String(text ?? "");
+function attachSortHandlers() {
+  document
+    .querySelectorAll("th.colSortable[data-sort-key]")
+    .forEach((th) => {
+      th.addEventListener("click", () => {
+        const key = th.dataset.sortKey;
+        if (!key) return;
+
+        if (sortState.key === key) {
+          sortState = {
+            key,
+            dir: sortState.dir === "asc" ? "desc" : "asc",
+          };
+        } else {
+          sortState = {
+            key,
+            dir: key === "orderName" ? "desc" : "asc",
+          };
+        }
+
+        applyFiltersAndSort();
+      });
+    });
+}
+
+function bindSelectAllCheckbox() {
+  const selectAll = $("selectAll");
+  if (!selectAll || selectAll.dataset.bound === "1") return;
+  selectAll.dataset.bound = "1";
+  selectAll.addEventListener("change", (e) => {
+    const checked = Boolean(e.target?.checked);
+    selectedOrderIds.clear();
+    if (checked) {
+      for (const row of currentOrders) {
+        const key = getOrderKey(row);
+        if (key) selectedOrderIds.add(key);
+      }
+    }
+    renderRows(currentOrders);
+    syncBulkDownloadButton();
+  });
+}
+
+function renderTableHeaderForActiveTab() {
+  const thead = document.querySelector(".table thead");
+  if (!thead) return;
+  const isShopNew = activeRole === "shop" && activeTab === "new";
+  const isShopAssigned = activeRole === "shop" && activeTab === "assigned";
+  const html = isShopNew
+    ? NEW_TAB_HEADER_HTML
+    : isShopAssigned
+      ? ASSIGNED_TAB_HEADER_HTML
+      : DEFAULT_HEADER_HTML;
+  thead.innerHTML = html;
+  bindSelectAllCheckbox();
+  attachSortHandlers();
+  updateSortIndicators();
 }
 
 function syncNewTabLayout() {
   if (!document.body) return;
   document.body.dataset.tab = activeTab;
-
   const isShopNew = activeRole === "shop" && activeTab === "new";
-
-  setHeaderText(
-    document.querySelector("th[data-sort-key='orderName']"),
-    isShopNew ? "Order Details" : "Order Name"
-  );
-  setHeaderText(
-    document.querySelector("thead th:nth-child(5)"),
-    isShopNew ? "Customer Details" : "Full Name"
-  );
-  setHeaderText(
-    document.querySelector("thead th:nth-child(13)"),
-    isShopNew ? "Payment" : "Total Price"
-  );
+  if (isShopNew) {
+    sortState = { key: "createdAt", dir: "desc" };
+  } else if (sortState.key === "createdAt") {
+    sortState = { key: "orderName", dir: "desc" };
+  }
+  renderTableHeaderForActiveTab();
 }
 
 function normalizeRole(role) {
@@ -488,6 +702,19 @@ async function fetchLatestOrders({ limit, since }) {
   return response.json();
 }
 
+async function fetchShopifyOrderProducts({ orderIds }) {
+  const response = await fetch("/api/shopify/orders/products", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify({ orderIds: Array.isArray(orderIds) ? orderIds : [] }),
+  });
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`${response.status} ${response.statusText} ${text}`.trim());
+  }
+  return response.json();
+}
+
 async function fetchFirestoreOrders({ status, limit }) {
   const url = new URL("/api/firestore/orders", window.location.origin);
   if (status) url.searchParams.set("status", String(status));
@@ -589,10 +816,14 @@ async function ensureFirestoreAssignedRealtime() {
           const order = data.order && typeof data.order === "object" ? data.order : null;
           const orderKey = String(data.orderKey ?? "").trim();
           if (orderKey) sessionAssignedOrderKeys.add(orderKey);
+          const trackingNumber =
+            String(data.trackingNumber ?? "").trim() ||
+            String(data?.shipment?.trackingNumber ?? "").trim();
           rows.push({
             ...(order ?? {}),
             orderKey,
             shipmentStatus: "assigned",
+            trackingNumber,
             firestore: {
               requestedAt: String(data.requestedAt ?? ""),
             },
@@ -600,12 +831,9 @@ async function ensureFirestoreAssignedRealtime() {
         }
         firestoreAssignedState.orders = rows;
         firestoreAssignedState.ready = true;
-        writeCachedOrders({
-          role: "shop",
-          storeId: getStoreIdForRequests(),
-          tab: "assigned",
-          orders: rows,
-        });
+
+        hydrateAssignedProductDescriptions(rows).catch(() => {});
+        hydrateAssignedServiceablePins(rows).catch(() => {});
 
         if (activeRole === "shop" && activeTab === "assigned") {
           allOrders = rows;
@@ -624,12 +852,8 @@ async function ensureFirestoreAssignedRealtime() {
           }
           firestoreAssignedState.orders = orders;
           firestoreAssignedState.ready = true;
-          writeCachedOrders({
-            role: "shop",
-            storeId: getStoreIdForRequests(),
-            tab: "assigned",
-            orders,
-          });
+          hydrateAssignedProductDescriptions(orders).catch(() => {});
+          hydrateAssignedServiceablePins(orders).catch(() => {});
           if (activeRole === "shop" && activeTab === "assigned") {
             allOrders = orders;
             applyFiltersAndSort();
@@ -772,6 +996,26 @@ function applyFiltersAndSort() {
     view = view.filter((row) => getTrackingAssigned(row) === wantAssigned);
   }
 
+  const isShopNew = activeRole === "shop" && activeTab === "new";
+  if (isShopNew) {
+    const useDir = sortState.key === "createdAt" ? sortState.dir : "desc";
+    const direction = useDir === "asc" ? 1 : -1;
+    const sorted = [...view].sort((a, b) => {
+      const ad = new Date(a?.createdAt ?? 0).getTime();
+      const bd = new Date(b?.createdAt ?? 0).getTime();
+      return (bd - ad) * direction;
+    });
+
+    renderRows(sorted);
+    updateSortIndicators();
+    updateMetrics(sorted);
+    setStatus(
+      `Showing ${sorted.length} of ${allOrders.length} order(s).`,
+      { kind: "ok" }
+    );
+    return;
+  }
+
   const { key, dir } = sortState;
   const direction = dir === "asc" ? 1 : -1;
 
@@ -821,57 +1065,66 @@ function updateSortIndicators() {
   }
 }
 
+const createBadge = ({ label, kind = "muted" }) => ({
+  badge: true,
+  label,
+  kind,
+});
+
+const createMenu = ({ label, url, trackingText }) => ({
+  menu: true,
+  label,
+  url,
+  trackingText,
+});
+
+const createTrackingValue = ({ text }) => ({
+  trackingValue: true,
+  text,
+});
+
+const createAdminUpdateMenu = ({ orderKey, shipmentStatus, trackingText }) => ({
+  adminMenu: true,
+  orderKey,
+  shipmentStatus,
+  trackingText,
+});
+
+const createActionButton = ({ label, action, orderKey }) => ({
+  actionButton: true,
+  label,
+  action,
+  orderKey,
+});
+
+const createWeightInput = ({ orderKey, value }) => ({
+  weightInput: true,
+  orderKey,
+  value,
+});
+
+const createCourierTypeSelect = ({ orderKey, value }) => ({
+  courierTypeSelect: true,
+  orderKey,
+  value,
+});
+
 function renderRows(orders) {
+  if (activeRole === "shop" && activeTab === "new") {
+    renderRowsNewTab(orders);
+    return;
+  }
+  if (activeRole === "shop" && activeTab === "assigned") {
+    renderRowsAssignedTab(orders);
+    return;
+  }
+
   const tbody = $("rows");
   if (!tbody) return;
 
   tbody.innerHTML = "";
 
   currentOrders = Array.isArray(orders) ? orders : [];
-
-  const createBadge = ({ label, kind = "muted" }) => ({
-    badge: true,
-    label,
-    kind,
-  });
-
-  const createMenu = ({ label, url, trackingText }) => ({
-    menu: true,
-    label,
-    url,
-    trackingText,
-  });
-
-  const createTrackingValue = ({ text }) => ({
-    trackingValue: true,
-    text,
-  });
-
-  const createAdminUpdateMenu = ({ orderKey, shipmentStatus, trackingText }) => ({
-    adminMenu: true,
-    orderKey,
-    shipmentStatus,
-    trackingText,
-  });
-
-  const createActionButton = ({ label, action, orderKey }) => ({
-    actionButton: true,
-    label,
-    action,
-    orderKey,
-  });
-
-  const createWeightInput = ({ orderKey, value }) => ({
-    weightInput: true,
-    orderKey,
-    value,
-  });
-
-  const createCourierTypeSelect = ({ orderKey, value }) => ({
-    courierTypeSelect: true,
-    orderKey,
-    value,
-  });
 
   const fragment = document.createDocumentFragment();
   for (const row of currentOrders) {
@@ -1242,6 +1495,404 @@ function renderRows(orders) {
   syncSelectAllCheckbox();
 }
 
+function renderRowsAssignedTab(orders) {
+  const tbody = $("rows");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  currentOrders = Array.isArray(orders) ? orders : [];
+
+  const formatDate = (iso) => {
+    const d = new Date(String(iso ?? ""));
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "2-digit" });
+  };
+
+  const createBadge = ({ label, kind = "muted" }) => ({
+    badge: true,
+    label,
+    kind,
+  });
+
+  const getPaymentLabel = (value) => {
+    const s = String(value ?? "").trim().toLowerCase();
+    if (!s) return { label: "", kind: "unknown" };
+    if (s === "paid" || s === "partially_paid") return { label: "Prepaid", kind: "paid" };
+    return { label: "COD", kind: "cod" };
+  };
+
+  const getTrackingNumber = (row) => {
+    const direct = String(row?.trackingNumber ?? "").trim();
+    if (direct) return direct;
+    const fromText = getPrimaryTrackingCode(
+      row?.trackingNumbersText ?? formatTrackingNumbers(row?.trackingNumbers)
+    );
+    if (fromText) return fromText;
+    const arr = Array.isArray(row?.trackingNumbers) ? row.trackingNumbers : [];
+    return String(arr[0] ?? "").trim();
+  };
+
+  const fragment = document.createDocumentFragment();
+
+  for (const row of currentOrders) {
+    const tr = document.createElement("tr");
+    const orderKey = getOrderKey(row);
+    tr.dataset.orderKey = orderKey;
+
+    const edits = getAssignedEdits(row);
+    const createdAt = formatDate(row?.createdAt);
+    const pin = normalizePincode(edits.pinCode);
+    const serviceable = Boolean(pin) && Boolean(assignedServiceableByPin.get(pin));
+    const isEditing = assignedEditMode.has(orderKey) && !serviceable;
+    const meta = assignedEditMeta.get(orderKey) ?? null;
+    const isDirty = Boolean(meta?.dirty);
+
+    const fullNameCell = isEditing
+      ? {
+          html: `<input class="inlineInput" data-role="assigned-fullName" data-order-key="${escapeHtml(
+            orderKey
+          )}" value="${escapeHtml(edits.fullName)}" />`,
+        }
+      : { text: edits.fullName, className: "" };
+
+    const addressCell = isEditing
+      ? {
+          html: `<div class="cellStack">
+            <div class="cellMuted">${escapeHtml(edits.fullName)}</div>
+            <input class="inlineInput" data-role="assigned-address1" data-order-key="${escapeHtml(
+              orderKey
+            )}" value="${escapeHtml(edits.address1)}" />
+            <input class="inlineInput" data-role="assigned-address2" data-order-key="${escapeHtml(
+              orderKey
+            )}" value="${escapeHtml(edits.address2)}" />
+            <input class="inlineInput" data-role="assigned-city" data-order-key="${escapeHtml(
+              orderKey
+            )}" value="${escapeHtml(edits.city)}" />
+            <input class="inlineInput" data-role="assigned-state" data-order-key="${escapeHtml(
+              orderKey
+            )}" value="${escapeHtml(edits.state)}" />
+          </div>`,
+        }
+      : {
+          html: `<div class="cellStack">
+            <div class="cellMuted">${escapeHtml(edits.fullName)}</div>
+            <div>${escapeHtml(edits.address1)}</div>
+            <div>${escapeHtml(edits.address2)}</div>
+            <div>${escapeHtml(edits.city)}</div>
+            <div>${escapeHtml(edits.state)}</div>
+          </div>`,
+        };
+
+    const pincodeCell = isEditing
+      ? {
+          html: `<input class="inlineInput mono" data-role="assigned-pinCode" data-order-key="${escapeHtml(
+            orderKey
+          )}" value="${escapeHtml(edits.pinCode)}" />`,
+        }
+      : { text: edits.pinCode, className: "mono" };
+
+    const phoneCell = isEditing
+      ? {
+          html: `<div class="cellStack">
+            <input class="inlineInput mono" data-role="assigned-phone1" data-order-key="${escapeHtml(
+              orderKey
+            )}" value="${escapeHtml(edits.phone1)}" />
+            <input class="inlineInput mono" data-role="assigned-phone2" data-order-key="${escapeHtml(
+              orderKey
+            )}" value="${escapeHtml(edits.phone2)}" />
+          </div>`,
+        }
+      : {
+          html: `<div class="cellStack">
+            <div class="mono">${escapeHtml(edits.phone1)}</div>
+            <div class="mono">${escapeHtml(edits.phone2)}</div>
+          </div>`,
+        };
+
+    const invoiceValue = row?.invoiceValue ?? row?.totalPrice ?? "";
+    const paymentRaw = row?.paymentStatus ?? row?.financialStatus ?? "";
+    const payment = getPaymentLabel(paymentRaw);
+
+    const paymentCell = {
+      html: `<span class="paymentStatus ${
+        payment.kind === "paid" ? "paymentStatusPaid" : "paymentStatusCod"
+      }">${escapeHtml(payment.label)}</span>`,
+    };
+
+    const fulfillmentStatusLabel = serviceable ? "Fulfilled" : "Unfulfilled";
+    const fulfillmentStatusKind = serviceable ? "ok" : "error";
+
+    const shipmentStatusRaw = String(row?.shipmentStatus ?? "").trim();
+    const shipmentStatusLabel = shipmentStatusRaw || "Assigned";
+
+    const trackingNumber = serviceable ? getTrackingNumber(row) : "";
+    const courierPartner = String(row?.trackingCompany ?? "").trim();
+    const trackingUrl =
+      String(row?.trackingUrl ?? "").trim() || buildDtdcTrackingUrl(trackingNumber);
+
+    const trackingCell = {
+      html: serviceable
+        ? `<div class="cellStack">
+            <a class="cellMuted trackingLink" href="${escapeHtml(trackingUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(courierPartner || "DTDC")}</a>
+            <div class="mono">${escapeHtml(trackingNumber || "—")}</div>
+          </div>`
+        : "",
+    };
+
+    const actionParts = [];
+    if (serviceable) {
+      actionParts.push(
+        `<button type="button" class="btn btnPrimary btnCompact btnIcon" data-action="download-slip" data-order-key="${escapeHtml(
+          orderKey
+        )}" title="Download Shipping label" aria-label="Download Shipping label">
+          <i class="fa-solid fa-download" aria-hidden="true"></i>
+        </button>`
+      );
+    } else if (isEditing) {
+      actionParts.push(
+        `<button type="button" class="btn btnPrimary btnCompact" data-action="save-assigned" data-order-key="${escapeHtml(
+          orderKey
+        )}" ${isDirty ? "" : "disabled"}>Save</button>`
+      );
+    } else {
+      actionParts.push(
+        `<button type="button" class="btn btnSecondary btnCompact" data-action="edit-order" data-order-key="${escapeHtml(
+          orderKey
+        )}">Edit Order</button>`
+      );
+    }
+
+    const cells = [
+      { check: true, checked: orderKey && selectedOrderIds.has(orderKey) },
+      {
+        html: `<div class="cellStack">
+          <div class="cellPrimary mono">${escapeHtml(row?.orderName ?? "")}</div>
+          <div class="cellMuted mono">${escapeHtml(row?.orderId ?? "")}</div>
+        </div>`,
+      },
+      { text: createdAt, className: "mono" },
+      fullNameCell,
+      addressCell,
+      pincodeCell,
+      phoneCell,
+      { text: String(invoiceValue ?? ""), className: "mono" },
+      paymentCell,
+      { text: String(row?.productDescription ?? row?.productDiscription ?? row?.product_description ?? "") },
+      createBadge({ label: fulfillmentStatusLabel, kind: fulfillmentStatusKind }),
+      createBadge({
+        label: shipmentStatusLabel.replaceAll("_", " "),
+        kind: shipmentStatusLabel.toLowerCase().includes("deliver")
+          ? "ok"
+          : shipmentStatusLabel.toLowerCase().includes("rto")
+            ? "error"
+            : "warn",
+      }),
+      trackingCell,
+      { html: `<div class="cellActions">${actionParts.join("")}</div>` },
+    ];
+
+    for (const value of cells) {
+      const td = document.createElement("td");
+      if (value && typeof value === "object" && value.check) {
+        td.className = "colCheck";
+        const input = document.createElement("input");
+        input.type = "checkbox";
+        input.checked = Boolean(value.checked);
+        input.ariaLabel = "Select row";
+        td.appendChild(input);
+      } else if (value && typeof value === "object" && value.badge) {
+        const span = document.createElement("span");
+        span.className =
+          value.kind === "ok"
+            ? "badge badgeOk"
+            : value.kind === "warn"
+              ? "badge badgeWarn"
+              : value.kind === "error"
+                ? "badge badgeError"
+                : "badge badgeMuted";
+        span.textContent = String(value.label ?? "");
+        td.appendChild(span);
+      } else if (value && typeof value === "object" && "text" in value) {
+        td.textContent = String(value.text ?? "");
+        if (value.className) td.className = value.className;
+      } else if (value && typeof value === "object" && "html" in value) {
+        td.innerHTML = value.html;
+      } else {
+        td.textContent = String(value ?? "");
+      }
+      tr.appendChild(td);
+    }
+
+    fragment.appendChild(tr);
+  }
+
+  tbody.appendChild(fragment);
+  syncSelectAllCheckbox();
+}
+
+function renderRowsNewTab(orders) {
+  const tbody = $("rows");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  currentOrders = Array.isArray(orders) ? orders : [];
+
+  const fragment = document.createDocumentFragment();
+
+  const formatDate = (iso) => {
+    const d = new Date(String(iso ?? ""));
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "2-digit" });
+  };
+
+  const getPaymentLabel = (value) => {
+    const s = String(value ?? "").trim().toLowerCase();
+    if (!s) return { label: "", kind: "unknown" };
+    if (s === "paid" || s === "partially_paid") return { label: "Paid", kind: "paid" };
+    return { label: "COD", kind: "cod" };
+  };
+
+  const createActionButton = ({ label, action, orderKey }) => ({
+    actionButton: true,
+    label,
+    action,
+    orderKey,
+  });
+
+  for (const row of currentOrders) {
+    const tr = document.createElement("tr");
+    const orderKey = getOrderKey(row);
+    tr.dataset.orderKey = orderKey;
+
+    const shipping = row?.shipping ?? {};
+    const createdAt = formatDate(row?.createdAt);
+    const orderDetailsHtml = `<div class="cellStack">
+      <div class="cellPrimary">${escapeHtml(row.orderName ?? "")}</div>
+      <div class="cellMuted mono">${escapeHtml(row.orderId ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(createdAt)}</div>
+    </div>`;
+
+    const customerDetailsHtml = `<div class="cellStack">
+      <div class="cellPrimary">${escapeHtml(shipping.fullName ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(shipping.address1 ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(shipping.address2 ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(shipping.city ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(shipping.state ?? "")}</div>
+    </div>`;
+
+    const phoneHtml = `<div class="cellStack">
+      <div class="cellMuted mono">${escapeHtml(shipping.phone1 ?? "")}</div>
+      <div class="cellMuted mono">${escapeHtml(shipping.phone2 ?? "")}</div>
+    </div>`;
+
+    const paymentStatus = row.paymentStatus ?? row.financialStatus ?? "";
+    const payment = getPaymentLabel(paymentStatus);
+    const invoiceDetailsHtml = `<div class="cellStack">
+      <div class="cellPrimary">${escapeHtml(row.productDescription ?? "")}</div>
+      <div class="cellMuted mono">${escapeHtml(row.invoiceValue ?? row.totalPrice ?? "")}</div>
+      <div class="cellMuted paymentStatus ${
+        payment.kind === "paid" ? "paymentStatusPaid" : "paymentStatusCod"
+      }">${escapeHtml(payment.label)}</div>
+    </div>`;
+
+    const shipForm = getShipForm(orderKey);
+    const weightCell = createWeightInput({ orderKey, value: shipForm.weightKg });
+
+    const courierTypeCell = createCourierTypeSelect({ orderKey, value: shipForm.courierType });
+
+    const actionCell = createActionButton({ label: "Ship Now", action: "ship-now", orderKey });
+
+    const cells = [
+      { check: true, checked: orderKey && selectedOrderIds.has(orderKey) },
+      { html: orderDetailsHtml },
+      { html: customerDetailsHtml },
+      { text: shipping.pinCode ?? "", className: "mono" },
+      { html: phoneHtml },
+      { html: invoiceDetailsHtml },
+      { text: row.fulfillmentCenter ?? "", className: "mono" },
+      weightCell,
+      courierTypeCell,
+      actionCell,
+    ];
+
+    for (const value of cells) {
+      const td = document.createElement("td");
+      if (value && typeof value === "object" && value.check) {
+        td.className = "colCheck";
+        const input = document.createElement("input");
+        input.type = "checkbox";
+        input.checked = Boolean(value.checked);
+        input.ariaLabel = "Select row";
+        td.appendChild(input);
+      } else if (value && typeof value === "object" && value.weightInput) {
+        td.className = "colWeight";
+        const wrap = document.createElement("div");
+        wrap.className = "weightWrap";
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.inputMode = "decimal";
+        input.placeholder = "0.0";
+        input.className = "weightInput";
+        input.dataset.role = "weight";
+        input.dataset.orderKey = String(value.orderKey ?? "");
+        input.value = String(value.value ?? "");
+        wrap.appendChild(input);
+
+        const suffix = document.createElement("span");
+        suffix.className = "weightSuffix";
+        suffix.textContent = "Kg";
+        wrap.appendChild(suffix);
+
+        td.appendChild(wrap);
+      } else if (value && typeof value === "object" && value.courierTypeSelect) {
+        td.className = "colCourierType";
+        const select = document.createElement("select");
+        select.className = "courierTypeSelect";
+        select.dataset.role = "courierType";
+        select.dataset.orderKey = String(value.orderKey ?? "");
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = "Select Courier type";
+        placeholder.disabled = true;
+        select.appendChild(placeholder);
+
+        const options = ["Z- Express", "D- Surface", "D- Air", "COD Surface", "COD Air"];
+        for (const optValue of options) {
+          const opt = document.createElement("option");
+          opt.value = optValue;
+          opt.textContent = optValue;
+          select.appendChild(opt);
+        }
+        select.value = String(value.value ?? "") || "";
+        td.appendChild(select);
+      } else if (value && typeof value === "object" && value.actionButton) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        const action = String(value.action ?? "");
+        btn.className = "btn btnPrimary btnCompact";
+        btn.dataset.action = action;
+        btn.dataset.orderKey = String(value.orderKey ?? "");
+        btn.textContent = String(value.label ?? "");
+        td.appendChild(btn);
+      } else if (value && typeof value === "object" && "text" in value) {
+        td.textContent = String(value.text ?? "");
+        if (value.className) td.className = value.className;
+      } else if (value && typeof value === "object" && "html" in value) {
+        td.innerHTML = value.html;
+      } else {
+        td.textContent = String(value ?? "");
+      }
+      tr.appendChild(td);
+    }
+
+    fragment.appendChild(tr);
+  }
+
+  tbody.appendChild(fragment);
+  syncSelectAllCheckbox();
+}
+
 function csvEscape(value) {
   const s = String(value ?? "");
   if (s.includes('"') || s.includes(",") || s.includes("\n") || s.includes("\r")) {
@@ -1337,19 +1988,12 @@ async function refresh({ forceNetwork = false } = {}) {
   const limit = SHOPIFY_MAX_LIMIT;
   const since = getSinceIsoForRange(getDateRange());
 
-  const cacheStoreId = activeRole === "admin" ? getActiveStoreId() : getStoreIdForRequests();
-  if (!forceNetwork) {
-    const cached = readCachedOrders({ role: activeRole, storeId: cacheStoreId, tab: activeTab });
-    if (cached?.orders) {
-      allOrders = cached.orders;
-      pruneSelectionToVisible(allOrders);
-      applyFiltersAndSort();
-      setStatus(`Loaded ${allOrders.length} order(s).`, { kind: "ok" });
-      return;
-    }
-  }
+  // Clear any stale rows immediately so tabs don't show previous data if this load fails.
+  allOrders = [];
+  pruneSelectionToVisible(allOrders);
+  applyFiltersAndSort();
 
-  setStatus("Loading…");
+  setStatus(forceNetwork ? "Syncing…" : "Loading…");
   setLoading(true);
 
   try {
@@ -1359,7 +2003,6 @@ async function refresh({ forceNetwork = false } = {}) {
         allOrders = [];
         applyFiltersAndSort();
         setStatus("Select a store.", { kind: "info" });
-        writeCachedOrders({ role: "admin", storeId: "", tab: activeTab, orders: [] });
         return;
       }
 
@@ -1369,14 +2012,12 @@ async function refresh({ forceNetwork = false } = {}) {
       allOrders = orders;
 
       pruneSelectionToVisible(orders);
-      writeCachedOrders({ role: "admin", storeId, tab: activeTab, orders });
 
       applyFiltersAndSort();
       return;
     }
 
     if (activeRole === "shop") {
-      const storeId = getStoreIdForRequests();
       if (activeTab === "assigned") {
         await ensureFirestoreAssignedRealtime();
         const orders = Array.isArray(firestoreAssignedState.orders)
@@ -1384,8 +2025,9 @@ async function refresh({ forceNetwork = false } = {}) {
           : [];
         allOrders = orders;
         pruneSelectionToVisible(orders);
-        writeCachedOrders({ role: "shop", storeId, tab: "assigned", orders });
         applyFiltersAndSort();
+        hydrateAssignedProductDescriptions(orders).catch(() => {});
+        hydrateAssignedServiceablePins(orders).catch(() => {});
         if (firestoreAssignedState.ready) {
           setStatus(`Loaded ${allOrders.length} assigned order(s).`, { kind: "ok" });
         }
@@ -1398,7 +2040,6 @@ async function refresh({ forceNetwork = false } = {}) {
         const orders = Array.isArray(data?.orders) ? data.orders : [];
         allOrders = orders;
         pruneSelectionToVisible(orders);
-        writeCachedOrders({ role: "shop", storeId, tab: activeTab, orders });
         applyFiltersAndSort();
         setStatus(`Loaded ${orders.length} order(s).`, { kind: "ok" });
         return;
@@ -1418,10 +2059,12 @@ async function refresh({ forceNetwork = false } = {}) {
     allOrders = orders;
 
     pruneSelectionToVisible(orders);
-    writeCachedOrders({ role: activeRole, storeId: cacheStoreId, tab: activeTab, orders });
 
     applyFiltersAndSort();
   } catch (error) {
+    allOrders = [];
+    pruneSelectionToVisible(allOrders);
+    applyFiltersAndSort();
     setStatus(error?.message ?? "Failed to load orders.", { kind: "error" });
   } finally {
     setLoading(false);
@@ -1597,42 +2240,6 @@ window.addEventListener("DOMContentLoaded", () => {
   });
   $("fulfillmentFilter")?.addEventListener("change", applyFiltersAndSort);
   $("trackingFilter")?.addEventListener("change", applyFiltersAndSort);
-
-  document
-    .querySelectorAll("th.colSortable[data-sort-key]")
-    .forEach((th) => {
-      th.addEventListener("click", () => {
-        const key = th.dataset.sortKey;
-        if (!key) return;
-
-        if (sortState.key === key) {
-          sortState = {
-            key,
-            dir: sortState.dir === "asc" ? "desc" : "asc",
-          };
-        } else {
-          sortState = {
-            key,
-            dir: key === "orderName" ? "desc" : "asc",
-          };
-        }
-
-        applyFiltersAndSort();
-      });
-    });
-
-  $("selectAll")?.addEventListener("change", (e) => {
-    const checked = Boolean(e.target?.checked);
-    selectedOrderIds.clear();
-    if (checked) {
-      for (const row of currentOrders) {
-        const key = getOrderKey(row);
-        if (key) selectedOrderIds.add(key);
-      }
-    }
-    renderRows(currentOrders);
-    syncBulkDownloadButton();
-  });
 
   $("rows")?.addEventListener("change", (e) => {
     const input = e.target;
@@ -1820,16 +2427,119 @@ window.addEventListener("DOMContentLoaded", () => {
       }
       return;
     }
+
+    if (action === "edit-order") {
+      const orderKey = String(item.dataset.orderKey ?? "").trim();
+      if (!orderKey) return;
+      const row = currentOrders.find((r) => getOrderKey(r) === orderKey) ?? null;
+      if (!row) return;
+      const edits = getAssignedEdits(row);
+      assignedEditMode.add(orderKey);
+      assignedEditMeta.set(orderKey, { original: { ...edits }, dirty: false });
+      renderRows(currentOrders);
+      const input = document.querySelector(
+        `input[data-role="assigned-pinCode"][data-order-key="${CSS.escape(orderKey)}"]`
+      );
+      input?.focus?.();
+      return;
+    }
+
+    if (action === "save-assigned") {
+      const orderKey = String(item.dataset.orderKey ?? "").trim();
+      if (!orderKey) return;
+      const row = currentOrders.find((r) => getOrderKey(r) === orderKey) ?? null;
+      if (!row) return;
+      const edits = getAssignedEdits(row);
+      const shipping = {
+        fullName: edits.fullName,
+        address1: edits.address1,
+        address2: edits.address2,
+        city: edits.city,
+        state: edits.state,
+        pinCode: normalizePincode(edits.pinCode),
+        phone1: String(edits.phone1 ?? "").replaceAll(/[^\d]/g, "").slice(0, 10),
+        phone2: String(edits.phone2 ?? "").replaceAll(/[^\d]/g, "").slice(0, 10),
+      };
+
+      item.disabled = true;
+      try {
+        await postJson("/api/firestore/orders/update-shipping", { orderKey, shipping });
+        row.shipping = { ...(row.shipping ?? {}), ...shipping };
+        assignedEditState.set(orderKey, { ...shipping });
+        assignedEditMode.delete(orderKey);
+        assignedEditMeta.delete(orderKey);
+        const pin = normalizePincode(shipping.pinCode);
+        if (pin) assignedServiceableByPin.delete(pin);
+        hydrateAssignedServiceablePins([row]).catch(() => {});
+        renderRows(currentOrders);
+        setStatus("Order updated.", { kind: "ok" });
+      } catch (error) {
+        setStatus(error?.message ?? "Failed to update order.", { kind: "error" });
+      } finally {
+        item.disabled = false;
+      }
+      return;
+    }
   });
 
   $("rows")?.addEventListener("input", (e) => {
-    if (activeRole !== "shop" || activeTab !== "new") return;
     const target = e.target;
     if (!target) return;
     const role = String(target.dataset?.role ?? "");
-    if (role !== "weight") return;
     const orderKey = String(target.dataset.orderKey ?? "").trim();
     if (!orderKey) return;
+
+    if (activeRole === "shop" && activeTab === "assigned") {
+      if (!role.startsWith("assigned-")) return;
+      const current = getAssignedEdits({
+        orderKey,
+        shipping: { fullName: "", address1: "", address2: "", city: "", state: "", pinCode: "", phone1: "", phone2: "" },
+      });
+      const next = { ...current };
+      const value = String(target.value ?? "");
+      if (role === "assigned-fullName") next.fullName = value;
+      if (role === "assigned-address1") next.address1 = value;
+      if (role === "assigned-address2") next.address2 = value;
+      if (role === "assigned-city") next.city = value;
+      if (role === "assigned-state") next.state = value;
+      if (role === "assigned-pinCode") next.pinCode = value.replaceAll(/[^\d]/g, "").slice(0, 6);
+      if (role === "assigned-phone1") next.phone1 = value.replaceAll(/[^\d]/g, "").slice(0, 10);
+      if (role === "assigned-phone2") next.phone2 = value.replaceAll(/[^\d]/g, "").slice(0, 10);
+      assignedEditState.set(orderKey, next);
+
+      const meta = assignedEditMeta.get(orderKey);
+      if (meta?.original) {
+        const o = meta.original;
+        const dirty =
+          String(o.fullName ?? "") !== String(next.fullName ?? "") ||
+          String(o.address1 ?? "") !== String(next.address1 ?? "") ||
+          String(o.address2 ?? "") !== String(next.address2 ?? "") ||
+          String(o.city ?? "") !== String(next.city ?? "") ||
+          String(o.state ?? "") !== String(next.state ?? "") ||
+          normalizePincode(o.pinCode) !== normalizePincode(next.pinCode) ||
+          String(o.phone1 ?? "") !== String(next.phone1 ?? "") ||
+          String(o.phone2 ?? "") !== String(next.phone2 ?? "");
+        assignedEditMeta.set(orderKey, { ...meta, dirty });
+        const saveBtn = document.querySelector(
+          `button[data-action="save-assigned"][data-order-key="${CSS.escape(orderKey)}"]`
+        );
+        if (saveBtn) saveBtn.disabled = !dirty;
+      }
+
+      target.value = String(
+        role === "assigned-pinCode"
+          ? next.pinCode
+          : role === "assigned-phone1"
+            ? next.phone1
+            : role === "assigned-phone2"
+              ? next.phone2
+              : value
+      );
+      return;
+    }
+
+    if (activeRole !== "shop" || activeTab !== "new") return;
+    if (role !== "weight") return;
 
     // Allow only digits and at most one dot and one digit after dot.
     const raw = String(target.value ?? "");

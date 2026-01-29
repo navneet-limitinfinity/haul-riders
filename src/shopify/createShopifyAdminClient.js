@@ -212,12 +212,26 @@ export function createShopifyAdminClient({
         order: "created_at desc",
         created_at_min: createdAtMin,
         fields:
-          "id,admin_graphql_api_id,name,created_at,financial_status,total_price,shipping_address,phone,fulfillment_status,fulfillments",
+          "id,admin_graphql_api_id,name,created_at,financial_status,total_price,shipping_address,phone,fulfillment_status,fulfillments,line_items,location_id",
       },
     });
 
     return data.orders ?? [];
   };
 
-  return { getShop, getAccessScopes, getOrdersCount, getLatestOrders };
+  const getOrdersByIds = async ({ ids, fields } = {}) => {
+    const list = Array.isArray(ids) ? ids.map((v) => String(v ?? "").trim()).filter(Boolean) : [];
+    if (list.length === 0) return [];
+    const data = await requestJson({
+      path: "/orders.json",
+      query: {
+        status: "any",
+        ids: list.join(","),
+        ...(fields ? { fields: String(fields) } : {}),
+      },
+    });
+    return data.orders ?? [];
+  };
+
+  return { getShop, getAccessScopes, getOrdersCount, getLatestOrders, getOrdersByIds };
 }

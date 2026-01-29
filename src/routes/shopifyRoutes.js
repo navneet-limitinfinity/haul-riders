@@ -170,5 +170,70 @@ export function createShopifyRouter({ env, logger, auth }) {
     }
   });
 
+  router.post(
+    "/orders/products",
+    auth.requireAnyRole(["admin", "shop"]),
+    async (req, res, next) => {
+      try {
+        res.setHeader("Cache-Control", "no-store");
+
+        const store = await getStoreForRequest(req);
+        if (!store?.domain || !store?.token) {
+          logger?.warn?.(
+            { storeId: store?.id, storeDomain: store?.domain, hasToken: Boolean(store?.token) },
+            "Shopify store not configured"
+          );
+          res.status(400).json({ error: "store_not_configured" });
+          return;
+        }
+
+        const orderIds = Array.isArray(req.body?.orderIds) ? req.body.orderIds : [];
+        const ids = orderIds
+          .map((v) => String(v ?? "").trim())
+          .filter(Boolean)
+          .slice(0, 200);
+
+        const client = createShopifyAdminClient({
+          storeDomain: store.domain,
+          accessToken: store.token,
+          apiVersion: store.apiVersion,
+          timeoutMs: env.shopify.timeoutMs,
+          maxRetries: env.shopify.maxRetries,
+        });
+
+        const chunkSize = 50;
+        const results = new Map();
+        for (let i = 0; i < ids.length; i += chunkSize) {
+          const chunk = ids.slice(i, i + chunkSize);
+          const orders = await client.getOrdersByIds({ ids: chunk, fields: "id,line_items" });
+          for (const order of orders) {
+            const id = order?.id == null ? "" : String(order.id);
+            if (!id) continue;
+            const items = Array.isArray(order?.line_items) ? order.line_items : [];
+            const parts = [];
+            for (const item of items) {
+              const title = String(item?.title ?? "").trim();
+              if (!title) continue;
+              const qtyRaw = item?.quantity;
+              const qty =
+                qtyRaw == null ? null : Number.isFinite(Number(qtyRaw)) ? Number(qtyRaw) : null;
+              parts.push(qty && qty > 1 ? `${title} x${qty}` : title);
+            }
+            results.set(id, parts.join(", "));
+          }
+        }
+
+        res.json({
+          storeId: store.id,
+          count: results.size,
+          products: Object.fromEntries(results.entries()),
+        });
+      } catch (error) {
+        logger?.error?.({ error }, "Failed to lookup Shopify order products");
+        next(error);
+      }
+    }
+  );
+
   return router;
 }

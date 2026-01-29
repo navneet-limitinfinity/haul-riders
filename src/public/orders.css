@@ -75,42 +75,148 @@ body {
   max-width: 340px;
 }
 
-/* New tab: compact columns (shop only). */
-body[data-role="shop"][data-tab="new"] .table th:nth-child(4),
-body[data-role="shop"][data-tab="new"] .table td:nth-child(4),
-body[data-role="shop"][data-tab="new"] .table th:nth-child(6),
-body[data-role="shop"][data-tab="new"] .table td:nth-child(6),
-body[data-role="shop"][data-tab="new"] .table th:nth-child(7),
-body[data-role="shop"][data-tab="new"] .table td:nth-child(7),
-body[data-role="shop"][data-tab="new"] .table th:nth-child(8),
-body[data-role="shop"][data-tab="new"] .table td:nth-child(8),
-body[data-role="shop"][data-tab="new"] .table th:nth-child(9),
-body[data-role="shop"][data-tab="new"] .table td:nth-child(9),
-body[data-role="shop"][data-tab="new"] .table th:nth-child(10),
-body[data-role="shop"][data-tab="new"] .table td:nth-child(10),
-body[data-role="shop"][data-tab="new"] .table th:nth-child(11),
-body[data-role="shop"][data-tab="new"] .table td:nth-child(11),
-body[data-role="shop"][data-tab="new"] .table th:nth-child(12),
-body[data-role="shop"][data-tab="new"] .table td:nth-child(12),
-body[data-role="shop"][data-tab="new"] .table th:nth-child(14),
-body[data-role="shop"][data-tab="new"] .table td:nth-child(14),
-body[data-role="shop"][data-tab="new"] .table th:nth-child(15),
-body[data-role="shop"][data-tab="new"] .table td:nth-child(15) {
-  display: none;
-}
-
 /* Shop New tab: card-like rows and fixed column widths. */
 body[data-role="shop"][data-tab="new"] .table {
-  min-width: 1100px;
+  min-width: 0;
+  width: 100%;
   table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0 10px;
 }
 
+body[data-role="shop"][data-tab="assigned"] .table {
+  min-width: 0;
+  width: 100%;
+  table-layout: fixed;
+}
+
+body[data-role="shop"][data-tab="assigned"] .table th,
+body[data-role="shop"][data-tab="assigned"] .table td {
+  padding: 10px 6px;
+  font-size: 12px;
+}
+
+body[data-role="shop"][data-tab="assigned"] .inlineInput {
+  width: 100%;
+  height: 28px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font: inherit;
+  outline: none;
+}
+
+body[data-role="shop"][data-tab="assigned"] .inlineInput:focus {
+  border-color: rgba(106, 166, 255, 0.65);
+  box-shadow: 0 0 0 2px rgba(106, 166, 255, 0.18);
+}
+
+body[data-role="shop"][data-tab="assigned"] .cellActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+body[data-role="shop"][data-tab="assigned"] .trackingLink {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+body[data-role="shop"][data-tab="assigned"] .paymentStatusPaid {
+  color: var(--ok);
+  font-weight: 700;
+}
+
+body[data-role="shop"][data-tab="assigned"] .paymentStatusCod {
+  color: var(--warn);
+  font-weight: 700;
+}
+
+body[data-role="shop"][data-tab="assigned"] .table th:nth-child(1),
+body[data-role="shop"][data-tab="assigned"] .table td:nth-child(1) {
+  width: 44px;
+}
+
+body[data-role="shop"][data-tab="assigned"] .table th:nth-child(2),
+body[data-role="shop"][data-tab="assigned"] .table td:nth-child(2) {
+  width: 120px;
+}
+
+body[data-role="shop"][data-tab="assigned"] .table th:nth-child(3),
+body[data-role="shop"][data-tab="assigned"] .table td:nth-child(3) {
+  width: 110px;
+}
+
+body[data-role="shop"][data-tab="assigned"] .table th:nth-child(4),
+body[data-role="shop"][data-tab="assigned"] .table td:nth-child(4) {
+  width: 170px;
+}
+
+body[data-role="shop"][data-tab="assigned"] .table th:nth-child(5),
+body[data-role="shop"][data-tab="assigned"] .table td:nth-child(5) {
+  width: 230px;
+}
+
+body[data-role="shop"][data-tab="assigned"] .table th:nth-child(6),
+body[data-role="shop"][data-tab="assigned"] .table td:nth-child(6) {
+  width: 92px;
+}
+
+body[data-role="shop"][data-tab="assigned"] .table th:nth-child(7),
+body[data-role="shop"][data-tab="assigned"] .table td:nth-child(7) {
+  width: 170px;
+}
+
+body[data-role="shop"][data-tab="assigned"] .table th:nth-child(8),
+body[data-role="shop"][data-tab="assigned"] .table td:nth-child(8) {
+  width: 120px;
+}
+
+body[data-role="shop"][data-tab="assigned"] .table th:nth-child(9),
+body[data-role="shop"][data-tab="assigned"] .table td:nth-child(9) {
+  width: 110px;
+}
+
+body[data-role="shop"][data-tab="assigned"] .table th:nth-child(10),
+body[data-role="shop"][data-tab="assigned"] .table td:nth-child(10) {
+  width: 220px;
+}
+
+body[data-role="shop"][data-tab="assigned"] .table th:nth-child(11),
+body[data-role="shop"][data-tab="assigned"] .table td:nth-child(11) {
+  width: 140px;
+}
+
+body[data-role="shop"][data-tab="assigned"] .table th:nth-child(12),
+body[data-role="shop"][data-tab="assigned"] .table td:nth-child(12) {
+  width: 140px;
+}
+
+body[data-role="shop"][data-tab="assigned"] .table th:nth-child(13),
+body[data-role="shop"][data-tab="assigned"] .table td:nth-child(13) {
+  width: 160px;
+}
+
+body[data-role="shop"][data-tab="assigned"] .table th:nth-child(14),
+body[data-role="shop"][data-tab="assigned"] .table td:nth-child(14) {
+  width: 120px;
+}
+
+body[data-role="shop"][data-tab="new"] .table th,
+body[data-role="shop"][data-tab="new"] .table td {
+  padding: 12px 6px;
+  font-size: 12px;
+}
+
+body[data-role="shop"][data-tab="new"] .cellStack {
+  word-break: break-word;
+}
+
 body[data-role="shop"][data-tab="new"] .table tbody tr td {
   border-bottom: none;
   background: var(--panel2);
-  padding: 16px 14px;
 }
 
 body[data-role="shop"][data-tab="new"] .table tbody tr td:first-child {
@@ -137,44 +243,59 @@ body[data-role="shop"][data-tab="new"] .table td:nth-child(1) {
   width: 44px;
 }
 
+body[data-role="shop"][data-tab="new"] .table th:nth-child(2),
+body[data-role="shop"][data-tab="new"] .table td:nth-child(2) {
+  width: 190px;
+}
+
 body[data-role="shop"][data-tab="new"] .table th:nth-child(3),
 body[data-role="shop"][data-tab="new"] .table td:nth-child(3) {
-  width: 180px;
+  width: 230px;
+}
+
+body[data-role="shop"][data-tab="new"] .table th:nth-child(4),
+body[data-role="shop"][data-tab="new"] .table td:nth-child(4) {
+  width: 92px;
 }
 
 body[data-role="shop"][data-tab="new"] .table th:nth-child(5),
 body[data-role="shop"][data-tab="new"] .table td:nth-child(5) {
+  width: 130px;
+}
+
+body[data-role="shop"][data-tab="new"] .table th:nth-child(6),
+body[data-role="shop"][data-tab="new"] .table td:nth-child(6) {
   width: 210px;
 }
 
-body[data-role="shop"][data-tab="new"] .table th:nth-child(13),
-body[data-role="shop"][data-tab="new"] .table td:nth-child(13) {
-  width: 110px;
-}
-
-body[data-role="shop"][data-tab="new"] .table th:nth-child(16),
-body[data-role="shop"][data-tab="new"] .table td:nth-child(16) {
+body[data-role="shop"][data-tab="new"] .table th:nth-child(7),
+body[data-role="shop"][data-tab="new"] .table td:nth-child(7) {
   width: 130px;
 }
 
-body[data-role="shop"][data-tab="new"] .table th:nth-child(17),
-body[data-role="shop"][data-tab="new"] .table td:nth-child(17) {
+body[data-role="shop"][data-tab="new"] .table th:nth-child(8),
+body[data-role="shop"][data-tab="new"] .table td:nth-child(8) {
+  width: 96px;
+}
+
+body[data-role="shop"][data-tab="new"] .table th:nth-child(9),
+body[data-role="shop"][data-tab="new"] .table td:nth-child(9) {
   width: 130px;
 }
 
-body[data-role="shop"][data-tab="new"] .table th:nth-child(18),
-body[data-role="shop"][data-tab="new"] .table td:nth-child(18) {
-  width: 110px;
+body[data-role="shop"][data-tab="new"] .table th:nth-child(10),
+body[data-role="shop"][data-tab="new"] .table td:nth-child(10) {
+  width: 92px;
 }
 
-body[data-role="shop"][data-tab="new"] .table th:nth-child(19),
-body[data-role="shop"][data-tab="new"] .table td:nth-child(19) {
-  width: 160px;
+body[data-role="shop"][data-tab="new"] .table .paymentStatusPaid {
+  color: var(--ok);
+  font-weight: 700;
 }
 
-body[data-role="shop"][data-tab="new"] .table th:nth-child(20),
-body[data-role="shop"][data-tab="new"] .table td:nth-child(20) {
-  width: 130px;
+body[data-role="shop"][data-tab="new"] .table .paymentStatusCod {
+  color: var(--warn);
+  font-weight: 700;
 }
 
 .weightWrap {
@@ -188,7 +309,7 @@ body[data-role="shop"][data-tab="new"] .table td:nth-child(20) {
 }
 
 .weightInput {
-  width: 76px;
+  width: 56px;
   padding: 10px 10px;
   border: 0;
   background: transparent;
@@ -592,6 +713,15 @@ body[data-role="admin"] #bulkShip {
   user-select: none;
 }
 
+.btnCompact {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .btn:hover {
   border-color: rgba(106, 166, 255, 0.65);
 }
@@ -757,21 +887,25 @@ body[data-role="shop"] .table {
   min-width: 1100px;
 }
 
-/* Shop view: keep only essential columns */
-body[data-role="shop"] .table th:nth-child(2),
-body[data-role="shop"] .table td:nth-child(2),
-body[data-role="shop"] .table th:nth-child(4),
-body[data-role="shop"] .table td:nth-child(4),
-body[data-role="shop"] .table th:nth-child(6),
-body[data-role="shop"] .table td:nth-child(6),
-body[data-role="shop"] .table th:nth-child(7),
-body[data-role="shop"] .table td:nth-child(7),
-body[data-role="shop"] .table th:nth-child(12),
-body[data-role="shop"] .table td:nth-child(12),
-body[data-role="shop"] .table th:nth-child(14),
-body[data-role="shop"] .table td:nth-child(14),
-body[data-role="shop"] .table th:nth-child(17),
-body[data-role="shop"] .table td:nth-child(17) {
+body[data-role="shop"][data-tab="new"] .table {
+  min-width: 0;
+}
+
+/* Shop view: keep only essential columns (except New tab which has a custom layout) */
+body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table th:nth-child(2),
+body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table td:nth-child(2),
+body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table th:nth-child(4),
+body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table td:nth-child(4),
+body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table th:nth-child(6),
+body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table td:nth-child(6),
+body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table th:nth-child(7),
+body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table td:nth-child(7),
+body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table th:nth-child(12),
+body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table td:nth-child(12),
+body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table th:nth-child(14),
+body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table td:nth-child(14),
+body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table th:nth-child(17),
+body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table td:nth-child(17) {
   display: none;
 }
 

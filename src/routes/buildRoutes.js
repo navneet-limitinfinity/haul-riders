@@ -6,6 +6,7 @@ import { createAuthRouter } from "./authRoutes.js";
 import { createFirestoreOrdersRouter } from "./firestoreOrdersRoutes.js";
 import { createBulkOrdersRouter } from "./bulkOrdersRoutes.js";
 import { createPagesRouter } from "./pagesRoutes.js";
+import { createPincodeRouter } from "./pincodeRoutes.js";
 import { createShipmentsRouter } from "./shipmentsRoutes.js";
 import { createShopifyRouter } from "./shopifyRoutes.js";
 import { createShopsRouter } from "./shopsRoutes.js";
@@ -25,6 +26,7 @@ export function buildRoutes({ env, logger }) {
   router.use("/api", createBulkOrdersRouter({ env, auth }));
   router.use("/api", createFirestoreOrdersRouter({ env, auth }));
   router.use("/api", createShopsRouter({ env, auth }));
+  router.use("/api", createPincodeRouter({ auth }));
   router.use("/api", createShipmentsRouter({ env, auth }));
   router.use("/api/shopify", createShopifyRouter({ env, logger, auth }));
 
