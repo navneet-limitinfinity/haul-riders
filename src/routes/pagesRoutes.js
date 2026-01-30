@@ -2,7 +2,6 @@ import { Router } from "express";
 import { getShopCollectionInfo } from "../firestore/shopCollections.js";
 
 const html = String.raw;
-const NAV_ASSET_VERSION = "1";
 
 const escapeHtml = (value) =>
   String(value ?? "")
@@ -40,7 +39,8 @@ function renderNavDrawer({ role, userLabel, activePath }) {
   `;
 
   return html`
-    <div id="navOverlay" class="navOverlay" aria-hidden="true"></div>
+    <input id="navState" class="navState" type="checkbox" aria-hidden="true" tabindex="-1" />
+    <label for="navState" id="navOverlay" class="navOverlay" aria-hidden="true"></label>
     <aside id="navDrawer" class="navDrawer" aria-label="Navigation">
       <div class="navHeader">
         <div class="navTitle">Haul Riders</div>
@@ -75,7 +75,6 @@ function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/fontawesome.min.css?v=${assetVersion}" />
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/solid.min.css?v=${assetVersion}" />
     <link rel="icon" type="image/png" href="/static/icon.png?v=${assetVersion}" />
-    <script src="/static/nav.js?v=${NAV_ASSET_VERSION}" defer></script>
     <script src="/static/orders.js?v=${assetVersion}" defer></script>
   </head>
   <body data-role="${role}" data-page="orders" data-store-id="${safeStoreId}" data-firestore-collection="${safeFirestoreCollectionId}">
@@ -83,9 +82,9 @@ function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
     <header class="topbar">
       <div class="topbarInner">
         <div class="brand">
-          <button id="navToggle" class="navToggle" type="button" aria-label="Open navigation">
+          <label id="navToggle" class="navToggle" for="navState" role="button" tabindex="0" aria-label="Open navigation">
             <i class="fa-solid fa-bars" aria-hidden="true"></i>
-          </button>
+          </label>
           <img
             class="brandLogo"
             src="/static/haul_riders_logo.jpeg?v=${assetVersion}"
@@ -281,22 +280,21 @@ function renderBulkUploadPage({ userLabel }) {
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/solid.min.css?v=29" />
     <link rel="stylesheet" href="/static/bulk-upload.css?v=${assetVersion}" />
     <link rel="icon" type="image/png" href="/static/icon.png?v=29" />
-    <script src="/static/nav.js?v=${NAV_ASSET_VERSION}" defer></script>
     <script src="/static/bulk-upload.js?v=${assetVersion}" defer></script>
   </head>
   <body data-role="admin" data-page="bulk-upload">
     ${renderNavDrawer({ role: "admin", userLabel, activePath: "/admin/bulk-upload" })}
-    <header class="topbar">
-      <div class="topbarInner">
-        <div class="brand">
-          <button id="navToggle" class="navToggle" type="button" aria-label="Open navigation">
-            <i class="fa-solid fa-bars" aria-hidden="true"></i>
-          </button>
-          <img
-            class="brandLogo"
-            src="/static/haul_riders_logo.jpeg?v=29"
-            alt="Haul Riders"
-            decoding="async"
+	    <header class="topbar">
+	      <div class="topbarInner">
+	        <div class="brand">
+	          <label id="navToggle" class="navToggle" for="navState" role="button" tabindex="0" aria-label="Open navigation">
+	            <i class="fa-solid fa-bars" aria-hidden="true"></i>
+	          </label>
+	          <img
+	            class="brandLogo"
+	            src="/static/haul_riders_logo.jpeg?v=29"
+	            alt="Haul Riders"
+	            decoding="async"
           />
           <div class="brandText">
             <div class="brandTitle">Haul Riders</div>
@@ -462,22 +460,21 @@ function renderFulfillmentCentersPage({ userLabel, storeId }) {
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/fontawesome.min.css?v=${assetVersion}" />
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/solid.min.css?v=${assetVersion}" />
     <link rel="icon" type="image/png" href="/static/icon.png?v=${assetVersion}" />
-    <script src="/static/nav.js?v=${NAV_ASSET_VERSION}" defer></script>
     <script src="/static/fulfillment-centers.js?v=${assetVersion}" defer></script>
   </head>
   <body data-role="shop" data-page="fulfillment-centers" data-store-id="${safeStoreId}">
     ${renderNavDrawer({ role: "shop", userLabel, activePath: "/shop/fulfillment-centers" })}
-    <header class="topbar">
-      <div class="topbarInner">
-        <div class="brand">
-          <button id="navToggle" class="navToggle" type="button" aria-label="Open navigation">
-            <i class="fa-solid fa-bars" aria-hidden="true"></i>
-          </button>
-          <img
-            class="brandLogo"
-            src="/static/haul_riders_logo.jpeg?v=${assetVersion}"
-            alt="Haul Riders"
-            decoding="async"
+	    <header class="topbar">
+	      <div class="topbarInner">
+	        <div class="brand">
+	          <label id="navToggle" class="navToggle" for="navState" role="button" tabindex="0" aria-label="Open navigation">
+	            <i class="fa-solid fa-bars" aria-hidden="true"></i>
+	          </label>
+	          <img
+	            class="brandLogo"
+	            src="/static/haul_riders_logo.jpeg?v=${assetVersion}"
+	            alt="Haul Riders"
+	            decoding="async"
           />
           <div class="brandText">
             <div class="brandTitle">Fulfillment Centers</div>

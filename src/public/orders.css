@@ -499,6 +499,14 @@ body[data-role="shop"][data-tab="new"] .weightSuffix {
   border-color: rgba(106, 166, 255, 0.65);
 }
 
+.navState {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .navOverlay {
   position: fixed;
   inset: 0;
@@ -531,6 +539,15 @@ body.navOpen .navOverlay {
 }
 
 body.navOpen .navDrawer {
+  transform: translateX(0);
+}
+
+.navState:checked ~ .navOverlay {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.navState:checked ~ .navDrawer {
   transform: translateX(0);
 }
 
