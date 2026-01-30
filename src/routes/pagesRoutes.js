@@ -39,7 +39,7 @@ function renderNavDrawer({ role, userLabel, activePath }) {
   `;
 
   return html`
-    <div id="navOverlay" class="navOverlay" aria-hidden="true"></div>
+    <div id="navOverlay" class="navOverlay" aria-hidden="true" onclick="toggleNav(false)"></div>
     <aside id="navDrawer" class="navDrawer" aria-label="Navigation">
       <div class="navHeader">
         <div class="navTitle">Haul Riders</div>
@@ -81,7 +81,7 @@ function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
     <header class="topbar">
       <div class="topbarInner">
         <div class="brand">
-          <button id="navToggle" class="navToggle" type="button" aria-label="Open navigation">
+          <button id="navToggle" class="navToggle" type="button" aria-label="Open navigation" onclick="toggleNav(true)">
             <i class="fa-solid fa-bars" aria-hidden="true"></i>
           </button>
           <img
@@ -286,7 +286,7 @@ function renderBulkUploadPage({ userLabel }) {
     <header class="topbar">
       <div class="topbarInner">
         <div class="brand">
-          <button id="navToggle" class="navToggle" type="button" aria-label="Open navigation">
+          <button id="navToggle" class="navToggle" type="button" aria-label="Open navigation" onclick="toggleNav(true)">
             <i class="fa-solid fa-bars" aria-hidden="true"></i>
           </button>
           <img
@@ -466,7 +466,7 @@ function renderFulfillmentCentersPage({ userLabel, storeId }) {
     <header class="topbar">
       <div class="topbarInner">
         <div class="brand">
-          <button id="navToggle" class="navToggle" type="button" aria-label="Open navigation">
+          <button id="navToggle" class="navToggle" type="button" aria-label="Open navigation" onclick="toggleNav(true)">
             <i class="fa-solid fa-bars" aria-hidden="true"></i>
           </button>
           <img
