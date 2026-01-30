@@ -20,7 +20,7 @@ jobs:
             cd /opt/haul-riders
 
             # If repo/package is private, ensure you've logged in once:
-            # docker login ghcr.io -u <github-username> -p <PAT-with-packages:read>
+            # docker login ghcr.io -u navneet-limitinfinity -p <PAT-with-packages:read>
 
             docker compose -f deploy/docker-compose.image.yml pull
             docker compose -f deploy/docker-compose.image.yml up -d
