@@ -55,6 +55,15 @@ function renderNavDrawer({ role, userLabel, activePath }) {
         </button>
       </div>
     </aside>
+    <script>
+      if (typeof window.toggleNav !== "function") {
+        window.toggleNav = function (open) {
+          document.body.classList.toggle("navOpen", Boolean(open));
+          var overlay = document.getElementById("navOverlay");
+          if (overlay) overlay.setAttribute("aria-hidden", open ? "false" : "true");
+        };
+      }
+    </script>
   `;
 }
 
