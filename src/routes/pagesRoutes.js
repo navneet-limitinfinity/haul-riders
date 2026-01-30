@@ -2,6 +2,7 @@ import { Router } from "express";
 import { getShopCollectionInfo } from "../firestore/shopCollections.js";
 
 const html = String.raw;
+const NAV_ASSET_VERSION = "1";
 
 const escapeHtml = (value) =>
   String(value ?? "")
@@ -74,6 +75,7 @@ function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/fontawesome.min.css?v=${assetVersion}" />
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/solid.min.css?v=${assetVersion}" />
     <link rel="icon" type="image/png" href="/static/icon.png?v=${assetVersion}" />
+    <script src="/static/nav.js?v=${NAV_ASSET_VERSION}" defer></script>
     <script src="/static/orders.js?v=${assetVersion}" defer></script>
   </head>
   <body data-role="${role}" data-page="orders" data-store-id="${safeStoreId}" data-firestore-collection="${safeFirestoreCollectionId}">
@@ -279,6 +281,7 @@ function renderBulkUploadPage({ userLabel }) {
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/solid.min.css?v=29" />
     <link rel="stylesheet" href="/static/bulk-upload.css?v=${assetVersion}" />
     <link rel="icon" type="image/png" href="/static/icon.png?v=29" />
+    <script src="/static/nav.js?v=${NAV_ASSET_VERSION}" defer></script>
     <script src="/static/bulk-upload.js?v=${assetVersion}" defer></script>
   </head>
   <body data-role="admin" data-page="bulk-upload">
@@ -459,6 +462,7 @@ function renderFulfillmentCentersPage({ userLabel, storeId }) {
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/fontawesome.min.css?v=${assetVersion}" />
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/solid.min.css?v=${assetVersion}" />
     <link rel="icon" type="image/png" href="/static/icon.png?v=${assetVersion}" />
+    <script src="/static/nav.js?v=${NAV_ASSET_VERSION}" defer></script>
     <script src="/static/fulfillment-centers.js?v=${assetVersion}" defer></script>
   </head>
   <body data-role="shop" data-page="fulfillment-centers" data-store-id="${safeStoreId}">
