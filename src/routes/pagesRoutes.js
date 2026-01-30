@@ -39,7 +39,7 @@ function renderNavDrawer({ role, userLabel, activePath }) {
   `;
 
   return html`
-    <div id="navOverlay" class="navOverlay" aria-hidden="true" onclick="toggleNav(false)"></div>
+    <div id="navOverlay" class="navOverlay" aria-hidden="true"></div>
     <aside id="navDrawer" class="navDrawer" aria-label="Navigation">
       <div class="navHeader">
         <div class="navTitle">Haul Riders</div>
@@ -55,15 +55,6 @@ function renderNavDrawer({ role, userLabel, activePath }) {
         </button>
       </div>
     </aside>
-    <script>
-      if (typeof window.toggleNav !== "function") {
-        window.toggleNav = function (open) {
-          document.body.classList.toggle("navOpen", Boolean(open));
-          var overlay = document.getElementById("navOverlay");
-          if (overlay) overlay.setAttribute("aria-hidden", open ? "false" : "true");
-        };
-      }
-    </script>
   `;
 }
 
@@ -90,7 +81,7 @@ function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
     <header class="topbar">
       <div class="topbarInner">
         <div class="brand">
-          <button id="navToggle" class="navToggle" type="button" aria-label="Open navigation" onclick="toggleNav(true)">
+          <button id="navToggle" class="navToggle" type="button" aria-label="Open navigation">
             <i class="fa-solid fa-bars" aria-hidden="true"></i>
           </button>
           <img
@@ -295,7 +286,7 @@ function renderBulkUploadPage({ userLabel }) {
     <header class="topbar">
       <div class="topbarInner">
         <div class="brand">
-          <button id="navToggle" class="navToggle" type="button" aria-label="Open navigation" onclick="toggleNav(true)">
+          <button id="navToggle" class="navToggle" type="button" aria-label="Open navigation">
             <i class="fa-solid fa-bars" aria-hidden="true"></i>
           </button>
           <img
@@ -475,7 +466,7 @@ function renderFulfillmentCentersPage({ userLabel, storeId }) {
     <header class="topbar">
       <div class="topbarInner">
         <div class="brand">
-          <button id="navToggle" class="navToggle" type="button" aria-label="Open navigation" onclick="toggleNav(true)">
+          <button id="navToggle" class="navToggle" type="button" aria-label="Open navigation">
             <i class="fa-solid fa-bars" aria-hidden="true"></i>
           </button>
           <img
