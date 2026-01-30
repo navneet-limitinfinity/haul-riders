@@ -358,5 +358,293 @@ export function createFirestoreOrdersRouter({ env, auth }) {
     }
   });
 
+  const resolveShopDomain = ({ storeId }) => {
+    const raw = String(storeId ?? "").trim().toLowerCase();
+    if (!raw) return "";
+    if (raw.includes(".")) return raw;
+    return `${raw}.myshopify.com`;
+  };
+
+  const getFulfillmentCentersRef = ({ firestore, shopDomain }) => {
+    const shopsCollection = String(env?.auth?.firebase?.shopsCollection ?? "shops").trim() || "shops";
+    return firestore.collection(shopsCollection).doc(shopDomain).collection("fulfillmentCenter");
+  };
+
+  const normalizeCenterPayload = (body) => {
+    const pinCode = String(body?.pinCode ?? "")
+      .replaceAll(/[^\d]/g, "")
+      .slice(0, 6);
+    const phone = String(body?.phone ?? "")
+      .replaceAll(/[^\d]/g, "")
+      .slice(0, 10);
+
+    return {
+      originName: String(body?.originName ?? "").trim(),
+      address1: String(body?.address1 ?? "").trim(),
+      address2: String(body?.address2 ?? "").trim(),
+      city: String(body?.city ?? "").trim(),
+      state: String(body?.state ?? "").trim(),
+      pinCode,
+      country: String(body?.country ?? "IN").trim() || "IN",
+      phone,
+      default: Boolean(body?.default),
+    };
+  };
+
+  router.get(
+    "/firestore/fulfillment-centers",
+    auth.requireRole("shop"),
+    async (req, res, next) => {
+      try {
+        if (env?.auth?.provider !== "firebase") {
+          res.status(400).json({ error: "auth_provider_not_firebase" });
+          return;
+        }
+
+        const storeId = String(req.user?.storeId ?? "").trim().toLowerCase();
+        const shopDomain = resolveShopDomain({ storeId });
+        if (!shopDomain) {
+          res.status(400).json({ error: "store_id_required" });
+          return;
+        }
+
+        const admin = await getFirebaseAdmin({ env });
+        const firestore = admin.firestore();
+        const centersRef = getFulfillmentCentersRef({ firestore, shopDomain });
+        const snap = await centersRef.orderBy("originName", "asc").get();
+        const centers = snap.docs.map((d) => ({ id: d.id, ...(d.data() ?? {}) }));
+
+        res.setHeader("Cache-Control", "no-store");
+        res.json({ shopDomain, count: centers.length, centers });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  router.post(
+    "/firestore/fulfillment-centers",
+    auth.requireRole("shop"),
+    async (req, res, next) => {
+      try {
+        if (env?.auth?.provider !== "firebase") {
+          res.status(400).json({ error: "auth_provider_not_firebase" });
+          return;
+        }
+
+        const storeId = String(req.user?.storeId ?? "").trim().toLowerCase();
+        const shopDomain = resolveShopDomain({ storeId });
+        if (!shopDomain) {
+          res.status(400).json({ error: "store_id_required" });
+          return;
+        }
+
+        const payload = normalizeCenterPayload(req.body ?? {});
+        if (!payload.originName) {
+          res.status(400).json({ error: "origin_name_required" });
+          return;
+        }
+
+        const admin = await getFirebaseAdmin({ env });
+        const firestore = admin.firestore();
+        const centersRef = getFulfillmentCentersRef({ firestore, shopDomain });
+        const existing = await centersRef.get();
+
+        const isFirst = existing.empty;
+        const makeDefault = Boolean(payload.default) || isFirst;
+        const docRef = centersRef.doc();
+
+        const batch = firestore.batch();
+        if (makeDefault) {
+          for (const doc of existing.docs) {
+            if (doc.id === docRef.id) continue;
+            batch.update(doc.ref, { default: false });
+          }
+        }
+
+        batch.set(docRef, { ...payload, default: makeDefault, createdAt: new Date().toISOString() });
+        await batch.commit();
+
+        res.setHeader("Cache-Control", "no-store");
+        res.status(201).json({ id: docRef.id, center: { id: docRef.id, ...payload, default: makeDefault } });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  router.put(
+    "/firestore/fulfillment-centers/:id",
+    auth.requireRole("shop"),
+    async (req, res, next) => {
+      try {
+        if (env?.auth?.provider !== "firebase") {
+          res.status(400).json({ error: "auth_provider_not_firebase" });
+          return;
+        }
+
+        const centerId = String(req.params?.id ?? "").trim();
+        if (!centerId) {
+          res.status(400).json({ error: "center_id_required" });
+          return;
+        }
+
+        const storeId = String(req.user?.storeId ?? "").trim().toLowerCase();
+        const shopDomain = resolveShopDomain({ storeId });
+        if (!shopDomain) {
+          res.status(400).json({ error: "store_id_required" });
+          return;
+        }
+
+        const payload = normalizeCenterPayload(req.body ?? {});
+        if (!payload.originName) {
+          res.status(400).json({ error: "origin_name_required" });
+          return;
+        }
+
+        const admin = await getFirebaseAdmin({ env });
+        const firestore = admin.firestore();
+        const centersRef = getFulfillmentCentersRef({ firestore, shopDomain });
+        const docRef = centersRef.doc(centerId);
+        const snap = await docRef.get();
+        if (!snap.exists) {
+          res.status(404).json({ error: "center_not_found" });
+          return;
+        }
+
+        const makeDefault = Boolean(payload.default);
+        const batch = firestore.batch();
+        if (makeDefault) {
+          const all = await centersRef.get();
+          for (const doc of all.docs) {
+            batch.update(doc.ref, { default: doc.id === centerId });
+          }
+        } else {
+          batch.update(docRef, { ...payload, default: Boolean(snap.data()?.default), updatedAt: new Date().toISOString() });
+        }
+
+        await batch.commit();
+        const updatedSnap = await docRef.get();
+        res.setHeader("Cache-Control", "no-store");
+        res.json({ id: centerId, center: { id: centerId, ...(updatedSnap.data() ?? {}) } });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  router.post(
+    "/firestore/fulfillment-centers/:id/default",
+    auth.requireRole("shop"),
+    async (req, res, next) => {
+      try {
+        if (env?.auth?.provider !== "firebase") {
+          res.status(400).json({ error: "auth_provider_not_firebase" });
+          return;
+        }
+
+        const centerId = String(req.params?.id ?? "").trim();
+        if (!centerId) {
+          res.status(400).json({ error: "center_id_required" });
+          return;
+        }
+
+        const storeId = String(req.user?.storeId ?? "").trim().toLowerCase();
+        const shopDomain = resolveShopDomain({ storeId });
+        if (!shopDomain) {
+          res.status(400).json({ error: "store_id_required" });
+          return;
+        }
+
+        const admin = await getFirebaseAdmin({ env });
+        const firestore = admin.firestore();
+        const centersRef = getFulfillmentCentersRef({ firestore, shopDomain });
+        const all = await centersRef.get();
+        if (all.empty) {
+          res.status(404).json({ error: "center_not_found" });
+          return;
+        }
+
+        const batch = firestore.batch();
+        let found = false;
+        for (const doc of all.docs) {
+          const isDefault = doc.id === centerId;
+          if (isDefault) found = true;
+          batch.update(doc.ref, { default: isDefault });
+        }
+        if (!found) {
+          res.status(404).json({ error: "center_not_found" });
+          return;
+        }
+
+        await batch.commit();
+        res.setHeader("Cache-Control", "no-store");
+        res.json({ ok: true, id: centerId });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  router.delete(
+    "/firestore/fulfillment-centers/:id",
+    auth.requireRole("shop"),
+    async (req, res, next) => {
+      try {
+        if (env?.auth?.provider !== "firebase") {
+          res.status(400).json({ error: "auth_provider_not_firebase" });
+          return;
+        }
+
+        const centerId = String(req.params?.id ?? "").trim();
+        if (!centerId) {
+          res.status(400).json({ error: "center_id_required" });
+          return;
+        }
+
+        const storeId = String(req.user?.storeId ?? "").trim().toLowerCase();
+        const shopDomain = resolveShopDomain({ storeId });
+        if (!shopDomain) {
+          res.status(400).json({ error: "store_id_required" });
+          return;
+        }
+
+        const admin = await getFirebaseAdmin({ env });
+        const firestore = admin.firestore();
+        const centersRef = getFulfillmentCentersRef({ firestore, shopDomain });
+        const all = await centersRef.get();
+        if (all.empty) {
+          res.status(404).json({ error: "center_not_found" });
+          return;
+        }
+
+        if (all.docs.length <= 1) {
+          res.status(400).json({ error: "cannot_delete_last_center" });
+          return;
+        }
+
+        const target = all.docs.find((d) => d.id === centerId) ?? null;
+        if (!target) {
+          res.status(404).json({ error: "center_not_found" });
+          return;
+        }
+
+        const wasDefault = Boolean(target.data()?.default);
+        const batch = firestore.batch();
+        batch.delete(target.ref);
+        if (wasDefault) {
+          const nextDefault = all.docs.find((d) => d.id !== centerId) ?? null;
+          if (nextDefault) batch.update(nextDefault.ref, { default: true });
+        }
+        await batch.commit();
+
+        res.setHeader("Cache-Control", "no-store");
+        res.json({ ok: true, id: centerId });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
   return router;
 }
