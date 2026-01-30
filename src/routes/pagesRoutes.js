@@ -11,8 +11,55 @@ const escapeHtml = (value) =>
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 
+function renderNavDrawer({ role, userLabel, activePath }) {
+  const safeUserLabel = escapeHtml(userLabel);
+  const isActive = (path) => (String(activePath ?? "") === path ? "isActive" : "");
+
+  const common = html`
+    <a class="navItem ${isActive(role === "admin" ? "/admin/orders" : "/shop/orders")}" href="${role === "admin" ? "/admin/orders" : "/shop/orders"}">
+      <i class="fa-solid fa-list" aria-hidden="true"></i>
+      Orders
+    </a>
+    ${role === "shop"
+      ? html`<a class="navItem ${isActive("/shop/fulfillment-centers")}" href="/shop/fulfillment-centers">
+          <i class="fa-solid fa-warehouse" aria-hidden="true"></i>
+          Fulfillment Centers
+        </a>`
+      : ""}
+    ${role === "admin"
+      ? html`<a class="navItem ${isActive("/admin/bulk-upload")}" href="/admin/bulk-upload">
+          <i class="fa-solid fa-file-arrow-up" aria-hidden="true"></i>
+          Bulk Tools
+        </a>`
+      : ""}
+    <a class="navItem" href="mailto:support@haulriders.com">
+      <i class="fa-solid fa-life-ring" aria-hidden="true"></i>
+      Support
+    </a>
+  `;
+
+  return html`
+    <div id="navOverlay" class="navOverlay" aria-hidden="true"></div>
+    <aside id="navDrawer" class="navDrawer" aria-label="Navigation">
+      <div class="navHeader">
+        <div class="navTitle">Haul Riders</div>
+        <div class="navSub">${safeUserLabel}</div>
+      </div>
+      <nav class="navList">
+        ${common}
+      </nav>
+      <div class="navFooter">
+        <button type="button" class="navItem navButton" data-action="logout">
+          <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+          Logout
+        </button>
+      </div>
+    </aside>
+  `;
+}
+
 function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
-  const assetVersion = "30";
+  const assetVersion = "38";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
   const safeFirestoreCollectionId = escapeHtml(firestoreCollectionId);
@@ -29,10 +76,14 @@ function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
     <link rel="icon" type="image/png" href="/static/icon.png?v=${assetVersion}" />
     <script src="/static/orders.js?v=${assetVersion}" defer></script>
   </head>
-  <body data-role="${role}" data-store-id="${safeStoreId}" data-firestore-collection="${safeFirestoreCollectionId}">
+  <body data-role="${role}" data-page="orders" data-store-id="${safeStoreId}" data-firestore-collection="${safeFirestoreCollectionId}">
+    ${renderNavDrawer({ role, userLabel, activePath: role === "admin" ? "/admin/orders" : "/shop/orders" })}
     <header class="topbar">
       <div class="topbarInner">
         <div class="brand">
+          <button id="navToggle" class="navToggle" type="button" aria-label="Open navigation">
+            <i class="fa-solid fa-bars" aria-hidden="true"></i>
+          </button>
           <img
             class="brandLogo"
             src="/static/haul_riders_logo.jpeg?v=${assetVersion}"
@@ -230,10 +281,14 @@ function renderBulkUploadPage({ userLabel }) {
     <link rel="icon" type="image/png" href="/static/icon.png?v=29" />
     <script src="/static/bulk-upload.js?v=${assetVersion}" defer></script>
   </head>
-  <body data-role="admin">
+  <body data-role="admin" data-page="bulk-upload">
+    ${renderNavDrawer({ role: "admin", userLabel, activePath: "/admin/bulk-upload" })}
     <header class="topbar">
       <div class="topbarInner">
         <div class="brand">
+          <button id="navToggle" class="navToggle" type="button" aria-label="Open navigation">
+            <i class="fa-solid fa-bars" aria-hidden="true"></i>
+          </button>
           <img
             class="brandLogo"
             src="/static/haul_riders_logo.jpeg?v=29"
@@ -389,6 +444,156 @@ function renderBulkUploadPage({ userLabel }) {
 </html>`;
 }
 
+function renderFulfillmentCentersPage({ userLabel, storeId }) {
+  const assetVersion = "39";
+  const safeUserLabel = escapeHtml(userLabel);
+  const safeStoreId = escapeHtml(storeId);
+
+  return html`<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fulfillment Centers</title>
+    <link rel="stylesheet" href="/static/orders.css?v=${assetVersion}" />
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/fontawesome.min.css?v=${assetVersion}" />
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/solid.min.css?v=${assetVersion}" />
+    <link rel="icon" type="image/png" href="/static/icon.png?v=${assetVersion}" />
+    <script src="/static/fulfillment-centers.js?v=${assetVersion}" defer></script>
+  </head>
+  <body data-role="shop" data-page="fulfillment-centers" data-store-id="${safeStoreId}">
+    ${renderNavDrawer({ role: "shop", userLabel, activePath: "/shop/fulfillment-centers" })}
+    <header class="topbar">
+      <div class="topbarInner">
+        <div class="brand">
+          <button id="navToggle" class="navToggle" type="button" aria-label="Open navigation">
+            <i class="fa-solid fa-bars" aria-hidden="true"></i>
+          </button>
+          <img
+            class="brandLogo"
+            src="/static/haul_riders_logo.jpeg?v=${assetVersion}"
+            alt="Haul Riders"
+            decoding="async"
+          />
+          <div class="brandText">
+            <div class="brandTitle">Fulfillment Centers</div>
+            <div class="brandSub">Manage pickup/origin addresses</div>
+          </div>
+        </div>
+
+        <div class="topbarActions">
+          <details class="userMenu" aria-label="User menu">
+            <summary class="userMenuSummary" aria-label="Open user menu">
+              <span class="userAvatar userAvatarIcon" aria-hidden="true">
+                <i class="fa-solid fa-user" aria-hidden="true"></i>
+              </span>
+            </summary>
+            <div class="userMenuList">
+              <div class="userMenuSection">
+                <strong>${safeUserLabel}</strong>
+              </div>
+              <a class="userMenuItem" href="/shop/orders">Dashboard</a>
+              <button type="button" class="userMenuItem userMenuButton" data-action="logout">
+                Logout
+              </button>
+            </div>
+          </details>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="panel">
+        <div class="panelHeader">
+          <div class="panelTitle">
+            <h1>Fulfillment Centers</h1>
+            <div class="panelHint">Select one default center for shipping labels.</div>
+          </div>
+
+          <div class="controls">
+            <div class="btnGroup">
+              <button id="addCenterBtn" class="btn btnPrimary btnIcon" type="button">
+                <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                Add Center
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="status" class="status" aria-live="polite"></div>
+
+        <div class="tableWrap">
+          <table class="table" aria-label="Fulfillment centers">
+	            <thead>
+	              <tr>
+	                <th>Origin Name</th>
+	                <th>Address</th>
+	                <th>PIN</th>
+	                <th>Phone</th>
+	                <th>Default</th>
+	                <th>Action</th>
+	              </tr>
+	            </thead>
+            <tbody id="centersRows"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="centerDialog" class="modal">
+      <form method="dialog" class="modalCard">
+        <div class="modalHeader">
+          <div class="modalTitle" id="centerDialogTitle">Add center</div>
+          <button type="button" class="btn btnSecondary btnCompact" data-action="close-dialog">Close</button>
+        </div>
+
+        <div class="modalBody">
+          <input type="hidden" id="centerId" value="" />
+          <label class="field">
+            <span>Origin Name</span>
+            <input id="originName" type="text" placeholder="e.g. ORG L02" required />
+          </label>
+          <div class="modalGrid">
+            <label class="field">
+              <span>Address 1</span>
+              <input id="address1" type="text" />
+            </label>
+            <label class="field">
+              <span>Address 2</span>
+              <input id="address2" type="text" />
+            </label>
+            <label class="field">
+              <span>City</span>
+              <input id="city" type="text" />
+            </label>
+            <label class="field">
+              <span>State</span>
+              <input id="state" type="text" />
+            </label>
+            <label class="field">
+              <span>PIN Code</span>
+              <input id="pinCode" type="text" inputmode="numeric" />
+            </label>
+            <label class="field">
+              <span>Phone</span>
+              <input id="phone" type="text" inputmode="numeric" />
+            </label>
+          </div>
+        </div>
+
+        <div class="modalFooter">
+          <label class="fieldCheckbox fieldCheckboxCompact">
+            <input id="makeDefault" type="checkbox" />
+            <span>Make default</span>
+          </label>
+          <button id="saveCenterBtn" class="btn btnPrimary" type="button">Save</button>
+        </div>
+      </form>
+    </dialog>
+  </body>
+</html>`;
+}
+
 export function createPagesRouter({ env, auth } = {}) {
   const router = Router();
 
@@ -414,6 +619,13 @@ export function createPagesRouter({ env, auth } = {}) {
     const userLabel = String(req.user?.email ?? env?.adminName ?? "Admin").trim() || "Admin";
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(renderBulkUploadPage({ userLabel }));
+  });
+
+  router.get("/shop/fulfillment-centers", auth.requireRole("shop"), (req, res) => {
+    const userLabel = String(req.user?.email ?? "Shop").trim() || "Shop";
+    const storeId = String(req.user?.storeId ?? "").trim();
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(renderFulfillmentCentersPage({ userLabel, storeId }));
   });
 
   return router;

@@ -210,8 +210,73 @@ body[data-role="shop"][data-tab="new"] .table td {
   font-size: 12px;
 }
 
+/* New tab: keep Select, Order Details, and Action pinned while scrolling horizontally. */
+body[data-role="shop"][data-tab="new"] .table th:nth-child(1),
+body[data-role="shop"][data-tab="new"] .table td:nth-child(1) {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+}
+
+body[data-role="shop"][data-tab="new"] .table th:nth-child(2),
+body[data-role="shop"][data-tab="new"] .table td:nth-child(2) {
+  position: sticky;
+  left: 44px;
+  z-index: 2;
+}
+
+body[data-role="shop"][data-tab="new"] .table th:nth-child(10),
+body[data-role="shop"][data-tab="new"] .table td:nth-child(10) {
+  position: sticky;
+  right: 0;
+  z-index: 3;
+}
+
+body[data-role="shop"][data-tab="new"] .table td:nth-child(1),
+body[data-role="shop"][data-tab="new"] .table td:nth-child(2),
+body[data-role="shop"][data-tab="new"] .table td:nth-child(10) {
+  background: var(--panel2);
+}
+
+body[data-role="shop"][data-tab="new"] .table th:nth-child(1),
+body[data-role="shop"][data-tab="new"] .table th:nth-child(2),
+body[data-role="shop"][data-tab="new"] .table th:nth-child(10) {
+  background: rgba(16, 26, 47, 0.92);
+}
+
+@media (prefers-color-scheme: light) {
+  body[data-role="shop"][data-tab="new"] .table th:nth-child(1),
+  body[data-role="shop"][data-tab="new"] .table th:nth-child(2),
+  body[data-role="shop"][data-tab="new"] .table th:nth-child(10) {
+    background: rgba(255, 255, 255, 0.92);
+  }
+}
+
+body[data-role="shop"][data-tab="new"] .table th:nth-child(2),
+body[data-role="shop"][data-tab="new"] .table td:nth-child(2) {
+  box-shadow: 10px 0 14px rgba(0, 0, 0, 0.06);
+}
+
+body[data-role="shop"][data-tab="new"] .table th:nth-child(10),
+body[data-role="shop"][data-tab="new"] .table td:nth-child(10) {
+  box-shadow: -10px 0 14px rgba(0, 0, 0, 0.06);
+}
+
 body[data-role="shop"][data-tab="new"] .cellStack {
   word-break: break-word;
+}
+
+/* New tab: a bit more breathing room for the last columns. */
+body[data-role="shop"][data-tab="new"] .table th:nth-child(7),
+body[data-role="shop"][data-tab="new"] .table td:nth-child(7),
+body[data-role="shop"][data-tab="new"] .table th:nth-child(8),
+body[data-role="shop"][data-tab="new"] .table td:nth-child(8),
+body[data-role="shop"][data-tab="new"] .table th:nth-child(9),
+body[data-role="shop"][data-tab="new"] .table td:nth-child(9),
+body[data-role="shop"][data-tab="new"] .table th:nth-child(10),
+body[data-role="shop"][data-tab="new"] .table td:nth-child(10) {
+  padding-left: 10px;
+  padding-right: 10px;
 }
 
 body[data-role="shop"][data-tab="new"] .table tbody tr td {
@@ -275,12 +340,12 @@ body[data-role="shop"][data-tab="new"] .table td:nth-child(7) {
 
 body[data-role="shop"][data-tab="new"] .table th:nth-child(8),
 body[data-role="shop"][data-tab="new"] .table td:nth-child(8) {
-  width: 96px;
+  width: 120px;
 }
 
 body[data-role="shop"][data-tab="new"] .table th:nth-child(9),
 body[data-role="shop"][data-tab="new"] .table td:nth-child(9) {
-  width: 130px;
+  width: 150px;
 }
 
 body[data-role="shop"][data-tab="new"] .table th:nth-child(10),
@@ -296,6 +361,27 @@ body[data-role="shop"][data-tab="new"] .table .paymentStatusPaid {
 body[data-role="shop"][data-tab="new"] .table .paymentStatusCod {
   color: var(--warn);
   font-weight: 700;
+}
+
+body[data-role="shop"][data-tab="new"] .table td {
+  overflow: hidden;
+}
+
+body[data-role="shop"][data-tab="new"] .courierTypeSelect {
+  min-width: 0;
+}
+
+body[data-role="shop"][data-tab="new"] .weightWrap {
+  max-width: 100%;
+}
+
+body[data-role="shop"][data-tab="new"] .weightInput {
+  width: 44px;
+  padding: 8px 8px;
+}
+
+body[data-role="shop"][data-tab="new"] .weightSuffix {
+  padding: 0 8px;
 }
 
 .weightWrap {
@@ -394,6 +480,193 @@ body[data-role="shop"][data-tab="new"] .table .paymentStatusCod {
   align-items: center;
   justify-content: space-between;
   gap: 18px;
+}
+
+.navToggle {
+  height: 38px;
+  width: 38px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.navToggle:hover {
+  border-color: rgba(106, 166, 255, 0.65);
+}
+
+.navOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+  z-index: 40;
+}
+
+.navDrawer {
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 280px;
+  transform: translateX(-102%);
+  transition: transform 180ms ease;
+  z-index: 50;
+  border-right: 1px solid var(--border);
+  background: var(--bg2);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+}
+
+body.navOpen .navOverlay {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+body.navOpen .navDrawer {
+  transform: translateX(0);
+}
+
+.navHeader {
+  padding: 18px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.navTitle {
+  font-weight: 900;
+  letter-spacing: 0.2px;
+}
+
+.navSub {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.navList {
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.navFooter {
+  margin-top: auto;
+  padding: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  color: var(--text);
+  text-decoration: none;
+  background: transparent;
+}
+
+.navItem:hover {
+  border-color: rgba(106, 166, 255, 0.35);
+  background: rgba(106, 166, 255, 0.08);
+}
+
+.navItem.isActive {
+  border-color: rgba(106, 166, 255, 0.55);
+  background: rgba(106, 166, 255, 0.14);
+}
+
+.navButton {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.modal {
+  border: 0;
+  border-radius: 16px;
+  padding: 0;
+  max-width: 820px;
+  width: calc(100% - 32px);
+  background: transparent;
+}
+
+.modal::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.modalCard {
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--bg2);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.modalHeader {
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+
+.modalTitle {
+  font-weight: 900;
+}
+
+.modalBody {
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.modalGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 760px) {
+  .modalGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fieldCheckbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fieldCheckboxCompact {
+  font-size: 12px;
+  color: var(--text);
+  gap: 8px;
+  user-select: none;
+}
+
+.fieldCheckboxCompact input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+.modalFooter {
+  padding: 14px 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
 }
 
 .topbarActions {
@@ -678,6 +951,24 @@ select {
   width: 96px;
 }
 
+body[data-page="fulfillment-centers"] .modal .field > span {
+  color: var(--text);
+  font-weight: 700;
+}
+
+body[data-page="fulfillment-centers"] .modal .field input {
+  width: 100%;
+  border-radius: 8px;
+}
+
+body[data-page="fulfillment-centers"] .modal {
+  border-radius: 12px;
+}
+
+body[data-page="fulfillment-centers"] .modalCard {
+  border-radius: 12px;
+}
+
 .btnGroup {
   display: inline-flex;
   gap: 10px;
@@ -891,21 +1182,35 @@ body[data-role="shop"][data-tab="new"] .table {
   min-width: 0;
 }
 
-/* Shop view: keep only essential columns (except New tab which has a custom layout) */
-body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table th:nth-child(2),
-body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table td:nth-child(2),
-body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table th:nth-child(4),
-body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table td:nth-child(4),
-body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table th:nth-child(6),
-body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table td:nth-child(6),
-body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table th:nth-child(7),
-body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table td:nth-child(7),
-body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table th:nth-child(12),
-body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table td:nth-child(12),
-body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table th:nth-child(14),
-body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table td:nth-child(14),
-body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table th:nth-child(17),
-body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table td:nth-child(17) {
+/* Shop orders view: keep only essential columns (except New/Assigned which have custom layouts). */
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"])
+  .table th:nth-child(2),
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"])
+  .table td:nth-child(2),
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"])
+  .table th:nth-child(4),
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"])
+  .table td:nth-child(4),
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"])
+  .table th:nth-child(6),
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"])
+  .table td:nth-child(6),
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"])
+  .table th:nth-child(7),
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"])
+  .table td:nth-child(7),
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"])
+  .table th:nth-child(12),
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"])
+  .table td:nth-child(12),
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"])
+  .table th:nth-child(14),
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"])
+  .table td:nth-child(14),
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"])
+  .table th:nth-child(17),
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"])
+  .table td:nth-child(17) {
   display: none;
 }
 
@@ -1020,6 +1325,54 @@ body[data-role="shop"]:not([data-tab="new"]):not([data-tab="assigned"]) .table t
   margin-left: 8px;
   font-size: 12px;
   color: var(--muted);
+}
+
+/* Icon-only menu button (Fulfillment Centers actions). */
+.iconMenuSummary {
+  height: 34px;
+  width: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+}
+
+.iconMenuSummary::after {
+  content: "";
+  display: none;
+}
+
+.iconMenuSummary:hover {
+  border-color: rgba(106, 166, 255, 0.45);
+}
+
+/* Fulfillment Centers page: don't stretch the list full-width. */
+body[data-page="fulfillment-centers"] .tableWrap {
+  overflow: auto;
+}
+
+body[data-page="fulfillment-centers"] .container {
+  max-width: 1300px;
+}
+
+body[data-page="fulfillment-centers"] .panel {
+  width: 100%;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+body[data-page="fulfillment-centers"] .table {
+  width: 100%;
+  min-width: 0;
+  table-layout: auto;
+}
+
+body[data-page="fulfillment-centers"] .tableWrap .table {
+  display: table;
 }
 
 .menuPopover {
