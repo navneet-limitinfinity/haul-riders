@@ -114,6 +114,10 @@ const RTO_TAB_HEADER_HTML = `<tr>
 let allOrders = [];
 let currentOrders = [];
 const selectedOrderIds = new Set();
+let fulfillmentCentersState = {
+  loaded: false,
+  defaultName: "",
+};
 function pruneSelectionToVisible(orders) {
   const allowed = new Set();
   for (const row of orders ?? []) {
@@ -799,6 +803,31 @@ async function fetchFirestoreAdminOrders({ storeId, status, limit }) {
     throw new Error(`${response.status} ${response.statusText} ${text}`.trim());
   }
   return response.json();
+}
+
+async function fetchFulfillmentCenters() {
+  const response = await fetch("/api/firestore/fulfillment-centers", {
+    cache: "no-store",
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`${response.status} ${response.statusText} ${text}`.trim());
+  }
+  return response.json();
+}
+
+async function ensureFulfillmentCentersLoaded() {
+  if (fulfillmentCentersState.loaded) return;
+  fulfillmentCentersState.loaded = true;
+  try {
+    const data = await fetchFulfillmentCenters();
+    const centers = Array.isArray(data?.centers) ? data.centers : [];
+    const defaultCenter = centers.find((c) => Boolean(c?.default)) ?? centers[0] ?? null;
+    fulfillmentCentersState.defaultName = String(defaultCenter?.originName ?? "").trim();
+  } catch {
+    fulfillmentCentersState.defaultName = "";
+  }
 }
 
 async function fetchConsignments({ tab, storeId, limit }) {
@@ -2286,7 +2315,7 @@ function renderRowsNewTab(orders) {
       { text: shipping.pinCode ?? "", className: "mono" },
       { html: phoneHtml },
       { html: invoiceDetailsHtml },
-      { text: row.fulfillmentCenter ?? "", className: "mono" },
+      { text: row.fulfillmentCenter ?? fulfillmentCentersState.defaultName ?? "", className: "mono" },
       weightCell,
       courierTypeCell,
       actionCell,
@@ -2574,6 +2603,12 @@ window.addEventListener("DOMContentLoaded", () => {
   const allowedTabs = new Set(["assigned", "in_transit", "delivered", "rto", "all"]);
   if (activeRole === "shop") allowedTabs.add("new");
   setActiveTab(allowedTabs.has(tabFromUrl) ? tabFromUrl : getDefaultTabForRole(activeRole));
+
+  if (activeRole === "shop") {
+    ensureFulfillmentCentersLoaded().then(() => {
+      if (activeTab === "new") renderRows(currentOrders);
+    });
+  }
 
   document.querySelectorAll(".tabBtn[data-tab]").forEach((btn) => {
     btn.addEventListener("click", async () => {
