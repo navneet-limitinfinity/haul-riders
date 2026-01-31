@@ -20,6 +20,14 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function normalizeIsoDate(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString();
+}
+
 const IN_TRANSIT_DISPLAY_STATUSES = [
   "In Transit",
   "Undelivered",
@@ -525,7 +533,10 @@ export function createBulkOrdersRouter({ env, auth }) {
               continue;
             }
 
-            const updatedAt = nowIso();
+            const updatedAt =
+              normalizeIsoDate(
+                pickFirstValue(row, ["updated_at", "updatedAt", "Updated On", "Updated At"])
+              ) || nowIso();
             const shipment_status =
               normalizeDisplayStatus(shipmentStatusRaw) ||
               internalToDisplayShipmentStatus(shipmentStatus) ||

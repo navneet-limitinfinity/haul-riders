@@ -413,7 +413,10 @@ const resolveStoreId = ({ req }) => {
     return storeId;
   }
   if (role === ROLE_SHOP) {
-    return String(req.user?.storeId ?? "").trim().toLowerCase();
+    const fromProfile = String(req.user?.storeId ?? "").trim().toLowerCase();
+    if (fromProfile) return fromProfile;
+    const q = req.query ?? {};
+    return String(q.storeId ?? q.store ?? q.shopDomain ?? "").trim().toLowerCase();
   }
   return "";
 };

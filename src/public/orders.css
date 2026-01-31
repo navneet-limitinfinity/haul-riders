@@ -335,12 +335,12 @@ body[data-role="shop"][data-tab="new"] .table td:nth-child(6) {
 
 body[data-role="shop"][data-tab="new"] .table th:nth-child(7),
 body[data-role="shop"][data-tab="new"] .table td:nth-child(7) {
-  width: 130px;
+  width: 200px;
 }
 
 body[data-role="shop"][data-tab="new"] .table th:nth-child(8),
 body[data-role="shop"][data-tab="new"] .table td:nth-child(8) {
-  width: 120px;
+  width: 140px;
 }
 
 body[data-role="shop"][data-tab="new"] .table th:nth-child(9),
@@ -368,6 +368,10 @@ body[data-role="shop"][data-tab="new"] .table td {
 }
 
 body[data-role="shop"][data-tab="new"] .courierTypeSelect {
+  min-width: 0;
+}
+
+body[data-role="shop"][data-tab="new"] .fulfillmentCenterSelect {
   min-width: 0;
 }
 
@@ -418,6 +422,11 @@ body[data-role="shop"][data-tab="new"] .weightSuffix {
 .courierTypeSelect {
   width: 100%;
   min-width: 140px;
+}
+
+.fulfillmentCenterSelect {
+  width: 100%;
+  min-width: 180px;
 }
 
 .statusSelect {
@@ -1201,7 +1210,7 @@ body[data-role="shop"] .table {
 }
 
 body[data-role="shop"][data-tab="new"] .table {
-  min-width: 0;
+  min-width: 1500px;
 }
 
 /* Shop orders view: keep only essential columns (except New/Assigned which have custom layouts). */

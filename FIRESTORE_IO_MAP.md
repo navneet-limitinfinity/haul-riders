@@ -221,7 +221,7 @@ Updates keys:
 - `trackingNumber` (from CSV)
 - `consignment_number` (mirrors trackingNumber)
 - `shipping_date` (preserved/backfilled)
-- `updated_at`, `updatedAt`
+- `updated_at`, `updatedAt` (defaults to "now"; can be provided as `Updated On` / `updated_at` in CSV)
 - `shipment.{ shipmentStatus, trackingNumber, shippingDate, updatedAt }`
 - `event: "bulk_status_csv"`
 - `updatedBy { uid, email, role }`
@@ -301,4 +301,3 @@ Updates keys:
 - Legacy ordering: `requestedAt`
 - New sorting requirement: `shipping_date` (if missing, derived from `shipment.shippingDate` → `shipment.assignedAt` → `requestedAt` → `updatedAt`)
 - Updated timestamp: `updated_at` (if missing, derived from `shipment.updatedAt` or `updatedAt`)
-

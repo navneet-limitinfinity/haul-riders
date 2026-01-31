@@ -117,6 +117,7 @@ const selectedOrderIds = new Set();
 let fulfillmentCentersState = {
   loaded: false,
   defaultName: "",
+  centers: [],
 };
 function pruneSelectionToVisible(orders) {
   const allowed = new Set();
@@ -457,10 +458,10 @@ async function hydrateAssignedServiceablePins(orders) {
 
 function getShipForm(orderKey) {
   const key = String(orderKey ?? "").trim();
-  if (!key) return { weightKg: "", courierType: "" };
+  if (!key) return { weightKg: "", courierType: "", fulfillmentCenter: "" };
   const existing = shipFormState.get(key);
   if (existing) return existing;
-  const initial = { weightKg: "", courierType: "" };
+  const initial = { weightKg: "", courierType: "", fulfillmentCenter: "" };
   shipFormState.set(key, initial);
   return initial;
 }
@@ -823,10 +824,12 @@ async function ensureFulfillmentCentersLoaded() {
   try {
     const data = await fetchFulfillmentCenters();
     const centers = Array.isArray(data?.centers) ? data.centers : [];
+    fulfillmentCentersState.centers = centers;
     const defaultCenter = centers.find((c) => Boolean(c?.default)) ?? centers[0] ?? null;
     fulfillmentCentersState.defaultName = String(defaultCenter?.originName ?? "").trim();
   } catch {
     fulfillmentCentersState.defaultName = "";
+    fulfillmentCentersState.centers = [];
   }
 }
 
@@ -1221,6 +1224,14 @@ const createCourierTypeSelect = ({ orderKey, value }) => ({
   value,
 });
 
+const createFulfillmentCenterSelect = ({ orderKey, value, options, disabled }) => ({
+  fulfillmentCenterSelect: true,
+  orderKey,
+  value,
+  options: Array.isArray(options) ? options : [],
+  disabled: Boolean(disabled),
+});
+
 function renderRows(orders) {
   if (activeRole === "shop" && activeTab === "new") {
     renderRowsNewTab(orders);
@@ -1508,6 +1519,33 @@ function renderRows(orders) {
           select.appendChild(opt);
         }
         select.value = String(value.value ?? "") || "";
+        td.appendChild(select);
+      } else if (value && typeof value === "object" && value.fulfillmentCenterSelect) {
+        const select = document.createElement("select");
+        select.className = "fulfillmentCenterSelect";
+        select.dataset.role = "fulfillmentCenter";
+        select.dataset.orderKey = String(value.orderKey ?? "");
+        select.disabled = Boolean(value.disabled);
+
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = "Fulfillment Center";
+        placeholder.disabled = true;
+        select.appendChild(placeholder);
+
+        const opts = Array.isArray(value.options) ? value.options : [];
+        for (const o of opts) {
+          const label = String(o?.label ?? "").trim();
+          if (!label) continue;
+          const opt = document.createElement("option");
+          opt.value = label;
+          opt.textContent = label;
+          select.appendChild(opt);
+        }
+
+        const selected = String(value.value ?? "").trim();
+        select.value = selected || "";
+        if (!select.value) select.value = "";
         td.appendChild(select);
       } else if (value && typeof value === "object" && value.actionButton) {
         const btn = document.createElement("button");
@@ -2306,6 +2344,21 @@ function renderRowsNewTab(orders) {
 
     const courierTypeCell = createCourierTypeSelect({ orderKey, value: shipForm.courierType });
 
+    const centers = Array.isArray(fulfillmentCentersState.centers)
+      ? fulfillmentCentersState.centers
+      : [];
+    const centerOptions = centers.map((c) => ({ label: String(c?.originName ?? "").trim() }));
+    const centerValue =
+      String(shipForm.fulfillmentCenter ?? "").trim() ||
+      String(row.fulfillmentCenter ?? "").trim() ||
+      String(fulfillmentCentersState.defaultName ?? "").trim();
+    const fulfillmentCenterCell = createFulfillmentCenterSelect({
+      orderKey,
+      value: centerValue,
+      options: centerOptions,
+      disabled: centerOptions.length === 0,
+    });
+
     const actionCell = createActionButton({ label: "Ship Now", action: "ship-now", orderKey });
 
     const cells = [
@@ -2315,7 +2368,7 @@ function renderRowsNewTab(orders) {
       { text: shipping.pinCode ?? "", className: "mono" },
       { html: phoneHtml },
       { html: invoiceDetailsHtml },
-      { text: row.fulfillmentCenter ?? fulfillmentCentersState.defaultName ?? "", className: "mono" },
+      fulfillmentCenterCell,
       weightCell,
       courierTypeCell,
       actionCell,
@@ -2371,6 +2424,33 @@ function renderRowsNewTab(orders) {
           select.appendChild(opt);
         }
         select.value = String(value.value ?? "") || "";
+        td.appendChild(select);
+      } else if (value && typeof value === "object" && value.fulfillmentCenterSelect) {
+        const select = document.createElement("select");
+        select.className = "fulfillmentCenterSelect";
+        select.dataset.role = "fulfillmentCenter";
+        select.dataset.orderKey = String(value.orderKey ?? "");
+        select.disabled = Boolean(value.disabled);
+
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = "Select Fulfillment Center";
+        placeholder.disabled = true;
+        select.appendChild(placeholder);
+
+        const opts = Array.isArray(value.options) ? value.options : [];
+        for (const o of opts) {
+          const label = String(o?.label ?? "").trim();
+          if (!label) continue;
+          const opt = document.createElement("option");
+          opt.value = label;
+          opt.textContent = label;
+          select.appendChild(opt);
+        }
+
+        const selected = String(value.value ?? "").trim();
+        select.value = selected || "";
+        if (!select.value) select.value = "";
         td.appendChild(select);
       } else if (value && typeof value === "object" && value.actionButton) {
         const btn = document.createElement("button");
@@ -2557,7 +2637,8 @@ async function refresh({ forceNetwork = false } = {}) {
           return;
         }
 
-        const data = await fetchConsignments({ tab: activeTab, limit: 250 });
+        const storeId = String(document.body?.dataset?.storeId ?? "").trim();
+        const data = await fetchConsignments({ tab: activeTab, storeId, limit: 250 });
         const orders = Array.isArray(data?.orders) ? data.orders : [];
         allOrders = orders;
         pruneSelectionToVisible(orders);
@@ -2741,6 +2822,11 @@ window.addEventListener("DOMContentLoaded", () => {
             const orderKey = getOrderKey(row);
             const meta = getShipForm(orderKey);
             const parsed = parseWeightKg(meta.weightKg);
+            const center =
+              String(meta.fulfillmentCenter ?? "").trim() ||
+              String(row.fulfillmentCenter ?? "").trim() ||
+              String(fulfillmentCentersState.defaultName ?? "").trim();
+            if (center) row.fulfillmentCenter = center;
             return postJson("/api/shipments/assign", {
               orderKey,
               order: row,
@@ -2903,6 +2989,7 @@ window.addEventListener("DOMContentLoaded", () => {
       const order = currentOrders.find((r) => getOrderKey(r) === orderKey) ?? null;
       item.disabled = true;
       try {
+        if (!order) throw new Error("Order not found.");
         const meta = getShipForm(orderKey);
         if (!String(meta.courierType ?? "").trim()) {
           throw new Error("Select Courier type before shipping.");
@@ -2911,6 +2998,11 @@ window.addEventListener("DOMContentLoaded", () => {
         if (!parsed.ok) {
           throw new Error("Invalid weight. Use e.g. 0.1");
         }
+        const center =
+          String(meta.fulfillmentCenter ?? "").trim() ||
+          String(order.fulfillmentCenter ?? "").trim() ||
+          String(fulfillmentCentersState.defaultName ?? "").trim();
+        if (center) order.fulfillmentCenter = center;
         const result = await postJson("/api/shipments/assign", {
           orderKey,
           order,
@@ -3127,11 +3219,17 @@ window.addEventListener("DOMContentLoaded", () => {
     const target = e.target;
     if (!target) return;
     const role = String(target.dataset?.role ?? "");
-    if (role !== "courierType") return;
+    if (role !== "courierType" && role !== "fulfillmentCenter") return;
     const orderKey = String(target.dataset.orderKey ?? "").trim();
     if (!orderKey) return;
     const current = getShipForm(orderKey);
-    shipFormState.set(orderKey, { ...current, courierType: String(target.value ?? "") });
+    if (role === "courierType") {
+      shipFormState.set(orderKey, { ...current, courierType: String(target.value ?? "") });
+    } else {
+      shipFormState.set(orderKey, { ...current, fulfillmentCenter: String(target.value ?? "") });
+      const row = currentOrders.find((r) => getOrderKey(r) === orderKey) ?? null;
+      if (row) row.fulfillmentCenter = String(target.value ?? "");
+    }
   });
 
   refresh();

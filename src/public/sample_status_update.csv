@@ -1,8 +1,8 @@
-Tracking Numbers,Shipments Status
-AWB000000001,In Transit
-AWB000000002,At Destination
-AWB000000003,Out for Delivery
-AWB000000004,Delivered
+Tracking Numbers,Shipments Status,Updated On
+AWB000000001,In Transit,2026-01-31T10:00:00Z
+AWB000000002,At Destination,2026-01-31T11:00:00Z
+AWB000000003,Out for Delivery,2026-01-31T12:00:00Z
+AWB000000004,Delivered,2026-01-31T13:00:00Z
 AWB000000005,RTO Accepted
 AWB000000006,RTO In Transit
 AWB000000007,RTO Reached At Destination

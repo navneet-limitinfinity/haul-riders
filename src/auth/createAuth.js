@@ -82,7 +82,11 @@ async function resolveUserFromFirebase({ env, logger, req }) {
   }
 
   // Shop users: use users/<uid>.storeId (full shop domain like `abc.myshopify.com`).
-  const storeId = String(profile?.storeId ?? "").trim().toLowerCase();
+  const storeId = String(
+    profile?.storeId ?? decoded?.storeId ?? decoded?.shopDomain ?? decoded?.shop ?? ""
+  )
+    .trim()
+    .toLowerCase();
 
   return {
     provider: "firebase",
