@@ -43,6 +43,15 @@ const normalizeDetailsPayload = (body) => {
   };
 };
 
+const coerceBytesToBuffer = (value) => {
+  if (!value) return null;
+  if (Buffer.isBuffer(value)) return value;
+  if (value instanceof Uint8Array) return Buffer.from(value);
+  if (typeof value?.toUint8Array === "function") return Buffer.from(value.toUint8Array());
+  if (Array.isArray(value)) return Buffer.from(Uint8Array.from(value));
+  return null;
+};
+
 export function createStoreRouter({ env, auth }) {
   const router = Router();
 
@@ -145,16 +154,15 @@ export function createStoreRouter({ env, auth }) {
 
       const data = snap.data() ?? {};
       const contentType = String(data?.contentType ?? "").trim() || "application/octet-stream";
-      const blob = data?.data ?? null;
-      if (!blob || typeof blob.toUint8Array !== "function") {
+      const buf = coerceBytesToBuffer(data?.data ?? null);
+      if (!buf) {
         res.status(404).json({ error: "logo_not_found" });
         return;
       }
 
-      const bytes = blob.toUint8Array();
       res.setHeader("Cache-Control", "no-store");
       res.setHeader("Content-Type", contentType);
-      res.status(200).send(Buffer.from(bytes));
+      res.status(200).send(buf);
     } catch (error) {
       next(error);
     }
@@ -203,8 +211,7 @@ export function createStoreRouter({ env, auth }) {
 
         const docRef = firestore.collection(shopsCollection).doc(shopDomain).collection("branding").doc("logo");
         const updatedAt = nowIso();
-        const blob = admin.firestore.Blob.fromUint8Array(Uint8Array.from(file.buffer));
-        await docRef.set({ contentType, sizeBytes, updatedAt, data: blob }, { merge: true });
+        await docRef.set({ contentType, sizeBytes, updatedAt, data: file.buffer }, { merge: true });
 
         res.setHeader("Cache-Control", "no-store");
         res.status(201).json({ ok: true, shopDomain, sizeBytes, contentType, updatedAt });
@@ -216,4 +223,3 @@ export function createStoreRouter({ env, auth }) {
 
   return router;
 }
-

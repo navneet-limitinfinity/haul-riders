@@ -260,9 +260,15 @@ async function resolveBrandingLogo({ env, shopDomain }) {
   const data = snap.data() ?? {};
   const contentType = String(data?.contentType ?? "").trim().toLowerCase();
   if (contentType !== "image/png" && contentType !== "image/jpeg") return null;
-  const blob = data?.data ?? null;
-  if (!blob || typeof blob.toUint8Array !== "function") return null;
-  const bytes = blob.toUint8Array();
+  const stored = data?.data ?? null;
+  let bytes = null;
+  if (stored && typeof stored?.toUint8Array === "function") {
+    bytes = stored.toUint8Array();
+  } else if (stored instanceof Uint8Array) {
+    bytes = stored;
+  } else if (Buffer.isBuffer(stored)) {
+    bytes = Uint8Array.from(stored);
+  }
   if (!bytes || bytes.length === 0) return null;
 
   return { contentType, bytes };
