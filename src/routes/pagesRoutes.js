@@ -21,9 +21,9 @@ function renderNavDrawer({ role, userLabel, activePath }) {
       Orders
     </a>
     ${role === "shop"
-      ? html`<a class="navItem ${isActive("/shop/fulfillment-centers")}" href="/shop/fulfillment-centers">
-          <i class="fa-solid fa-warehouse" aria-hidden="true"></i>
-          Fulfillment Centers
+      ? html`<a class="navItem ${isActive("/shop/store")}" href="/shop/store">
+          <i class="fa-solid fa-store" aria-hidden="true"></i>
+          Store / Shop Details
         </a>`
       : ""}
     ${role === "admin"
@@ -60,7 +60,7 @@ function renderNavDrawer({ role, userLabel, activePath }) {
 }
 
 function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
-  const assetVersion = "39";
+  const assetVersion = "40";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
   const safeFirestoreCollectionId = escapeHtml(firestoreCollectionId);
@@ -98,6 +98,17 @@ function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
         </div>
 
         <div class="topbarActions">
+          ${
+            role === "shop"
+              ? html`<img
+                  class="brandingLogoTopbar"
+                  src="/api/store/branding/logo"
+                  alt="Brand logo"
+                  decoding="async"
+                  onerror="this.style.display='none'"
+                />`
+              : ""
+          }
           ${
             role === "admin"
               ? html`<div class="storePill" aria-live="polite">
@@ -449,7 +460,7 @@ function renderBulkUploadPage({ userLabel }) {
 }
 
 function renderFulfillmentCentersPage({ userLabel, storeId }) {
-  const assetVersion = "39";
+  const assetVersion = "40";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
 
@@ -486,6 +497,13 @@ function renderFulfillmentCentersPage({ userLabel, storeId }) {
         </div>
 
         <div class="topbarActions">
+          <img
+            class="brandingLogoTopbar"
+            src="/api/store/branding/logo"
+            alt="Brand logo"
+            decoding="async"
+            onerror="this.style.display='none'"
+          />
           <details class="userMenu" aria-label="User menu">
             <summary class="userMenuSummary" aria-label="Open user menu">
               <span class="userAvatar userAvatarIcon" aria-hidden="true">
@@ -598,6 +616,226 @@ function renderFulfillmentCentersPage({ userLabel, storeId }) {
 </html>`;
 }
 
+function renderStoreDetailsPage({ userLabel, storeId }) {
+  const assetVersion = "40";
+  const safeUserLabel = escapeHtml(userLabel);
+  const safeStoreId = escapeHtml(storeId);
+
+  return html`<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Store Details</title>
+    <link rel="stylesheet" href="/static/orders.css?v=${assetVersion}" />
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/fontawesome.min.css?v=${assetVersion}" />
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/solid.min.css?v=${assetVersion}" />
+    <link rel="icon" type="image/png" href="/static/icon.png?v=${assetVersion}" />
+    <script src="/static/store-details.js?v=${assetVersion}" defer></script>
+  </head>
+  <body data-role="shop" data-page="store" data-store-id="${safeStoreId}">
+    ${renderNavDrawer({ role: "shop", userLabel, activePath: "/shop/store" })}
+    <header class="topbar">
+      <div class="topbarInner">
+        <div class="brand">
+          <label id="navToggle" class="navToggle" for="navState" role="button" tabindex="0" aria-label="Open navigation">
+            <i class="fa-solid fa-bars" aria-hidden="true"></i>
+          </label>
+          <img class="brandLogo" src="/static/haul_riders_logo.jpeg?v=${assetVersion}" alt="Haul Riders" decoding="async" />
+          <div class="brandText">
+            <div class="brandTitle">Store / Shop Details</div>
+            <div class="brandSub">Manage store info, branding, and fulfillment centers</div>
+          </div>
+        </div>
+
+        <div class="topbarActions">
+          <img
+            class="brandingLogoTopbar"
+            src="/api/store/branding/logo"
+            alt="Brand logo"
+            decoding="async"
+            onerror="this.style.display='none'"
+          />
+          <details class="userMenu" aria-label="User menu">
+            <summary class="userMenuSummary" aria-label="Open user menu">
+              <span class="userAvatar userAvatarIcon" aria-hidden="true">
+                <i class="fa-solid fa-user" aria-hidden="true"></i>
+              </span>
+            </summary>
+            <div class="userMenuList">
+              <div class="userMenuSection">
+                <strong>${safeUserLabel}</strong>
+              </div>
+              <a class="userMenuItem" href="/shop/orders">Dashboard</a>
+              <button type="button" class="userMenuItem userMenuButton" data-action="logout">
+                Logout
+              </button>
+            </div>
+          </details>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="panel">
+        <div class="panelHeader">
+          <div class="panelTitle">
+            <h1>Store Details</h1>
+            <div class="panelHint">These details are editable and specific to your store.</div>
+          </div>
+          <div class="controls">
+            <div class="btnGroup">
+              <button id="saveStoreDetails" class="btn btnPrimary btnIcon" type="button">
+                <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="status" class="status" aria-live="polite"></div>
+
+        <div class="modalGrid">
+          <label class="field">
+            <span>Store Name</span>
+            <input id="storeName" type="text" placeholder="Store Name" />
+          </label>
+          <label class="field">
+            <span>GST Number</span>
+            <input id="gstNumber" type="text" placeholder="GST Number" />
+          </label>
+          <label class="field" style="grid-column: 1 / -1;">
+            <span>Registered Address</span>
+            <textarea id="registeredAddress" rows="3" placeholder="Registered Address"></textarea>
+          </label>
+          <label class="field">
+            <span>Contact Person Name</span>
+            <input id="contactPersonName" type="text" placeholder="Name" />
+          </label>
+          <label class="field">
+            <span>Contact Person Email</span>
+            <input id="contactPersonEmail" type="email" placeholder="Email" />
+          </label>
+          <label class="field">
+            <span>Contact Person Phone</span>
+            <input id="contactPersonPhone" type="text" inputmode="numeric" placeholder="10-digit phone" />
+          </label>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panelHeader">
+          <div class="panelTitle">
+            <h1>Branding</h1>
+            <div class="panelHint">Upload a logo (PNG/JPG, max 1MB). Used on dashboard (top-right) and shipping labels.</div>
+          </div>
+          <div class="controls">
+            <div class="btnGroup">
+              <input id="brandingLogoFile" type="file" accept="image/png,image/jpeg" />
+              <button id="uploadBrandingLogo" class="btn btnSecondary btnIcon" type="button">
+                <i class="fa-solid fa-upload" aria-hidden="true"></i>
+                Upload
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="tableWrap">
+          <div style="padding: 12px;">
+            <img id="brandingLogoPreview" alt="Brand logo preview" style="max-width: 220px; max-height: 220px; border-radius: 12px; border: 1px solid var(--border);" />
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panelHeader">
+          <div class="panelTitle">
+            <h1>Fulfillment Centers</h1>
+            <div class="panelHint">Ship-from address on labels is taken from the fulfillment center selected per order (or default center when missing).</div>
+          </div>
+          <div class="controls">
+            <div class="btnGroup">
+              <button id="addCenterBtn" class="btn btnPrimary btnIcon" type="button">
+                <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                Add Center
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="tableWrap">
+          <table class="table" aria-label="Fulfillment centers">
+            <thead>
+              <tr>
+                <th>Origin Name</th>
+                <th>Address</th>
+                <th>PIN</th>
+                <th>Phone</th>
+                <th>Default</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="centersRows"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="centerDialog" class="modal">
+      <form method="dialog" class="modalCard">
+        <div class="modalHeader">
+          <div class="modalTitle" id="centerDialogTitle">Add center</div>
+          <button type="button" class="btn btnSecondary btnCompact" data-action="close-dialog">Close</button>
+        </div>
+
+        <div class="modalBody">
+          <input type="hidden" id="centerId" value="" />
+          <label class="field">
+            <span>Origin Name</span>
+            <input id="originName" type="text" placeholder="e.g. ORG L02" required />
+          </label>
+          <div class="modalGrid">
+            <label class="field">
+              <span>Address 1</span>
+              <input id="address1" type="text" />
+            </label>
+            <label class="field">
+              <span>Address 2</span>
+              <input id="address2" type="text" />
+            </label>
+            <label class="field">
+              <span>City</span>
+              <input id="city" type="text" />
+            </label>
+            <label class="field">
+              <span>State</span>
+              <input id="state" type="text" />
+            </label>
+            <label class="field">
+              <span>PIN Code</span>
+              <input id="pinCode" type="text" inputmode="numeric" />
+            </label>
+            <label class="field">
+              <span>Phone</span>
+              <input id="phone" type="text" inputmode="numeric" />
+            </label>
+          </div>
+        </div>
+
+        <div class="modalFooter">
+          <label class="fieldCheckbox fieldCheckboxCompact">
+            <input id="makeDefault" type="checkbox" />
+            <span>Set as default</span>
+          </label>
+          <div class="btnGroup">
+            <button id="saveCenterBtn" class="btn btnPrimary" type="button">Save</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+  </body>
+</html>`;
+}
+
 export function createPagesRouter({ env, auth } = {}) {
   const router = Router();
 
@@ -611,6 +849,13 @@ export function createPagesRouter({ env, auth } = {}) {
     const firestoreCollectionId = getShopCollectionInfo({ storeId }).collectionId;
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(renderOrdersPage({ role: "shop", userLabel, storeId, firestoreCollectionId }));
+  });
+
+  router.get("/shop/store", auth.requireRole("shop"), (req, res) => {
+    const userLabel = String(req.user?.email ?? "Shop").trim() || "Shop";
+    const storeId = String(req.user?.storeId ?? "").trim();
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(renderStoreDetailsPage({ userLabel, storeId }));
   });
 
   router.get("/admin/orders", auth.requireRole("admin"), (req, res) => {

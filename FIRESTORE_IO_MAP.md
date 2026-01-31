@@ -83,6 +83,39 @@ Keys written in a center doc:
 - `createdAt`
 - `updatedAt`
 
+### 1.4 Store Details + Branding (Shop-only)
+Stored under the shops collection:
+
+**Store details**
+- Path: `shops/<shopDomain>` (doc fields)
+- File: `src/routes/storeRoutes.js`
+- Endpoints (shop role):
+  - `GET /api/store/details`
+  - `POST /api/store/details`
+- Keys written (under `storeDetails` object):
+  - `storeName`
+  - `registeredAddress`
+  - `gstNumber`
+  - `contactPerson { name, email, phone }`
+  - `updatedAt`
+
+**Branding logo**
+- Path: `shops/<shopDomain>/branding/logo`
+- File: `src/routes/storeRoutes.js`
+- Endpoints (shop role):
+  - `GET /api/store/branding/logo` (returns image bytes)
+  - `POST /api/store/branding/logo` (multipart; field: `logo`)
+- Keys written:
+  - `contentType` (`image/png` or `image/jpeg`)
+  - `sizeBytes`
+  - `updatedAt`
+  - `data` (Firestore `Blob`, image bytes; max 1MB)
+
+**Reads**
+- `src/routes/pagesRoutes.js` (shop pages render top-right `<img>` pointing to `/api/store/branding/logo`)
+- `src/public/store-details.js` (shop UI to edit store details + upload logo)
+- `src/shipments/label/shippingLabelPdf.js` (embeds logo into label PDF when present)
+
 ## 2) Shop Orders/Shipments Collection (Per-Store)
 
 Path:

@@ -57,7 +57,12 @@ export function createApp({ env, logger }) {
       setHeaders: (res, filePath) => {
         const p = String(filePath ?? "");
         // Prevent stale dashboard JS/CSS being served by aggressive proxy/browser caches.
-        if (p.endsWith(`${path.sep}orders.js`) || p.endsWith(`${path.sep}orders.css`)) {
+        if (
+          p.endsWith(`${path.sep}orders.js`) ||
+          p.endsWith(`${path.sep}orders.css`) ||
+          p.endsWith(`${path.sep}fulfillment-centers.js`) ||
+          p.endsWith(`${path.sep}store-details.js`)
+        ) {
           res.setHeader("Cache-Control", "no-store");
         }
       },

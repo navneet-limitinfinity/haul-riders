@@ -11,6 +11,7 @@ import { createShipmentsRouter } from "./shipmentsRoutes.js";
 import { createConsignmentsRouter } from "./consignmentsRoutes.js";
 import { createShopifyRouter } from "./shopifyRoutes.js";
 import { createShopsRouter } from "./shopsRoutes.js";
+import { createStoreRouter } from "./storeRoutes.js";
 
 /**
  * Builds and returns the top-level router.
@@ -30,6 +31,7 @@ export function buildRoutes({ env, logger }) {
   router.use("/api", createPincodeRouter({ auth }));
   router.use("/api", createShipmentsRouter({ env, auth }));
   router.use("/api", createConsignmentsRouter({ env, auth }));
+  router.use("/api", createStoreRouter({ env, auth }));
   router.use("/api/shopify", createShopifyRouter({ env, logger, auth }));
 
   return router;

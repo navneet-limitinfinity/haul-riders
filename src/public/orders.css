@@ -706,6 +706,15 @@ body.navOpen .navDrawer {
   gap: 12px;
 }
 
+.brandingLogoTopbar {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+}
+
 .brand {
   display: flex;
   align-items: center;

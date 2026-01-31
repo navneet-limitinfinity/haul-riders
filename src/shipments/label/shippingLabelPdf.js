@@ -187,6 +187,87 @@ async function resolveDefaultFulfillmentCenterName({ env, shopDomain }) {
   return "";
 }
 
+async function resolveFulfillmentCenter({ env, shopDomain, originName }) {
+  if (env?.auth?.provider !== "firebase") return null;
+  const domain = normalizeDomain(shopDomain);
+  if (!domain) return null;
+
+  const admin = await getFirebaseAdmin({ env });
+  const firestore = admin.firestore();
+  const shopsCollection = String(env.auth.firebase.shopsCollection ?? "shops").trim() || "shops";
+  const centersCol = firestore.collection(shopsCollection).doc(domain).collection("fulfillmentCenter");
+
+  const normalizeCenter = (data) => {
+    const d = data && typeof data === "object" ? data : {};
+    const origin = String(d.originName ?? "").trim();
+    if (!origin) return null;
+    return {
+      originName: origin,
+      address1: String(d.address1 ?? "").trim(),
+      address2: String(d.address2 ?? "").trim(),
+      city: String(d.city ?? "").trim(),
+      state: String(d.state ?? "").trim(),
+      pinCode: String(d.pinCode ?? "").trim(),
+      country: String(d.country ?? "").trim() || "IN",
+      phone: String(d.phone ?? "").trim(),
+      default: Boolean(d.default),
+    };
+  };
+
+  const requested = String(originName ?? "").trim();
+  if (requested) {
+    try {
+      const match = await centersCol.where("originName", "==", requested).limit(1).get();
+      const doc = match.docs[0];
+      if (doc?.exists) return normalizeCenter(doc.data());
+    } catch {
+      // ignore
+    }
+  }
+
+  try {
+    const def = await centersCol.where("default", "==", true).limit(1).get();
+    const doc = def.docs[0];
+    if (doc?.exists) return normalizeCenter(doc.data());
+  } catch {
+    // ignore
+  }
+
+  try {
+    const first = await centersCol.limit(1).get();
+    const doc = first.docs[0];
+    if (doc?.exists) return normalizeCenter(doc.data());
+  } catch {
+    // ignore
+  }
+
+  return null;
+}
+
+async function resolveBrandingLogo({ env, shopDomain }) {
+  if (env?.auth?.provider !== "firebase") return null;
+  const domain = normalizeDomain(shopDomain);
+  if (!domain) return null;
+
+  const admin = await getFirebaseAdmin({ env });
+  const firestore = admin.firestore();
+  const shopsCollection = String(env.auth.firebase.shopsCollection ?? "shops").trim() || "shops";
+
+  const docRef = firestore.collection(shopsCollection).doc(domain).collection("branding").doc("logo");
+  const snap = await docRef.get();
+  if (!snap.exists) return null;
+
+  const data = snap.data() ?? {};
+  const contentType = String(data?.contentType ?? "").trim().toLowerCase();
+  if (contentType !== "image/png" && contentType !== "image/jpeg") return null;
+  const blob = data?.data ?? null;
+  if (!blob || typeof blob.toUint8Array !== "function") return null;
+  const bytes = blob.toUint8Array();
+  if (!bytes || bytes.length === 0) return null;
+
+  return { contentType, bytes };
+}
+
 export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestoreDoc }) {
   const data = firestoreDoc && typeof firestoreDoc === "object" ? firestoreDoc : {};
   const order = data.order && typeof data.order === "object" ? data.order : null;
@@ -209,9 +290,17 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
   const shipTime = formatTimeHHMMSS(now);
 
   const shipFrom = await resolveShipFrom({ env, shopDomain });
-  const fulfillmentCenter =
-    String(order?.fulfillmentCenter ?? data?.fulfillmentCenter ?? "").trim() ||
+  const fulfillmentCenterName = String(order?.fulfillmentCenter ?? data?.fulfillmentCenter ?? "").trim();
+  const fulfillmentCenter = await resolveFulfillmentCenter({
+    env,
+    shopDomain,
+    originName: fulfillmentCenterName,
+  });
+  const fulfillmentCenterLabel =
+    fulfillmentCenter?.originName ||
+    fulfillmentCenterName ||
     (await resolveDefaultFulfillmentCenterName({ env, shopDomain }));
+  const brandingLogo = await resolveBrandingLogo({ env, shopDomain });
   const shipTo = getBestShipTo(order) ?? {};
   const pin = String(shipTo?.pinCode ?? "").trim();
 
@@ -240,6 +329,33 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
     page.drawText(text, { x: Number(t.x ?? 0), y: Number(t.y ?? 0), size, font, color: black });
   }
 
+  // Branding logo (top-right).
+  if (brandingLogo) {
+    try {
+      const { contentType, bytes } = brandingLogo;
+      const img =
+        contentType === "image/png"
+          ? await pdfDoc.embedPng(bytes)
+          : await pdfDoc.embedJpg(bytes);
+
+      const maxW = 72;
+      const maxH = 72;
+      const scale = Math.min(maxW / img.width, maxH / img.height, 1);
+      const w = img.width * scale;
+      const h = img.height * scale;
+
+      // Keep away from the edge and away from the date/value text.
+      page.drawImage(img, {
+        x: 493 - 12 - w,
+        y: 700 - 12 - h,
+        width: w,
+        height: h,
+      });
+    } catch {
+      // ignore branding render failures
+    }
+  }
+
   // Top-right metadata.
   if (fields.shipDate) {
     page.drawText(shipDate, {
@@ -263,13 +379,20 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
 
   // FROM block (multiline).
   if (fields.fromBlock) {
-    const fromName = [shipFrom.name, fulfillmentCenter].filter(Boolean).join(" - ");
+    const fromName = [shipFrom.name, fulfillmentCenterLabel].filter(Boolean).join(" - ");
+    const fromAddress1 = fulfillmentCenter?.address1 || shipFrom.address1;
+    const fromAddress2 = fulfillmentCenter?.address2 || shipFrom.address2;
+    const fromCity = fulfillmentCenter?.city || shipFrom.city;
+    const fromState = fulfillmentCenter?.state || shipFrom.state;
+    const fromPin = fulfillmentCenter?.pinCode || shipFrom.pinCode;
+    const fromCountry = fulfillmentCenter?.country || shipFrom.country;
+
     const fromLines = [
       fromName,
-      shipFrom.address1,
-      shipFrom.address2,
-      [shipFrom.city, shipFrom.pinCode].filter(Boolean).join(" "),
-      [shipFrom.state, shipFrom.country].filter(Boolean).join(", "),
+      fromAddress1,
+      fromAddress2,
+      [fromCity, fromPin].filter(Boolean).join(" "),
+      [fromState, fromCountry].filter(Boolean).join(", "),
     ]
       .filter(Boolean)
       .join(" ");
