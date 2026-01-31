@@ -676,52 +676,62 @@ function renderStoreDetailsPage({ userLabel, storeId }) {
       </div>
     </header>
 
-    <main class="container">
-      <section class="panel">
-        <div class="panelHeader">
-          <div class="panelTitle">
-            <h1>Store Details</h1>
-            <div class="panelHint">These details are editable and specific to your store.</div>
-          </div>
-          <div class="controls">
-            <div class="btnGroup">
-              <button id="saveStoreDetails" class="btn btnPrimary btnIcon" type="button">
-                <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
+	    <main class="container">
+	      <section class="panel">
+	        <div class="panelHeader">
+	          <div class="panelTitle">
+	            <h1>Store Details</h1>
+	            <div class="panelHint">These details are editable and specific to your store.</div>
+	          </div>
+	          <div class="controls">
+	            <div class="btnGroup">
+	              <button id="editStoreDetails" class="btn btnSecondary btnIcon" type="button">
+	                <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
+	                Edit details
+	              </button>
+	              <button id="cancelStoreDetails" class="btn btnSecondary btnIcon" type="button" hidden>
+	                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+	                Cancel
+	              </button>
+	              <button id="saveStoreDetails" class="btn btnPrimary btnIcon" type="button" hidden>
+	                <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+	                Save
+	              </button>
+	            </div>
+	          </div>
+	        </div>
 
         <div id="status" class="status" aria-live="polite"></div>
 
-        <div class="modalGrid">
-          <label class="field">
-            <span>Store Name</span>
-            <input id="storeName" type="text" placeholder="Store Name" />
-          </label>
-          <label class="field">
-            <span>GST Number</span>
-            <input id="gstNumber" type="text" placeholder="GST Number" />
-          </label>
-          <label class="field" style="grid-column: 1 / -1;">
-            <span>Registered Address</span>
-            <textarea id="registeredAddress" rows="3" placeholder="Registered Address"></textarea>
-          </label>
-          <label class="field">
-            <span>Contact Person Name</span>
-            <input id="contactPersonName" type="text" placeholder="Name" />
-          </label>
-          <label class="field">
-            <span>Contact Person Email</span>
-            <input id="contactPersonEmail" type="email" placeholder="Email" />
-          </label>
-          <label class="field">
-            <span>Contact Person Phone</span>
-            <input id="contactPersonPhone" type="text" inputmode="numeric" placeholder="10-digit phone" />
-          </label>
-        </div>
-      </section>
+	        <div class="storeDetailsWrap">
+	        <div class="storeDetailsGrid">
+	          <label class="field">
+	            <span>Store Name</span>
+	            <input id="storeName" type="text" placeholder="Store Name" />
+	          </label>
+	          <label class="field">
+	            <span>GST Number</span>
+	            <input id="gstNumber" type="text" placeholder="GST Number" />
+	          </label>
+	          <label class="field fieldSpanAll">
+	            <span>Registered Address</span>
+	            <textarea id="registeredAddress" rows="3" placeholder="Registered Address"></textarea>
+	          </label>
+	          <label class="field">
+	            <span>Contact Person Name</span>
+	            <input id="contactPersonName" type="text" placeholder="Name" />
+	          </label>
+	          <label class="field">
+	            <span>Contact Person Email</span>
+	            <input id="contactPersonEmail" type="email" placeholder="Email" />
+	          </label>
+	          <label class="field">
+	            <span>Contact Person Phone</span>
+	            <input id="contactPersonPhone" type="text" inputmode="numeric" placeholder="10-digit phone" />
+	          </label>
+	        </div>
+	        </div>
+	      </section>
 
       <section class="panel">
         <div class="panelHeader">

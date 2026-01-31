@@ -94,29 +94,80 @@ function escapeHtml(value) {
 // Store details + branding
 // -----------------------------
 
+function getStoreDetailsFields() {
+  const ids = [
+    "storeName",
+    "registeredAddress",
+    "gstNumber",
+    "contactPersonName",
+    "contactPersonEmail",
+    "contactPersonPhone",
+  ];
+  return ids.map((id) => $(id)).filter(Boolean);
+}
+
+function normalizeStoreDetails(details) {
+  const d = details && typeof details === "object" ? details : {};
+  return {
+    storeName: String(d?.storeName ?? "").trim(),
+    registeredAddress: String(d?.registeredAddress ?? "").trim(),
+    gstNumber: String(d?.gstNumber ?? "").trim(),
+    contactPersonName: String(d?.contactPersonName ?? "").trim(),
+    contactPersonEmail: String(d?.contactPersonEmail ?? "").trim(),
+    contactPersonPhone: String(d?.contactPersonPhone ?? "").trim(),
+  };
+}
+
+function hasStoreDetails(details) {
+  const d = normalizeStoreDetails(details);
+  return Object.values(d).some((v) => String(v ?? "").trim().length > 0);
+}
+
 function fillStoreDetails(details) {
-  $("storeName").value = String(details?.storeName ?? "");
-  $("registeredAddress").value = String(details?.registeredAddress ?? "");
-  $("gstNumber").value = String(details?.gstNumber ?? "");
-  $("contactPersonName").value = String(details?.contactPersonName ?? "");
-  $("contactPersonEmail").value = String(details?.contactPersonEmail ?? "");
-  $("contactPersonPhone").value = String(details?.contactPersonPhone ?? "");
+  const d = normalizeStoreDetails(details);
+  $("storeName").value = d.storeName;
+  $("registeredAddress").value = d.registeredAddress;
+  $("gstNumber").value = d.gstNumber;
+  $("contactPersonName").value = d.contactPersonName;
+  $("contactPersonEmail").value = d.contactPersonEmail;
+  $("contactPersonPhone").value = d.contactPersonPhone;
 }
 
 async function loadStoreDetails() {
   const data = await requestJson("/api/store/details");
-  fillStoreDetails(data?.storeDetails ?? {});
+  const details = normalizeStoreDetails(data?.storeDetails ?? {});
+  fillStoreDetails(details);
+  return details;
 }
 
 function readStoreDetails() {
-  return {
+  return normalizeStoreDetails({
     storeName: String($("storeName")?.value ?? "").trim(),
     registeredAddress: String($("registeredAddress")?.value ?? "").trim(),
     gstNumber: String($("gstNumber")?.value ?? "").trim(),
     contactPersonName: String($("contactPersonName")?.value ?? "").trim(),
     contactPersonEmail: String($("contactPersonEmail")?.value ?? "").trim(),
     contactPersonPhone: String($("contactPersonPhone")?.value ?? "").trim(),
-  };
+  });
+}
+
+function setStoreDetailsReadOnly(readOnly) {
+  const fields = getStoreDetailsFields();
+  for (const el of fields) {
+    el.readOnly = Boolean(readOnly);
+  }
+  document.body.dataset.storeDetailsMode = readOnly ? "read" : "edit";
+}
+
+function setStoreDetailsButtons({ canEdit, editing }) {
+  const editBtn = $("editStoreDetails");
+  const cancelBtn = $("cancelStoreDetails");
+  const saveBtn = $("saveStoreDetails");
+
+  const isEditing = Boolean(editing);
+  if (editBtn) editBtn.hidden = !canEdit || isEditing;
+  if (cancelBtn) cancelBtn.hidden = !isEditing;
+  if (saveBtn) saveBtn.hidden = !isEditing;
 }
 
 function refreshBrandingLogoImages() {
@@ -287,16 +338,45 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   refreshBrandingLogoImages();
 
+  let initialDetails = normalizeStoreDetails({});
+  let canEdit = true;
+
   try {
-    await loadStoreDetails();
+    initialDetails = (await loadStoreDetails()) || normalizeStoreDetails({});
+    canEdit = hasStoreDetails(initialDetails);
+
+    if (canEdit) {
+      setStoreDetailsReadOnly(true);
+      setStoreDetailsButtons({ canEdit: true, editing: false });
+    } else {
+      setStoreDetailsReadOnly(false);
+      setStoreDetailsButtons({ canEdit: false, editing: true });
+    }
   } catch (error) {
     setStatus(error?.message ?? "Failed to load store details.", { kind: "error" });
   }
+
+  $("editStoreDetails")?.addEventListener("click", () => {
+    initialDetails = readStoreDetails();
+    setStoreDetailsReadOnly(false);
+    setStoreDetailsButtons({ canEdit: true, editing: true });
+    $("storeName")?.focus?.();
+  });
+
+  $("cancelStoreDetails")?.addEventListener("click", () => {
+    fillStoreDetails(initialDetails);
+    setStoreDetailsReadOnly(true);
+    setStoreDetailsButtons({ canEdit: true, editing: false });
+  });
 
   $("saveStoreDetails")?.addEventListener("click", async () => {
     try {
       await postJson("/api/store/details", readStoreDetails());
       setStatus("Store details saved.", { kind: "ok" });
+      initialDetails = readStoreDetails();
+      canEdit = true;
+      setStoreDetailsReadOnly(true);
+      setStoreDetailsButtons({ canEdit: true, editing: false });
     } catch (error) {
       setStatus(error?.message ?? "Failed to save store details.", { kind: "error" });
     }
@@ -409,4 +489,3 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
   });
 });
-
