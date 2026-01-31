@@ -3,8 +3,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import bwipjs from "bwip-js";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { getFirebaseAdmin } from "../../auth/firebaseAdmin.js";
 import { resolveShipFrom } from "./resolveShipFrom.js";
 import { extractAwbNumber } from "./extractAwb.js";
+
+const normalizeDomain = (domain) => String(domain ?? "").trim().toLowerCase();
 
 function formatDateDDMMYYYY(date) {
   const d = date instanceof Date ? date : new Date(String(date ?? ""));
@@ -148,6 +151,42 @@ async function getTemplateAssets() {
   return templateAssetsPromise;
 }
 
+async function resolveDefaultFulfillmentCenterName({ env, shopDomain }) {
+  if (env?.auth?.provider !== "firebase") return "";
+  const domain = normalizeDomain(shopDomain);
+  if (!domain) return "";
+
+  const admin = await getFirebaseAdmin({ env });
+  const firestore = admin.firestore();
+  const shopsCollection = String(env.auth.firebase.shopsCollection ?? "shops").trim() || "shops";
+
+  const centersCol = firestore.collection(shopsCollection).doc(domain).collection("fulfillmentCenter");
+
+  try {
+    const defaultSnap = await centersCol.where("default", "==", true).limit(1).get();
+    const defaultDoc = defaultSnap.docs[0];
+    if (defaultDoc?.exists) {
+      const data = defaultDoc.data() ?? {};
+      return String(data?.originName ?? "").trim();
+    }
+  } catch {
+    // ignore
+  }
+
+  try {
+    const firstSnap = await centersCol.limit(1).get();
+    const firstDoc = firstSnap.docs[0];
+    if (firstDoc?.exists) {
+      const data = firstDoc.data() ?? {};
+      return String(data?.originName ?? "").trim();
+    }
+  } catch {
+    // ignore
+  }
+
+  return "";
+}
+
 export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestoreDoc }) {
   const data = firestoreDoc && typeof firestoreDoc === "object" ? firestoreDoc : {};
   const order = data.order && typeof data.order === "object" ? data.order : null;
@@ -170,6 +209,9 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
   const shipTime = formatTimeHHMMSS(now);
 
   const shipFrom = await resolveShipFrom({ env, shopDomain });
+  const fulfillmentCenter =
+    String(order?.fulfillmentCenter ?? data?.fulfillmentCenter ?? "").trim() ||
+    (await resolveDefaultFulfillmentCenterName({ env, shopDomain }));
   const shipTo = getBestShipTo(order) ?? {};
   const pin = String(shipTo?.pinCode ?? "").trim();
 
@@ -221,8 +263,9 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
 
   // FROM block (multiline).
   if (fields.fromBlock) {
+    const fromName = [shipFrom.name, fulfillmentCenter].filter(Boolean).join(" - ");
     const fromLines = [
-      shipFrom.name,
+      fromName,
       shipFrom.address1,
       shipFrom.address2,
       [shipFrom.city, shipFrom.pinCode].filter(Boolean).join(" "),
