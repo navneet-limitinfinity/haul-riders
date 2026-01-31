@@ -60,7 +60,7 @@ function renderNavDrawer({ role, userLabel, activePath }) {
 }
 
 function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
-  const assetVersion = "38";
+  const assetVersion = "39";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
   const safeFirestoreCollectionId = escapeHtml(firestoreCollectionId);
@@ -389,7 +389,9 @@ function renderBulkUploadPage({ userLabel }) {
                 <li><code>Shipments Status</code> (or <code>shipmentStatus</code>)</li>
               </ul>
               <div class="bulkHint">
-                RTO values supported: <code>RTO Initiated</code>, <code>RTO Delivered</code>.
+                Supported values: <code>In Transit</code>, <code>Undelivered</code>, <code>At Destination</code>,
+                <code>Out for Delivery</code>, <code>Set RTO</code>, <code>Delivered</code>,
+                <code>RTO Accepted</code>, <code>RTO In Transit</code>, <code>RTO Reached At Destination</code>, <code>RTO Delivered</code>.
               </div>
             </details>
           </div>
@@ -433,7 +435,8 @@ function renderBulkUploadPage({ userLabel }) {
                 <li><code>totalPrice</code>, <code>financialStatus</code> (e.g. <code>paid</code> or <code>pending</code>)</li>
               </ul>
               <div class="bulkHint">
-                Optional: <code>awbNumber</code>, <code>courierType</code>, <code>weightKg</code>, <code>customerEmail</code>, <code>address2</code>, <code>phone2</code>.
+                Optional (tracking/shipment): <code>consignment_number</code>/<code>awbNumber</code>, <code>courier_partner</code>/<code>trackingCompany</code>, <code>courier_type</code>/<code>courierType</code>, <code>weight</code>/<code>weightKg</code>, <code>shipping_date</code>, <code>expected_delivery_date</code>.
+                Optional (order): <code>customerEmail</code>, <code>address2</code>, <code>phone2</code>, <code>content_and_quantity</code> (or <code>productDescription</code>), <code>invoice_value</code>.
               </div>
             </details>
           </div>

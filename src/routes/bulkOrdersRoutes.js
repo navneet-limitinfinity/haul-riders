@@ -20,6 +20,85 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+const IN_TRANSIT_DISPLAY_STATUSES = [
+  "In Transit",
+  "Undelivered",
+  "At Destination",
+  "Out for Delivery",
+  "Set RTO",
+];
+
+const DELIVERED_DISPLAY_STATUS = "Delivered";
+
+const RTO_DISPLAY_STATUSES = [
+  "RTO Accepted",
+  "RTO In Transit",
+  "RTO Reached At Destination",
+  "RTO Delivered",
+];
+
+function normalizeDisplayStatus(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const key = raw.toLowerCase();
+  const all = [...IN_TRANSIT_DISPLAY_STATUSES, DELIVERED_DISPLAY_STATUS, ...RTO_DISPLAY_STATUSES];
+  for (const s of all) {
+    if (s.toLowerCase() === key) return s;
+  }
+  return "";
+}
+
+function displayToInternalStatus(display) {
+  const d = normalizeDisplayStatus(display);
+  if (!d) return "";
+  if (d === DELIVERED_DISPLAY_STATUS) return "delivered";
+  if (IN_TRANSIT_DISPLAY_STATUSES.includes(d)) return "in_transit";
+  if (d === "RTO Delivered") return "rto_delivered";
+  if (d === "RTO Accepted") return "rto_initiated";
+  return "rto";
+}
+
+function internalToDisplayShipmentStatus(value) {
+  const s = String(value ?? "").trim().toLowerCase();
+  if (!s) return "";
+  if (s === "new") return "New";
+  if (s === "assigned") return "Assigned";
+  if (s === "undelivered") return "Undelivered";
+  if (s === "at_destination" || s === "atdestination") return "At Destination";
+  if (s === "out_for_delivery" || s === "outfordelivery") return "Out for Delivery";
+  if (s === "set_rto" || s === "setrto") return "Set RTO";
+  if (s === "in_transit" || s === "in transit") return "In Transit";
+  if (s === "delivered") return "Delivered";
+  if (s === "rto_accepted") return "RTO Accepted";
+  if (s === "rto_in_transit" || s === "rto_intransit") return "RTO In Transit";
+  if (s === "rto_reached_at_destination" || s === "rto_reached_atdestination")
+    return "RTO Reached At Destination";
+  if (s === "rto") return "RTO In Transit";
+  if (s === "rto_initiated" || s === "rto initiated") return "RTO Accepted";
+  if (s === "rto_delivered" || s === "rto delivered") return "RTO Delivered";
+  return "";
+}
+
+function getDocShipmentStatusRaw(data) {
+  const direct = String(data?.shipmentStatus ?? "").trim();
+  if (direct) return direct;
+  const nested = data?.shipment && typeof data.shipment === "object" ? data.shipment : null;
+  return String(nested?.shipmentStatus ?? "").trim();
+}
+
+function getDocShippingDateIso(data) {
+  const direct = String(data?.shipping_date ?? "").trim();
+  if (direct) return direct;
+  const nested = data?.shipment && typeof data.shipment === "object" ? data.shipment : null;
+  const nestedShipping = String(nested?.shippingDate ?? "").trim();
+  if (nestedShipping) return nestedShipping;
+  const assignedAt = String(nested?.assignedAt ?? "").trim();
+  if (assignedAt) return assignedAt;
+  const requestedAt = String(data?.requestedAt ?? "").trim();
+  if (requestedAt) return requestedAt;
+  return String(data?.updatedAt ?? "").trim();
+}
+
 function safeNumber(value) {
   const s = String(value ?? "").trim();
   if (!s) return "";
@@ -43,6 +122,14 @@ function buildDtdcTrackingUrl(trackingNumber) {
 
 function getRowValue(row, key) {
   return String(row?.[key] ?? "").trim();
+}
+
+function pickRowValue(row, keys) {
+  for (const key of Array.isArray(keys) ? keys : []) {
+    const v = String(row?.[key] ?? "").trim();
+    if (v) return v;
+  }
+  return "";
 }
 
 function cleanupJobs() {
@@ -111,6 +198,8 @@ function parseCsvBuffer(buffer) {
 function normalizeShipmentStatus(value) {
   const s = String(value ?? "").trim().toLowerCase();
   if (!s) return "";
+  const display = normalizeDisplayStatus(value);
+  if (display) return displayToInternalStatus(display);
   if (s === "new") return "new";
   if (s === "assigned") return "assigned";
   if (s === "delivered") return "delivered";
@@ -121,6 +210,12 @@ function normalizeShipmentStatus(value) {
   if (s.includes("rto") && s.includes("deliver")) return "rto_delivered";
   if (s.includes("deliver")) return "delivered";
   if (s.includes("transit")) return "in_transit";
+  if (s.includes("undeliver")) return "undelivered";
+  if (s.includes("at") && s.includes("dest")) return "at_destination";
+  if (s.includes("out") && s.includes("deliver")) return "out_for_delivery";
+  if (s.includes("set") && s.includes("rto")) return "set_rto";
+  if (s.includes("rto") && s.includes("accept")) return "rto_initiated";
+  if (s.includes("rto") && s.includes("reach") && s.includes("dest")) return "rto";
   if (s.includes("assign")) return "assigned";
   return s.replaceAll(/\s+/g, "_");
 }
@@ -210,12 +305,27 @@ export function createBulkOrdersRouter({ env, auth }) {
             const phone2 = normalizePhone10(getRowValue(row, "phone2"));
             const phoneNumbers = [phone1, phone2].filter(Boolean);
 
-            const awbNumber = getRowValue(row, "awbNumber");
-            const trackingCompany = getRowValue(row, "trackingCompany") || (awbNumber ? "DTDC" : "");
+            const awbNumber = pickRowValue(row, [
+              "consignment_number",
+              "consignmentNumber",
+              "awbNumber",
+              "trackingNumber",
+              "tracking_number",
+              "Tracking Number",
+            ]);
+            const trackingCompany = pickRowValue(row, ["courier_partner", "courierPartner", "trackingCompany", "courier"])
+              || (awbNumber ? "DTDC" : "");
             const trackingUrl =
               trackingCompany.toLowerCase().includes("dtdc") && awbNumber
                 ? buildDtdcTrackingUrl(awbNumber)
                 : "";
+
+            const shippingDate = pickRowValue(row, ["shipping_date", "shippingDate"]) || assignedAt;
+            const expectedDeliveryDate = pickRowValue(row, [
+              "expected_delivery_date",
+              "expectedDeliveryDate",
+              "edd",
+            ]);
 
             const order = {
               index: i + 1,
@@ -225,7 +335,14 @@ export function createBulkOrdersRouter({ env, auth }) {
               createdAt: getRowValue(row, "createdAt") || assignedAt,
               customerEmail: getRowValue(row, "customerEmail"),
               financialStatus: getRowValue(row, "financialStatus"),
+              paymentStatus: getRowValue(row, "financialStatus"),
               totalPrice: safeNumber(getRowValue(row, "totalPrice")),
+              invoiceValue: safeNumber(pickRowValue(row, ["invoice_value", "invoiceValue"]) || getRowValue(row, "totalPrice")),
+              productDescription: pickRowValue(row, [
+                "content_and_quantity",
+                "productDescription",
+                "product_description",
+              ]),
               fulfillmentStatus: "unfulfilled",
               trackingNumbers: awbNumber ? [awbNumber] : [],
               trackingNumbersText: awbNumber ? awbNumber : "",
@@ -245,20 +362,30 @@ export function createBulkOrdersRouter({ env, auth }) {
               },
             };
 
-            const courierType = getRowValue(row, "courierType");
-            const weightKgRaw = getRowValue(row, "weightKg");
+            const courierType = pickRowValue(row, ["courier_type", "courierType", "courierTypeName", "courierTypeValue"]);
+            const weightKgRaw = pickRowValue(row, ["weight", "weightKg", "weight_kg"]);
             const weightKg = weightKgRaw ? Number.parseFloat(weightKgRaw) : NaN;
 
             const shipment = {
               shipmentStatus: "assigned",
               assignedAt,
+              shippingDate,
+              updatedAt: assignedAt,
               ...(courierType ? { courierType } : {}),
               ...(Number.isFinite(weightKg) ? { weightKg: Number(weightKg.toFixed(1)) } : {}),
               ...(awbNumber ? { awbNumber, trackingNumber: awbNumber } : {}),
+              ...(expectedDeliveryDate ? { expectedDeliveryDate } : {}),
             };
 
             try {
               const existing = await docRef.get();
+              const existingData = existing.data() ?? {};
+              const existingShippingDate = String(existingData?.shipping_date ?? "").trim();
+              const existingDisplayStatus = String(existingData?.shipment_status ?? "").trim();
+              const existingConsignment = String(existingData?.consignment_number ?? "").trim();
+              const existingCourierPartner = String(existingData?.courier_partner ?? "").trim();
+              const resolvedShippingDate = existingShippingDate || shippingDate;
+
               await docRef.set(
                 {
                   orderKey,
@@ -268,6 +395,14 @@ export function createBulkOrdersRouter({ env, auth }) {
                   order,
                   shipment,
                   shipmentStatus: "assigned",
+                  shipment_status: existingDisplayStatus || "Assigned",
+                  courier_partner: trackingCompany || existingCourierPartner || (awbNumber ? "DTDC" : ""),
+                  consignment_number: awbNumber || existingConsignment || "",
+                  ...(Number.isFinite(weightKg) ? { weight: Number(weightKg.toFixed(1)) } : {}),
+                  ...(courierType ? { courier_type: courierType } : {}),
+                  shipping_date: resolvedShippingDate,
+                  ...(expectedDeliveryDate ? { expected_delivery_date: expectedDeliveryDate } : {}),
+                  updated_at: assignedAt,
                   ...(awbNumber ? { trackingNumber: awbNumber } : {}),
                   event: "bulk_csv_upload",
                   requestedBy: {
@@ -276,7 +411,7 @@ export function createBulkOrdersRouter({ env, auth }) {
                     role: String(req.user?.role ?? ""),
                   },
                   requestedAt: assignedAt,
-                  updatedAt: nowIso(),
+                  updatedAt: assignedAt,
                 },
                 { merge: true }
               );
@@ -391,6 +526,12 @@ export function createBulkOrdersRouter({ env, auth }) {
             }
 
             const updatedAt = nowIso();
+            const shipment_status =
+              normalizeDisplayStatus(shipmentStatusRaw) ||
+              internalToDisplayShipmentStatus(shipmentStatus) ||
+              "";
+            const courierPartner = pickRowValue(row, ["courier_partner", "courierPartner", "trackingCompany"]) ||
+              (trackingNumber ? "DTDC" : "");
 
             let matches = [];
             try {
@@ -434,27 +575,61 @@ export function createBulkOrdersRouter({ env, auth }) {
 
             try {
               for (const docSnap of matches) {
-                await docSnap.ref.set(
-                  {
-                    storeId: normalizedStoreId,
-                    shopName: displayName,
-                    shipmentStatus,
-                    trackingNumber,
-                    shipment: {
+                const historyRef = docSnap.ref.collection("shipment_status_history").doc();
+                await firestore.runTransaction(async (tx) => {
+                  const snap = await tx.get(docSnap.ref);
+                  const data = snap.data() ?? {};
+
+                  const prevInternal = normalizeShipmentStatus(getDocShipmentStatusRaw(data));
+                  const prevDisplay =
+                    String(data?.shipment_status ?? "").trim() ||
+                    internalToDisplayShipmentStatus(prevInternal) ||
+                    "";
+
+                  const shippingDate = getDocShippingDateIso(data) || "";
+
+                  tx.set(
+                    docSnap.ref,
+                    {
+                      storeId: normalizedStoreId,
+                      shopName: displayName,
                       shipmentStatus,
+                      shipment_status,
                       trackingNumber,
+                      consignment_number: trackingNumber,
+                      courier_partner: courierPartner,
+                      shipping_date: shippingDate,
+                      updated_at: updatedAt,
+                      shipment: {
+                        shipmentStatus,
+                        trackingNumber,
+                        shippingDate,
+                        updatedAt,
+                      },
+                      event: "bulk_status_csv",
+                      updatedBy: {
+                        uid: String(req.user?.uid ?? ""),
+                        email: String(req.user?.email ?? ""),
+                        role: String(req.user?.role ?? ""),
+                      },
                       updatedAt,
                     },
-                    event: "bulk_status_csv",
-                    updatedBy: {
+                    { merge: true }
+                  );
+
+                  tx.set(historyRef, {
+                    changed_at: updatedAt,
+                    from_shipment_status: prevDisplay,
+                    to_shipment_status: shipment_status,
+                    from_internal_status: prevInternal,
+                    to_internal_status: shipmentStatus,
+                    updated_by: {
                       uid: String(req.user?.uid ?? ""),
                       email: String(req.user?.email ?? ""),
                       role: String(req.user?.role ?? ""),
                     },
-                    updatedAt,
-                  },
-                  { merge: true }
-                );
+                  });
+                });
               }
               current.updated += matches.length;
             } catch (error) {

@@ -65,6 +65,52 @@ const ASSIGNED_TAB_HEADER_HTML = `<tr>
   <th>Action</th>
 </tr>`;
 
+const IN_TRANSIT_TAB_HEADER_HTML = `<tr>
+  <th class="colCheck">
+    <input id="selectAll" type="checkbox" aria-label="Select all" />
+  </th>
+  <th>Order Details</th>
+  <th>Customer Details</th>
+  <th>Phone No</th>
+  <th>Invoice Details</th>
+  <th>Shipping Date</th>
+  <th>Tracking No</th>
+  <th>Shipment Details</th>
+  <th>Shipment Status</th>
+  <th>Updated On</th>
+  <th>EDD</th>
+</tr>`;
+
+const DELIVERED_TAB_HEADER_HTML = `<tr>
+  <th class="colCheck">
+    <input id="selectAll" type="checkbox" aria-label="Select all" />
+  </th>
+  <th>Order Details</th>
+  <th>Customer Details</th>
+  <th>Phone No</th>
+  <th>Invoice Details</th>
+  <th>Shipping Date</th>
+  <th>Tracking No</th>
+  <th>Shipment Details</th>
+  <th>Shipment Status</th>
+  <th>Updated On</th>
+</tr>`;
+
+const RTO_TAB_HEADER_HTML = `<tr>
+  <th class="colCheck">
+    <input id="selectAll" type="checkbox" aria-label="Select all" />
+  </th>
+  <th>Order Details</th>
+  <th>Customer Details</th>
+  <th>Phone No</th>
+  <th>Invoice Details</th>
+  <th>Shipping Date</th>
+  <th>Tracking No</th>
+  <th>Shipment Details</th>
+  <th>Shipment Status</th>
+  <th>Updated On</th>
+</tr>`;
+
 let allOrders = [];
 let currentOrders = [];
 const selectedOrderIds = new Set();
@@ -476,11 +522,20 @@ function renderTableHeaderForActiveTab() {
   if (!thead) return;
   const isShopNew = activeRole === "shop" && activeTab === "new";
   const isShopAssigned = activeRole === "shop" && activeTab === "assigned";
+  const isInTransit = activeTab === "in_transit";
+  const isDelivered = activeTab === "delivered";
+  const isRto = activeTab === "rto";
   const html = isShopNew
     ? NEW_TAB_HEADER_HTML
     : isShopAssigned
       ? ASSIGNED_TAB_HEADER_HTML
-      : DEFAULT_HEADER_HTML;
+      : isInTransit
+        ? IN_TRANSIT_TAB_HEADER_HTML
+        : isDelivered
+          ? DELIVERED_TAB_HEADER_HTML
+          : isRto
+            ? RTO_TAB_HEADER_HTML
+            : DEFAULT_HEADER_HTML;
   thead.innerHTML = html;
   bindSelectAllCheckbox();
   attachSortHandlers();
@@ -493,7 +548,13 @@ function syncNewTabLayout() {
   const isShopNew = activeRole === "shop" && activeTab === "new";
   if (isShopNew) {
     sortState = { key: "createdAt", dir: "desc" };
+  } else if (["in_transit", "delivered", "rto"].includes(activeTab)) {
+    // These tabs must default to shipping_date DESC (server already returns sorted).
+    // Keep a non-sorted key so applyFiltersAndSort preserves server order.
+    sortState = { key: "shipping_date", dir: "desc" };
   } else if (sortState.key === "createdAt") {
+    sortState = { key: "orderName", dir: "desc" };
+  } else if (sortState.key === "shipping_date") {
     sortState = { key: "orderName", dir: "desc" };
   }
   renderTableHeaderForActiveTab();
@@ -731,6 +792,19 @@ async function fetchFirestoreAdminOrders({ storeId, status, limit }) {
   const url = new URL("/api/firestore/admin/orders", window.location.origin);
   if (storeId) url.searchParams.set("shopDomain", String(storeId));
   if (status) url.searchParams.set("status", String(status));
+  if (limit) url.searchParams.set("limit", String(limit));
+  const response = await fetch(url, { cache: "no-store", headers: getAuthHeaders() });
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`${response.status} ${response.statusText} ${text}`.trim());
+  }
+  return response.json();
+}
+
+async function fetchConsignments({ tab, storeId, limit }) {
+  const safeTab = String(tab ?? "").trim().toLowerCase();
+  const url = new URL(`/api/consignments/${encodeURIComponent(safeTab)}`, window.location.origin);
+  if (storeId) url.searchParams.set("storeId", String(storeId));
   if (limit) url.searchParams.set("limit", String(limit));
   const response = await fetch(url, { cache: "no-store", headers: getAuthHeaders() });
   if (!response.ok) {
@@ -1017,6 +1091,15 @@ function applyFiltersAndSort() {
   }
 
   const { key, dir } = sortState;
+  if (key === "shipping_date") {
+    // These tabs must keep server order (shipping_date DESC).
+    renderRows(view);
+    updateSortIndicators();
+    updateMetrics(view);
+    setStatus(`Showing ${view.length} of ${allOrders.length} order(s).`, { kind: "ok" });
+    return;
+  }
+
   const direction = dir === "asc" ? 1 : -1;
 
   const sorted = [...view].sort((a, b) => {
@@ -1116,6 +1199,18 @@ function renderRows(orders) {
   }
   if (activeRole === "shop" && activeTab === "assigned") {
     renderRowsAssignedTab(orders);
+    return;
+  }
+  if (activeTab === "in_transit") {
+    renderRowsInTransitTab(orders);
+    return;
+  }
+  if (activeTab === "delivered") {
+    renderRowsDeliveredTab(orders);
+    return;
+  }
+  if (activeTab === "rto") {
+    renderRowsRtoTab(orders);
     return;
   }
 
@@ -1730,6 +1825,388 @@ function renderRowsAssignedTab(orders) {
   syncSelectAllCheckbox();
 }
 
+function renderRowsInTransitTab(orders) {
+  const tbody = $("rows");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  currentOrders = Array.isArray(orders) ? orders : [];
+
+  const formatDate = (iso) => formatOrderDate(iso);
+  const formatDateTime = (iso) => {
+    const d = new Date(String(iso ?? ""));
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const allowed = ["In Transit", "Undelivered", "At Destination", "Out for Delivery", "Set RTO"];
+  const isAdmin = activeRole === "admin";
+
+  const fragment = document.createDocumentFragment();
+  for (const row of currentOrders) {
+    const tr = document.createElement("tr");
+
+    const orderKey = getOrderKey(row);
+    tr.dataset.orderKey = orderKey;
+
+    const orderName = String(row.order_name ?? row.orderName ?? row.order_id ?? "").trim();
+    const orderDetailsHtml = `<div class="cellStack">
+      <div class="cellPrimary">${escapeHtml(orderName)}</div>
+      <div class="cellMuted">${escapeHtml(formatDate(row.order_date))}</div>
+    </div>`;
+
+    const customerDetailsHtml = `<div class="cellStack">
+      <div class="cellPrimary">${escapeHtml(row.name ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(row.address_line_1 ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(row.address_line_2 ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(row.pincode ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(row.city ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(row.state ?? "")}</div>
+    </div>`;
+
+    const phoneHtml = `<div class="cellStack">
+      <div class="cellMuted mono">${escapeHtml(row.phone_1 ?? "")}</div>
+      <div class="cellMuted mono">${escapeHtml(row.phone_2 ?? "")}</div>
+    </div>`;
+
+    const invoiceHtml = `<div class="cellStack">
+      <div class="cellPrimary">${escapeHtml(row.content_and_quantity ?? "")}</div>
+      <div class="cellMuted mono">${escapeHtml(row.invoice_value ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(row.payment_status ?? "")}</div>
+    </div>`;
+
+    const shippingDateHtml = `<div class="cellStack">
+      <div class="cellPrimary">${escapeHtml(formatDate(row.shipping_date))}</div>
+    </div>`;
+
+    const awb = String(row.consignment_number ?? "").trim();
+    const courierPartner = String(row.courier_partner ?? "").trim() || (awb ? "DTDC" : "");
+    const trackingUrl = awb ? buildDtdcTrackingUrl(awb) : "";
+    const courierHtml =
+      courierPartner && trackingUrl
+        ? `<a class="cellMuted trackingLink" href="${escapeHtml(trackingUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(courierPartner)}</a>`
+        : escapeHtml(courierPartner || "—");
+    const trackingHtml = `<div class="cellStack">
+      <div class="cellPrimary">${courierHtml}</div>
+      <div class="cellMuted mono">${escapeHtml(awb || "—")}</div>
+    </div>`;
+
+    const shipmentDetailsHtml = `<div class="cellStack">
+      <div class="cellPrimary mono">${escapeHtml(row.weight ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(row.courier_type ?? "")}</div>
+    </div>`;
+
+    const statusValue = String(row.shipment_status ?? "").trim();
+    const statusOptionsHtml = allowed
+      .map((v) => {
+        const selected = v === statusValue ? " selected" : "";
+        return `<option value="${escapeHtml(v)}"${selected}>${escapeHtml(v)}</option>`;
+      })
+      .join("");
+    const statusHtml = isAdmin
+      ? `<select class="statusSelect" data-role="consignment-status" data-order-key="${escapeHtml(orderKey)}" data-prev-value="${escapeHtml(statusValue)}">
+          ${statusOptionsHtml}
+        </select>`
+      : `<span class="badge badgeMuted">${escapeHtml(statusValue || "—")}</span>`;
+
+    const updatedOnHtml = `<div class="cellStack">
+      <div class="cellPrimary">${escapeHtml(formatDateTime(row.updated_at))}</div>
+    </div>`;
+
+    const eddHtml = `<div class="cellStack">
+      <div class="cellPrimary">${escapeHtml(formatDate(row.expected_delivery_date))}</div>
+    </div>`;
+
+    const cells = [
+      { check: true, checked: orderKey && selectedOrderIds.has(orderKey) },
+      { html: orderDetailsHtml },
+      { html: customerDetailsHtml },
+      { html: phoneHtml },
+      { html: invoiceHtml },
+      { html: shippingDateHtml },
+      { html: trackingHtml },
+      { html: shipmentDetailsHtml },
+      { html: statusHtml },
+      { html: updatedOnHtml },
+      { html: eddHtml },
+    ];
+
+    for (const value of cells) {
+      const td = document.createElement("td");
+      if (value && typeof value === "object" && value.check) {
+        td.className = "colCheck";
+        const input = document.createElement("input");
+        input.type = "checkbox";
+        input.checked = Boolean(value.checked);
+        input.ariaLabel = "Select row";
+        td.appendChild(input);
+      } else if (value && typeof value === "object" && "html" in value) {
+        td.innerHTML = value.html;
+      } else {
+        td.textContent = String(value ?? "");
+      }
+      tr.appendChild(td);
+    }
+
+    fragment.appendChild(tr);
+  }
+
+  tbody.appendChild(fragment);
+  syncSelectAllCheckbox();
+}
+
+function renderRowsDeliveredTab(orders) {
+  const tbody = $("rows");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  currentOrders = Array.isArray(orders) ? orders : [];
+
+  const formatDate = (iso) => formatOrderDate(iso);
+  const formatDateTime = (iso) => {
+    const d = new Date(String(iso ?? ""));
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const fragment = document.createDocumentFragment();
+  for (const row of currentOrders) {
+    const tr = document.createElement("tr");
+
+    const orderKey = getOrderKey(row);
+    tr.dataset.orderKey = orderKey;
+
+    const orderName = String(row.order_name ?? row.orderName ?? row.order_id ?? "").trim();
+    const orderDetailsHtml = `<div class="cellStack">
+      <div class="cellPrimary">${escapeHtml(orderName)}</div>
+      <div class="cellMuted">${escapeHtml(formatDate(row.order_date))}</div>
+    </div>`;
+
+    const customerDetailsHtml = `<div class="cellStack">
+      <div class="cellPrimary">${escapeHtml(row.name ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(row.address_line_1 ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(row.address_line_2 ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(row.pincode ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(row.city ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(row.state ?? "")}</div>
+    </div>`;
+
+    const phoneHtml = `<div class="cellStack">
+      <div class="cellMuted mono">${escapeHtml(row.phone_1 ?? "")}</div>
+      <div class="cellMuted mono">${escapeHtml(row.phone_2 ?? "")}</div>
+    </div>`;
+
+    const invoiceHtml = `<div class="cellStack">
+      <div class="cellPrimary">${escapeHtml(row.content_and_quantity ?? "")}</div>
+      <div class="cellMuted mono">${escapeHtml(row.total_price_including_gst ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(row.payment_mode ?? "")}</div>
+    </div>`;
+
+    const shippingDateHtml = `<div class="cellStack">
+      <div class="cellPrimary">${escapeHtml(formatDate(row.shipping_date))}</div>
+    </div>`;
+
+    const awb = String(row.consignment_number ?? "").trim();
+    const courierPartner = String(row.courier_partner ?? "").trim() || (awb ? "DTDC" : "");
+    const trackingUrl = awb ? buildDtdcTrackingUrl(awb) : "";
+    const courierHtml =
+      courierPartner && trackingUrl
+        ? `<a class="cellMuted trackingLink" href="${escapeHtml(trackingUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(courierPartner)}</a>`
+        : escapeHtml(courierPartner || "—");
+    const trackingHtml = `<div class="cellStack">
+      <div class="cellPrimary">${courierHtml}</div>
+      <div class="cellMuted mono">${escapeHtml(awb || "—")}</div>
+    </div>`;
+
+    const shipmentDetailsHtml = `<div class="cellStack">
+      <div class="cellPrimary mono">${escapeHtml(row.weight ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(row.courier_type ?? "")}</div>
+    </div>`;
+
+    const updatedOnHtml = `<div class="cellStack">
+      <div class="cellPrimary">${escapeHtml(formatDateTime(row.updated_at))}</div>
+    </div>`;
+
+    const cells = [
+      { check: true, checked: orderKey && selectedOrderIds.has(orderKey) },
+      { html: orderDetailsHtml },
+      { html: customerDetailsHtml },
+      { html: phoneHtml },
+      { html: invoiceHtml },
+      { html: shippingDateHtml },
+      { html: trackingHtml },
+      { html: shipmentDetailsHtml },
+      { html: `<span class="badge badgeOk">Delivered</span>` },
+      { html: updatedOnHtml },
+    ];
+
+    for (const value of cells) {
+      const td = document.createElement("td");
+      if (value && typeof value === "object" && value.check) {
+        td.className = "colCheck";
+        const input = document.createElement("input");
+        input.type = "checkbox";
+        input.checked = Boolean(value.checked);
+        input.ariaLabel = "Select row";
+        td.appendChild(input);
+      } else if (value && typeof value === "object" && "html" in value) {
+        td.innerHTML = value.html;
+      } else {
+        td.textContent = String(value ?? "");
+      }
+      tr.appendChild(td);
+    }
+
+    fragment.appendChild(tr);
+  }
+
+  tbody.appendChild(fragment);
+  syncSelectAllCheckbox();
+}
+
+function renderRowsRtoTab(orders) {
+  const tbody = $("rows");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  currentOrders = Array.isArray(orders) ? orders : [];
+
+  const formatDate = (iso) => formatOrderDate(iso);
+  const formatDateTime = (iso) => {
+    const d = new Date(String(iso ?? ""));
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const allowed = ["RTO Accepted", "RTO In Transit", "RTO Reached At Destination", "RTO Delivered"];
+  const isAdmin = activeRole === "admin";
+
+  const fragment = document.createDocumentFragment();
+  for (const row of currentOrders) {
+    const tr = document.createElement("tr");
+
+    const orderKey = getOrderKey(row);
+    tr.dataset.orderKey = orderKey;
+
+    const orderName = String(row.order_name ?? row.orderName ?? row.order_id ?? "").trim();
+    const orderDetailsHtml = `<div class="cellStack">
+      <div class="cellPrimary">${escapeHtml(orderName)}</div>
+      <div class="cellMuted">${escapeHtml(formatDate(row.order_date))}</div>
+    </div>`;
+
+    const customerDetailsHtml = `<div class="cellStack">
+      <div class="cellPrimary">${escapeHtml(row.name ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(row.address_line_1 ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(row.address_line_2 ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(row.pincode ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(row.city ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(row.state ?? "")}</div>
+    </div>`;
+
+    const phoneHtml = `<div class="cellStack">
+      <div class="cellMuted mono">${escapeHtml(row.phone_1 ?? "")}</div>
+      <div class="cellMuted mono">${escapeHtml(row.phone_2 ?? "")}</div>
+    </div>`;
+
+    const invoiceHtml = `<div class="cellStack">
+      <div class="cellPrimary">${escapeHtml(row.content_and_quantity ?? "")}</div>
+      <div class="cellMuted mono">${escapeHtml(row.total_price_including_gst ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(row.payment_mode ?? "")}</div>
+    </div>`;
+
+    const shippingDateHtml = `<div class="cellStack">
+      <div class="cellPrimary">${escapeHtml(formatDate(row.shipping_date))}</div>
+    </div>`;
+
+    const awb = String(row.consignment_number ?? "").trim();
+    const courierPartner = String(row.courier_partner ?? "").trim() || (awb ? "DTDC" : "");
+    const trackingUrl = awb ? buildDtdcTrackingUrl(awb) : "";
+    const courierHtml =
+      courierPartner && trackingUrl
+        ? `<a class="cellMuted trackingLink" href="${escapeHtml(trackingUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(courierPartner)}</a>`
+        : escapeHtml(courierPartner || "—");
+    const trackingHtml = `<div class="cellStack">
+      <div class="cellPrimary">${courierHtml}</div>
+      <div class="cellMuted mono">${escapeHtml(awb || "—")}</div>
+    </div>`;
+
+    const shipmentDetailsHtml = `<div class="cellStack">
+      <div class="cellPrimary mono">${escapeHtml(row.weight ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(row.courier_type ?? "")}</div>
+    </div>`;
+
+    const statusValue = String(row.shipment_status ?? "").trim();
+    const statusOptionsHtml = allowed
+      .map((v) => {
+        const selected = v === statusValue ? " selected" : "";
+        return `<option value="${escapeHtml(v)}"${selected}>${escapeHtml(v)}</option>`;
+      })
+      .join("");
+    const statusHtml = isAdmin
+      ? `<select class="statusSelect" data-role="consignment-status" data-order-key="${escapeHtml(orderKey)}" data-prev-value="${escapeHtml(statusValue)}">
+          ${statusOptionsHtml}
+        </select>`
+      : `<span class="badge badgeMuted">${escapeHtml(statusValue || "—")}</span>`;
+
+    const updatedOnHtml = `<div class="cellStack">
+      <div class="cellPrimary">${escapeHtml(formatDateTime(row.updated_at))}</div>
+    </div>`;
+
+    const cells = [
+      { check: true, checked: orderKey && selectedOrderIds.has(orderKey) },
+      { html: orderDetailsHtml },
+      { html: customerDetailsHtml },
+      { html: phoneHtml },
+      { html: invoiceHtml },
+      { html: shippingDateHtml },
+      { html: trackingHtml },
+      { html: shipmentDetailsHtml },
+      { html: statusHtml },
+      { html: updatedOnHtml },
+    ];
+
+    for (const value of cells) {
+      const td = document.createElement("td");
+      if (value && typeof value === "object" && value.check) {
+        td.className = "colCheck";
+        const input = document.createElement("input");
+        input.type = "checkbox";
+        input.checked = Boolean(value.checked);
+        input.ariaLabel = "Select row";
+        td.appendChild(input);
+      } else if (value && typeof value === "object" && "html" in value) {
+        td.innerHTML = value.html;
+      } else {
+        td.textContent = String(value ?? "");
+      }
+      tr.appendChild(td);
+    }
+
+    fragment.appendChild(tr);
+  }
+
+  tbody.appendChild(fragment);
+  syncSelectAllCheckbox();
+}
+
 function renderRowsNewTab(orders) {
   const tbody = $("rows");
   if (!tbody) return;
@@ -2006,8 +2483,14 @@ async function refresh({ forceNetwork = false } = {}) {
         return;
       }
 
-      const status = activeTab && activeTab !== "all" ? activeTab : "all";
-      const data = await fetchFirestoreAdminOrders({ storeId, status, limit: 250 });
+      const useConsignments = ["in_transit", "delivered", "rto"].includes(activeTab);
+      const data = useConsignments
+        ? await fetchConsignments({ tab: activeTab, storeId, limit: 250 })
+        : await fetchFirestoreAdminOrders({
+            storeId,
+            status: activeTab && activeTab !== "all" ? activeTab : "all",
+            limit: 250,
+          });
       const orders = Array.isArray(data?.orders) ? data.orders : [];
       allOrders = orders;
 
@@ -2035,8 +2518,17 @@ async function refresh({ forceNetwork = false } = {}) {
       }
 
       if (["in_transit", "delivered", "rto", "all"].includes(activeTab)) {
-        const status = activeTab === "all" ? "all" : activeTab;
-        const data = await fetchFirestoreOrders({ status, limit: 250 });
+        if (activeTab === "all") {
+          const data = await fetchFirestoreOrders({ status: "all", limit: 250 });
+          const orders = Array.isArray(data?.orders) ? data.orders : [];
+          allOrders = orders;
+          pruneSelectionToVisible(orders);
+          applyFiltersAndSort();
+          setStatus(`Loaded ${orders.length} order(s).`, { kind: "ok" });
+          return;
+        }
+
+        const data = await fetchConsignments({ tab: activeTab, limit: 250 });
         const orders = Array.isArray(data?.orders) ? data.orders : [];
         allOrders = orders;
         pruneSelectionToVisible(orders);
@@ -2241,18 +2733,56 @@ window.addEventListener("DOMContentLoaded", () => {
   $("fulfillmentFilter")?.addEventListener("change", applyFiltersAndSort);
   $("trackingFilter")?.addEventListener("change", applyFiltersAndSort);
 
-  $("rows")?.addEventListener("change", (e) => {
-    const input = e.target;
-    if (!input || input.tagName !== "INPUT" || input.type !== "checkbox") return;
-    const tr = input.closest("tr");
-    const orderKey = String(tr?.dataset?.orderKey ?? "");
-    if (!orderKey) return;
+  $("rows")?.addEventListener("change", async (e) => {
+    const target = e.target;
+    if (!target) return;
 
-    if (input.checked) selectedOrderIds.add(orderKey);
-    else selectedOrderIds.delete(orderKey);
+    if (target.tagName === "SELECT" && String(target.dataset?.role ?? "") === "consignment-status") {
+      if (activeRole !== "admin") return;
+      if (!["in_transit", "rto"].includes(activeTab)) return;
 
-    syncSelectAllCheckbox();
-    syncBulkDownloadButton();
+      const tr = target.closest("tr");
+      const orderKey = String(target.dataset?.orderKey ?? tr?.dataset?.orderKey ?? "").trim();
+      if (!orderKey) return;
+
+      const storeId = getActiveStoreId();
+      if (!storeId) {
+        setStatus("Select a store before updating status.", { kind: "error" });
+        return;
+      }
+
+      const prev = String(target.dataset.prevValue ?? "");
+      const nextValue = String(target.value ?? "").trim();
+      target.disabled = true;
+      try {
+        await postJson("/api/consignments/update-status", {
+          orderKey,
+          storeId,
+          shipment_status: nextValue,
+        });
+        target.dataset.prevValue = nextValue;
+        setStatus("Status updated.", { kind: "ok" });
+        await refresh({ forceNetwork: true });
+      } catch (error) {
+        if (prev) target.value = prev;
+        setStatus(error?.message ?? "Failed to update status.", { kind: "error" });
+      } finally {
+        target.disabled = false;
+      }
+      return;
+    }
+
+    if (target.tagName === "INPUT" && target.type === "checkbox") {
+      const tr = target.closest("tr");
+      const orderKey = String(tr?.dataset?.orderKey ?? "");
+      if (!orderKey) return;
+
+      if (target.checked) selectedOrderIds.add(orderKey);
+      else selectedOrderIds.delete(orderKey);
+
+      syncSelectAllCheckbox();
+      syncBulkDownloadButton();
+    }
   });
 
   const ensureBarcodeTooltip = () => {

@@ -420,6 +420,11 @@ body[data-role="shop"][data-tab="new"] .weightSuffix {
   min-width: 140px;
 }
 
+.statusSelect {
+  width: 100%;
+  min-width: 180px;
+}
+
 .trackingHover {
   cursor: help;
   text-decoration: underline dotted;
@@ -1200,33 +1205,33 @@ body[data-role="shop"][data-tab="new"] .table {
 }
 
 /* Shop orders view: keep only essential columns (except New/Assigned which have custom layouts). */
-body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"])
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"])
   .table th:nth-child(2),
-body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"])
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"])
   .table td:nth-child(2),
-body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"])
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"])
   .table th:nth-child(4),
-body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"])
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"])
   .table td:nth-child(4),
-body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"])
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"])
   .table th:nth-child(6),
-body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"])
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"])
   .table td:nth-child(6),
-body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"])
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"])
   .table th:nth-child(7),
-body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"])
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"])
   .table td:nth-child(7),
-body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"])
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"])
   .table th:nth-child(12),
-body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"])
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"])
   .table td:nth-child(12),
-body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"])
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"])
   .table th:nth-child(14),
-body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"])
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"])
   .table td:nth-child(14),
-body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"])
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"])
   .table th:nth-child(17),
-body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"])
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"])
   .table td:nth-child(17) {
   display: none;
 }

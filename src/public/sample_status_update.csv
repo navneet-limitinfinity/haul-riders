@@ -1,5 +1,9 @@
 Tracking Numbers,Shipments Status
 AWB000000001,In Transit
-AWB000000002,Delivered
-AWB000000003,RTO Initiated
-AWB000000004,RTO Delivered
+AWB000000002,At Destination
+AWB000000003,Out for Delivery
+AWB000000004,Delivered
+AWB000000005,RTO Accepted
+AWB000000006,RTO In Transit
+AWB000000007,RTO Reached At Destination
+AWB000000008,RTO Delivered

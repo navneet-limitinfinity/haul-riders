@@ -49,7 +49,20 @@ export function createApp({ env, logger }) {
     })
   );
   app.use(express.json({ limit: "1mb" }));
-  app.use("/static", express.static(publicDir, { etag: true, maxAge: "5m" }));
+  app.use(
+    "/static",
+    express.static(publicDir, {
+      etag: true,
+      maxAge: "5m",
+      setHeaders: (res, filePath) => {
+        const p = String(filePath ?? "");
+        // Prevent stale dashboard JS/CSS being served by aggressive proxy/browser caches.
+        if (p.endsWith(`${path.sep}orders.js`) || p.endsWith(`${path.sep}orders.css`)) {
+          res.setHeader("Cache-Control", "no-store");
+        }
+      },
+    })
+  );
   app.use(
     "/vendor/firebase",
     express.static(vendorFirebaseDir, { etag: true, maxAge: "5m" })
