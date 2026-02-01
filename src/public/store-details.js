@@ -99,6 +99,7 @@ function getStoreDetailsFields() {
     "storeName",
     "registeredAddress",
     "gstNumber",
+    "websiteAddress",
     "contactPersonName",
     "contactPersonEmail",
     "contactPersonPhone",
@@ -112,6 +113,7 @@ function normalizeStoreDetails(details) {
     storeName: String(d?.storeName ?? "").trim(),
     registeredAddress: String(d?.registeredAddress ?? "").trim(),
     gstNumber: String(d?.gstNumber ?? "").trim(),
+    websiteAddress: String(d?.websiteAddress ?? "").trim(),
     contactPersonName: String(d?.contactPersonName ?? "").trim(),
     contactPersonEmail: String(d?.contactPersonEmail ?? "").trim(),
     contactPersonPhone: String(d?.contactPersonPhone ?? "").trim(),
@@ -128,6 +130,7 @@ function fillStoreDetails(details) {
   $("storeName").value = d.storeName;
   $("registeredAddress").value = d.registeredAddress;
   $("gstNumber").value = d.gstNumber;
+  $("websiteAddress").value = d.websiteAddress;
   $("contactPersonName").value = d.contactPersonName;
   $("contactPersonEmail").value = d.contactPersonEmail;
   $("contactPersonPhone").value = d.contactPersonPhone;
@@ -137,6 +140,7 @@ async function loadStoreDetails() {
   const data = await requestJson("/api/store/details");
   const details = normalizeStoreDetails(data?.storeDetails ?? {});
   fillStoreDetails(details);
+  renderShopifyConfig(data?.shopify ?? null);
   return details;
 }
 
@@ -145,6 +149,7 @@ function readStoreDetails() {
     storeName: String($("storeName")?.value ?? "").trim(),
     registeredAddress: String($("registeredAddress")?.value ?? "").trim(),
     gstNumber: String($("gstNumber")?.value ?? "").trim(),
+    websiteAddress: String($("websiteAddress")?.value ?? "").trim(),
     contactPersonName: String($("contactPersonName")?.value ?? "").trim(),
     contactPersonEmail: String($("contactPersonEmail")?.value ?? "").trim(),
     contactPersonPhone: String($("contactPersonPhone")?.value ?? "").trim(),
@@ -159,15 +164,48 @@ function setStoreDetailsReadOnly(readOnly) {
   document.body.dataset.storeDetailsMode = readOnly ? "read" : "edit";
 }
 
-function setStoreDetailsButtons({ canEdit, editing }) {
-  const editBtn = $("editStoreDetails");
-  const cancelBtn = $("cancelStoreDetails");
-  const saveBtn = $("saveStoreDetails");
+function renderShopifyConfig(shopify) {
+  const cfg = shopify && typeof shopify === "object" ? shopify : {};
+  const connected = Boolean(cfg.connected);
+  const storeDomain = String(cfg.storeDomain ?? "").trim();
+  const connectUrl = String(cfg.connectUrl ?? "").trim();
+  const authenticateUrl = String(cfg.authenticateUrl ?? "").trim();
 
-  const isEditing = Boolean(editing);
-  if (editBtn) editBtn.hidden = !canEdit || isEditing;
-  if (cancelBtn) cancelBtn.hidden = !isEditing;
-  if (saveBtn) saveBtn.hidden = !isEditing;
+  const pill = $("shopifyStatusPill");
+  const domainEl = $("shopifyStoreDomain");
+  const connectLink = $("connectShopifyLink");
+  const authWrap = $("authenticateWrap");
+  const authLink = $("authenticateShopifyLink");
+  const authCheckbox = $("authenticateCheckbox");
+
+  if (pill) {
+    pill.className = `shopifyPill ${connected ? "shopifyPillOk" : "shopifyPillMuted"}`;
+    pill.textContent = connected ? "Connected" : "Not Configured";
+  }
+
+  if (domainEl) {
+    domainEl.hidden = !connected;
+    domainEl.textContent = storeDomain || "";
+  }
+
+  if (connectLink) {
+    const showConnect = !connected && Boolean(connectUrl);
+    connectLink.style.display = showConnect ? "inline-flex" : "none";
+    connectLink.setAttribute("href", connectUrl || "#");
+  }
+
+  if (authLink) {
+    authLink.setAttribute("href", authenticateUrl || "#");
+    authLink.style.pointerEvents = authenticateUrl ? "auto" : "none";
+  }
+
+  if (authWrap) {
+    authWrap.style.display = !connected && Boolean(authenticateUrl) ? "flex" : "none";
+  }
+
+  if (authCheckbox) {
+    authCheckbox.checked = false;
+  }
 }
 
 function refreshBrandingLogoImages() {
@@ -340,17 +378,18 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   let initialDetails = normalizeStoreDetails({});
   let canEdit = true;
+  let isEditing = false;
 
   try {
     initialDetails = (await loadStoreDetails()) || normalizeStoreDetails({});
     canEdit = hasStoreDetails(initialDetails);
 
     if (canEdit) {
+      isEditing = false;
       setStoreDetailsReadOnly(true);
-      setStoreDetailsButtons({ canEdit: true, editing: false });
     } else {
+      isEditing = true;
       setStoreDetailsReadOnly(false);
-      setStoreDetailsButtons({ canEdit: false, editing: true });
     }
   } catch (error) {
     setStatus(error?.message ?? "Failed to load store details.", { kind: "error" });
@@ -358,28 +397,37 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   $("editStoreDetails")?.addEventListener("click", () => {
     initialDetails = readStoreDetails();
+    isEditing = true;
     setStoreDetailsReadOnly(false);
-    setStoreDetailsButtons({ canEdit: true, editing: true });
     $("storeName")?.focus?.();
   });
 
-  $("cancelStoreDetails")?.addEventListener("click", () => {
-    fillStoreDetails(initialDetails);
-    setStoreDetailsReadOnly(true);
-    setStoreDetailsButtons({ canEdit: true, editing: false });
-  });
-
   $("saveStoreDetails")?.addEventListener("click", async () => {
+    if (!isEditing) {
+      setStatus("Click “Edit details” to update.", { kind: "info" });
+      return;
+    }
     try {
       await postJson("/api/store/details", readStoreDetails());
       setStatus("Store details saved.", { kind: "ok" });
       initialDetails = readStoreDetails();
       canEdit = true;
+      isEditing = false;
       setStoreDetailsReadOnly(true);
-      setStoreDetailsButtons({ canEdit: true, editing: false });
     } catch (error) {
       setStatus(error?.message ?? "Failed to save store details.", { kind: "error" });
     }
+  });
+
+  $("authenticateWrap")?.addEventListener("click", (e) => {
+    const link = $("authenticateShopifyLink");
+    const url = String(link?.getAttribute?.("href") ?? "").trim();
+    if (!url || url === "#") return;
+    const target = e.target;
+    if (target && target.tagName === "INPUT") return;
+    window.open(url, "_blank", "noopener,noreferrer");
+    const cb = $("authenticateCheckbox");
+    if (cb) cb.checked = false;
   });
 
   $("uploadBrandingLogo")?.addEventListener("click", async () => {

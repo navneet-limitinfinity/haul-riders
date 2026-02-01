@@ -27,6 +27,7 @@ const normalizeDetailsPayload = (body) => {
   const storeName = String(body?.storeName ?? "").trim();
   const registeredAddress = String(body?.registeredAddress ?? "").trim();
   const gstNumber = String(body?.gstNumber ?? "").trim();
+  const websiteAddress = String(body?.websiteAddress ?? "").trim();
   const contactPersonName = String(body?.contactPersonName ?? "").trim();
   const contactPersonEmail = String(body?.contactPersonEmail ?? "").trim();
   const contactPersonPhone = normalizePhone10(body?.contactPersonPhone ?? "");
@@ -35,6 +36,7 @@ const normalizeDetailsPayload = (body) => {
     storeName,
     registeredAddress,
     gstNumber,
+    websiteAddress,
     contactPerson: {
       name: contactPersonName,
       email: contactPersonEmail,
@@ -77,6 +79,26 @@ export function createStoreRouter({ env, auth }) {
 
       const details = data?.storeDetails && typeof data.storeDetails === "object" ? data.storeDetails : {};
 
+      // Shopify UI links (read-only; configured in Firestore).
+      const shopifyUi = data?.shopifyUi && typeof data.shopifyUi === "object" ? data.shopifyUi : {};
+      const connectUrl = String(shopifyUi?.connectUrl ?? "").trim();
+      const authenticateUrl = String(shopifyUi?.authenticateUrl ?? "").trim();
+
+      // "Connected" state inferred from existing Shopify access token doc.
+      let connected = false;
+      try {
+        const shopifySnap = await firestore
+          .collection(shopsCollection)
+          .doc(shopDomain)
+          .collection("shopify")
+          .doc("config")
+          .get();
+        const cfg = shopifySnap.exists ? shopifySnap.data() ?? {} : {};
+        connected = Boolean(String(cfg?.accessToken ?? "").trim());
+      } catch {
+        connected = false;
+      }
+
       res.setHeader("Cache-Control", "no-store");
       res.json({
         shopDomain,
@@ -84,9 +106,16 @@ export function createStoreRouter({ env, auth }) {
           storeName: String(details?.storeName ?? "").trim(),
           registeredAddress: String(details?.registeredAddress ?? "").trim(),
           gstNumber: String(details?.gstNumber ?? "").trim(),
+          websiteAddress: String(details?.websiteAddress ?? "").trim(),
           contactPersonName: String(details?.contactPerson?.name ?? "").trim(),
           contactPersonEmail: String(details?.contactPerson?.email ?? "").trim(),
           contactPersonPhone: String(details?.contactPerson?.phone ?? "").trim(),
+        },
+        shopify: {
+          connected,
+          storeDomain: shopDomain,
+          connectUrl,
+          authenticateUrl,
         },
       });
     } catch (error) {

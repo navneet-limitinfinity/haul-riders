@@ -60,7 +60,7 @@ function renderNavDrawer({ role, userLabel, activePath }) {
 }
 
 function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
-  const assetVersion = "40";
+  const assetVersion = "41";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
   const safeFirestoreCollectionId = escapeHtml(firestoreCollectionId);
@@ -460,7 +460,7 @@ function renderBulkUploadPage({ userLabel }) {
 }
 
 function renderFulfillmentCentersPage({ userLabel, storeId }) {
-  const assetVersion = "40";
+  const assetVersion = "41";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
 
@@ -617,7 +617,7 @@ function renderFulfillmentCentersPage({ userLabel, storeId }) {
 }
 
 function renderStoreDetailsPage({ userLabel, storeId }) {
-  const assetVersion = "40";
+  const assetVersion = "41";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
 
@@ -689,11 +689,7 @@ function renderStoreDetailsPage({ userLabel, storeId }) {
 	                <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
 	                Edit details
 	              </button>
-	              <button id="cancelStoreDetails" class="btn btnSecondary btnIcon" type="button" hidden>
-	                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-	                Cancel
-	              </button>
-	              <button id="saveStoreDetails" class="btn btnPrimary btnIcon" type="button" hidden>
+	              <button id="saveStoreDetails" class="btn btnPrimary btnIcon" type="button">
 	                <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
 	                Save
 	              </button>
@@ -704,7 +700,7 @@ function renderStoreDetailsPage({ userLabel, storeId }) {
         <div id="status" class="status" aria-live="polite"></div>
 
 	        <div class="storeDetailsWrap">
-	        <div class="storeDetailsGrid">
+	        <div class="storeDetailsGrid storeDetailsGrid3">
 	          <label class="field">
 	            <span>Store Name</span>
 	            <input id="storeName" type="text" placeholder="Store Name" />
@@ -712,6 +708,10 @@ function renderStoreDetailsPage({ userLabel, storeId }) {
 	          <label class="field">
 	            <span>GST Number</span>
 	            <input id="gstNumber" type="text" placeholder="GST Number" />
+	          </label>
+	          <label class="field">
+	            <span>Website Address</span>
+	            <input id="websiteAddress" type="text" placeholder="https://example.com" />
 	          </label>
 	          <label class="field fieldSpanAll">
 	            <span>Registered Address</span>
@@ -728,6 +728,22 @@ function renderStoreDetailsPage({ userLabel, storeId }) {
 	          <label class="field">
 	            <span>Contact Person Phone</span>
 	            <input id="contactPersonPhone" type="text" inputmode="numeric" placeholder="10-digit phone" />
+	          </label>
+	        </div>
+	        <div class="storeSectionDivider"></div>
+	        <div class="shopifyConfig">
+	          <div class="shopifyConfigTitle">Shopify Store Configuration</div>
+	          <div class="shopifyConfigRow">
+	            <span id="shopifyStatusPill" class="shopifyPill shopifyPillMuted">Not Configured</span>
+	            <span id="shopifyStoreDomain" class="shopifyDomain" hidden></span>
+	            <a id="connectShopifyLink" class="btn btnPrimary btnIcon btnShopifyConnect" href="#" target="_blank" rel="noopener noreferrer">
+	              <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+	              Connect Shopify Store
+	            </a>
+	          </div>
+	          <label id="authenticateWrap" class="shopifyAuthRow">
+	            <input id="authenticateCheckbox" type="checkbox" />
+	            <a id="authenticateShopifyLink" href="#" target="_blank" rel="noopener noreferrer">Authenticate us to fetch the orders from store</a>
 	          </label>
 	        </div>
 	        </div>

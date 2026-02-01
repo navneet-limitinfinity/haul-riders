@@ -96,8 +96,18 @@ Stored under the shops collection:
   - `storeName`
   - `registeredAddress`
   - `gstNumber`
+  - `websiteAddress`
   - `contactPerson { name, email, phone }`
   - `updatedAt`
+
+**Shopify UI links (Shop Store Details page)**
+- Path: `shops/<shopDomain>` (doc fields)
+- File: `src/routes/storeRoutes.js`, `src/public/store-details.js`
+- Keys read (under `shopifyUi` object):
+  - `connectUrl` (used for "Connect Shopify Store" button)
+  - `authenticateUrl` (used for "Authenticate us to fetch the orders from store" link)
+- Connected state:
+  - derived from `shops/<shopDomain>/shopify/config.accessToken` (read-only inference)
 
 **Branding logo**
 - Path: `shops/<shopDomain>/branding/logo`
