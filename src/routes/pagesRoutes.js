@@ -460,7 +460,7 @@ function renderBulkUploadPage({ userLabel }) {
 }
 
 function renderFulfillmentCentersPage({ userLabel, storeId }) {
-  const assetVersion = "49";
+  const assetVersion = "52";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
 
@@ -562,62 +562,62 @@ function renderFulfillmentCentersPage({ userLabel, storeId }) {
       </section>
     </main>
 
-    <dialog id="centerDialog" class="modal">
-      <form method="dialog" class="modalCard">
-        <div class="modalHeader">
-          <div class="modalTitle" id="centerDialogTitle">Add center</div>
-          <button type="button" class="btn btnSecondary btnCompact" data-action="close-dialog">Close</button>
-        </div>
-
-        <div class="modalBody">
-          <input type="hidden" id="centerId" value="" />
-          <label class="field">
-            <span>Origin Name</span>
-            <input id="originName" type="text" placeholder="e.g. ORG L02" required />
-          </label>
-          <div class="modalGrid">
-            <label class="field">
-              <span>Address 1</span>
-              <input id="address1" type="text" />
-            </label>
-            <label class="field">
-              <span>Address 2</span>
-              <input id="address2" type="text" />
-            </label>
-            <label class="field">
-              <span>City</span>
-              <input id="city" type="text" />
-            </label>
-            <label class="field">
-              <span>State</span>
-              <input id="state" type="text" />
-            </label>
-            <label class="field">
-              <span>PIN Code</span>
-              <input id="pinCode" type="text" inputmode="numeric" />
-            </label>
-            <label class="field">
-              <span>Phone</span>
-              <input id="phone" type="text" inputmode="numeric" />
-            </label>
-          </div>
-        </div>
-
-        <div class="modalFooter">
-          <label class="fieldCheckbox fieldCheckboxCompact">
-            <input id="makeDefault" type="checkbox" />
-            <span>Make default</span>
-          </label>
-          <button id="saveCenterBtn" class="btn btnPrimary" type="button">Save</button>
-        </div>
-      </form>
-    </dialog>
+	    <div id="centerDrawerOverlay" class="sideDrawerOverlay" hidden></div>
+	    <aside id="centerDrawer" class="sideDrawer" aria-label="Fulfillment center details" aria-hidden="true">
+	      <div class="sideDrawerHeader">
+	        <div class="sideDrawerTitle" id="centerDrawerTitle">Add center</div>
+	        <button id="centerDrawerClose" type="button" class="btn btnSecondary btnIcon" aria-label="Close">
+	          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+	        </button>
+	      </div>
+	      <div class="sideDrawerBody">
+	        <input type="hidden" id="centerId" value="" />
+	        <label class="field">
+	          <span>Origin Name</span>
+	          <input id="originName" type="text" placeholder="e.g. ORG L02" required />
+	        </label>
+	        <div class="modalGrid">
+	          <label class="field">
+	            <span>Address 1</span>
+	            <input id="address1" type="text" />
+	          </label>
+	          <label class="field">
+	            <span>Address 2</span>
+	            <input id="address2" type="text" />
+	          </label>
+	          <label class="field">
+	            <span>City</span>
+	            <input id="city" type="text" />
+	          </label>
+	          <label class="field">
+	            <span>State</span>
+	            <input id="state" type="text" />
+	          </label>
+	          <label class="field">
+	            <span>PIN Code</span>
+	            <input id="pinCode" type="text" inputmode="numeric" />
+	          </label>
+	          <label class="field">
+	            <span>Phone</span>
+	            <input id="phone" type="text" inputmode="numeric" />
+	          </label>
+	        </div>
+	        <label class="fieldCheckbox" style="margin-top: 6px;">
+	          <input id="makeDefault" type="checkbox" />
+	          <span>Make default</span>
+	        </label>
+	      </div>
+	      <div class="sideDrawerFooter">
+	        <button id="centerDrawerCancel" type="button" class="btn btnSecondary">Cancel</button>
+	        <button id="saveCenterBtn" class="btn btnPrimary" type="button">Save</button>
+	      </div>
+	    </aside>
   </body>
 </html>`;
 }
 
 function renderStoreDetailsPage({ userLabel, storeId }) {
-  const assetVersion = "51";
+  const assetVersion = "52";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
 
@@ -861,58 +861,56 @@ function renderStoreDetailsPage({ userLabel, storeId }) {
 	      </div>
 	    </aside>
 
-	    <dialog id="centerDialog" class="modal">
-	      <form method="dialog" class="modalCard">
-	        <div class="modalHeader">
-	          <div class="modalTitle" id="centerDialogTitle">Add center</div>
-          <button type="button" class="btn btnSecondary btnCompact" data-action="close-dialog">Close</button>
-        </div>
-
-        <div class="modalBody">
-          <input type="hidden" id="centerId" value="" />
-          <label class="field">
-            <span>Origin Name</span>
-            <input id="originName" type="text" placeholder="e.g. ORG L02" required />
-          </label>
-          <div class="modalGrid">
-            <label class="field">
-              <span>Address 1</span>
-              <input id="address1" type="text" />
-            </label>
-            <label class="field">
-              <span>Address 2</span>
-              <input id="address2" type="text" />
-            </label>
-            <label class="field">
-              <span>City</span>
-              <input id="city" type="text" />
-            </label>
-            <label class="field">
-              <span>State</span>
-              <input id="state" type="text" />
-            </label>
-            <label class="field">
-              <span>PIN Code</span>
-              <input id="pinCode" type="text" inputmode="numeric" />
-            </label>
-            <label class="field">
-              <span>Phone</span>
-              <input id="phone" type="text" inputmode="numeric" />
-            </label>
-          </div>
-        </div>
-
-        <div class="modalFooter">
-          <label class="fieldCheckbox fieldCheckboxCompact">
-            <input id="makeDefault" type="checkbox" />
-            <span>Set as default</span>
-          </label>
-          <div class="btnGroup">
-            <button id="saveCenterBtn" class="btn btnPrimary" type="button">Save</button>
-          </div>
-        </div>
-      </form>
-    </dialog>
+	    <div id="centerDrawerOverlay" class="sideDrawerOverlay" hidden></div>
+	    <aside id="centerDrawer" class="sideDrawer" aria-label="Fulfillment center details" aria-hidden="true">
+	      <div class="sideDrawerHeader">
+	        <div class="sideDrawerTitle" id="centerDrawerTitle">Add center</div>
+	        <button id="centerDrawerClose" type="button" class="btn btnSecondary btnIcon" aria-label="Close">
+	          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+	        </button>
+	      </div>
+	      <div class="sideDrawerBody">
+	        <input type="hidden" id="centerId" value="" />
+	        <label class="field">
+	          <span>Origin Name</span>
+	          <input id="originName" type="text" placeholder="e.g. ORG L02" required />
+	        </label>
+	        <div class="modalGrid">
+	          <label class="field">
+	            <span>Address 1</span>
+	            <input id="address1" type="text" />
+	          </label>
+	          <label class="field">
+	            <span>Address 2</span>
+	            <input id="address2" type="text" />
+	          </label>
+	          <label class="field">
+	            <span>City</span>
+	            <input id="city" type="text" />
+	          </label>
+	          <label class="field">
+	            <span>State</span>
+	            <input id="state" type="text" />
+	          </label>
+	          <label class="field">
+	            <span>PIN Code</span>
+	            <input id="pinCode" type="text" inputmode="numeric" />
+	          </label>
+	          <label class="field">
+	            <span>Phone</span>
+	            <input id="phone" type="text" inputmode="numeric" />
+	          </label>
+	        </div>
+	        <label class="fieldCheckbox" style="margin-top: 6px;">
+	          <input id="makeDefault" type="checkbox" />
+	          <span>Set as default</span>
+	        </label>
+	      </div>
+	      <div class="sideDrawerFooter">
+	        <button id="centerDrawerCancel" type="button" class="btn btnSecondary">Cancel</button>
+	        <button id="saveCenterBtn" class="btn btnPrimary" type="button">Save</button>
+	      </div>
+	    </aside>
   </body>
 </html>`;
 }

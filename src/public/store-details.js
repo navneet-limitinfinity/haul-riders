@@ -334,9 +334,14 @@ function readDialogValues() {
 }
 
 function openDialog({ mode, center }) {
-  const dialog = $("centerDialog");
-  if (!dialog) return;
-  $("centerDialogTitle").textContent = mode === "edit" ? "Edit center" : "Add center";
+  const overlay = $("centerDrawerOverlay");
+  const drawer = $("centerDrawer");
+  if (overlay) overlay.hidden = false;
+  if (drawer) {
+    drawer.dataset.open = "true";
+    drawer.setAttribute("aria-hidden", "false");
+  }
+  $("centerDrawerTitle").textContent = mode === "edit" ? "Edit center" : "Add center";
   $("centerId").value = center?.id ?? "";
   $("originName").value = center?.originName ?? "";
   $("address1").value = center?.address1 ?? "";
@@ -346,12 +351,20 @@ function openDialog({ mode, center }) {
   $("pinCode").value = center?.pinCode ?? "";
   $("phone").value = center?.phone ?? "";
   $("makeDefault").checked = Boolean(center?.default);
-  dialog.showModal();
+  document.body.classList.add("drawerOpen");
 }
 
 function closeDialog() {
-  const dialog = $("centerDialog");
-  dialog?.close();
+  const overlay = $("centerDrawerOverlay");
+  const drawer = $("centerDrawer");
+  if (overlay) overlay.hidden = true;
+  if (drawer) {
+    drawer.dataset.open = "false";
+    drawer.setAttribute("aria-hidden", "true");
+  }
+  const accountOpen = $("accountDrawer")?.dataset?.open === "true";
+  const centerOpen = drawer?.dataset?.open === "true";
+  document.body.classList.toggle("drawerOpen", Boolean(accountOpen || centerOpen));
 }
 
 async function loadCenters() {
@@ -529,10 +542,9 @@ window.addEventListener("DOMContentLoaded", async () => {
     openDialog({ mode: "add", center: { default: centers.length === 0 } });
   });
 
-  $("centerDialog")?.addEventListener("click", (e) => {
-    const action = e.target?.closest?.("[data-action]")?.dataset?.action ?? "";
-    if (action === "close-dialog") closeDialog();
-  });
+  $("centerDrawerOverlay")?.addEventListener("click", () => closeDialog());
+  $("centerDrawerClose")?.addEventListener("click", () => closeDialog());
+  $("centerDrawerCancel")?.addEventListener("click", () => closeDialog());
 
   $("saveCenterBtn")?.addEventListener("click", async () => {
     const id = String($("centerId")?.value ?? "").trim();
