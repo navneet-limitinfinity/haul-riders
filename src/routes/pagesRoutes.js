@@ -60,7 +60,7 @@ function renderNavDrawer({ role, userLabel, activePath }) {
 }
 
 function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
-  const assetVersion = "41";
+  const assetVersion = "43";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
   const safeFirestoreCollectionId = escapeHtml(firestoreCollectionId);
@@ -460,7 +460,7 @@ function renderBulkUploadPage({ userLabel }) {
 }
 
 function renderFulfillmentCentersPage({ userLabel, storeId }) {
-  const assetVersion = "41";
+  const assetVersion = "43";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
 
@@ -617,7 +617,7 @@ function renderFulfillmentCentersPage({ userLabel, storeId }) {
 }
 
 function renderStoreDetailsPage({ userLabel, storeId }) {
-  const assetVersion = "41";
+  const assetVersion = "43";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
 
@@ -683,71 +683,100 @@ function renderStoreDetailsPage({ userLabel, storeId }) {
 	            <h1>Store Details</h1>
 	            <div class="panelHint">These details are editable and specific to your store.</div>
 	          </div>
-	          <div class="controls">
-	            <div class="btnGroup">
-	              <button id="editStoreDetails" class="btn btnSecondary btnIcon" type="button">
-	                <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
-	                Edit details
-	              </button>
-	              <button id="saveStoreDetails" class="btn btnPrimary btnIcon" type="button">
-	                <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
-	                Save
-	              </button>
-	            </div>
-	          </div>
-	        </div>
+		          <div class="controls">
+		            <div class="btnGroup">
+		              <button id="editStoreDetails" class="btn btnSecondary btnIcon" type="button" aria-label="Edit store details">
+		                <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
+		              </button>
+		              <button id="cancelStoreDetails" class="btn btnSecondary btnIcon" type="button" aria-label="Cancel editing" hidden>
+		                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+		              </button>
+		              <button id="saveStoreDetails" class="btn btnPrimary btnIcon" type="button" aria-label="Save store details" hidden>
+		                <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+		              </button>
+		            </div>
+		          </div>
+		        </div>
 
         <div id="status" class="status" aria-live="polite"></div>
 
-	        <div class="storeDetailsWrap">
-	        <div class="storeDetailsGrid storeDetailsGrid3">
-	          <label class="field">
-	            <span>Store Name</span>
-	            <input id="storeName" type="text" placeholder="Store Name" />
-	          </label>
-	          <label class="field">
-	            <span>GST Number</span>
-	            <input id="gstNumber" type="text" placeholder="GST Number" />
-	          </label>
-	          <label class="field">
-	            <span>Website Address</span>
-	            <input id="websiteAddress" type="text" placeholder="https://example.com" />
-	          </label>
-	          <label class="field fieldSpanAll">
-	            <span>Registered Address</span>
-	            <textarea id="registeredAddress" rows="3" placeholder="Registered Address"></textarea>
-	          </label>
-	          <label class="field">
-	            <span>Contact Person Name</span>
-	            <input id="contactPersonName" type="text" placeholder="Name" />
-	          </label>
-	          <label class="field">
-	            <span>Contact Person Email</span>
-	            <input id="contactPersonEmail" type="email" placeholder="Email" />
-	          </label>
-	          <label class="field">
-	            <span>Contact Person Phone</span>
-	            <input id="contactPersonPhone" type="text" inputmode="numeric" placeholder="10-digit phone" />
-	          </label>
-	        </div>
-	        <div class="storeSectionDivider"></div>
-	        <div class="shopifyConfig">
-	          <div class="shopifyConfigTitle">Shopify Store Configuration</div>
-	          <div class="shopifyConfigRow">
-	            <span id="shopifyStatusPill" class="shopifyPill shopifyPillMuted">Not Configured</span>
-	            <span id="shopifyStoreDomain" class="shopifyDomain" hidden></span>
-	            <a id="connectShopifyLink" class="btn btnPrimary btnIcon btnShopifyConnect" href="#" target="_blank" rel="noopener noreferrer">
-	              <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
-	              Connect Shopify Store
-	            </a>
-	          </div>
-	          <label id="authenticateWrap" class="shopifyAuthRow">
-	            <input id="authenticateCheckbox" type="checkbox" />
-	            <a id="authenticateShopifyLink" href="#" target="_blank" rel="noopener noreferrer">Authenticate us to fetch the orders from store</a>
-	          </label>
-	        </div>
-	        </div>
-	      </section>
+		        <div class="storeDetailsWrap">
+		          <div id="storeDetailsRead" class="storeDetailsRead" aria-label="Store details (read)">
+		            <div class="storeDetailsTable">
+		              <div class="storeDetailsKey">Store Name</div>
+		              <div id="storeNameText" class="storeDetailsValue"></div>
+
+		              <div class="storeDetailsKey">GST Number</div>
+		              <div id="gstNumberText" class="storeDetailsValue mono"></div>
+
+		              <div class="storeDetailsKey">Website Address</div>
+		              <div id="websiteAddressText" class="storeDetailsValue"></div>
+
+		              <div class="storeDetailsKey">Registered Address</div>
+		              <div id="registeredAddressText" class="storeDetailsValue storeDetailsValueMultiline"></div>
+
+		              <div class="storeDetailsKey">Contact Person Name</div>
+		              <div id="contactPersonNameText" class="storeDetailsValue"></div>
+
+		              <div class="storeDetailsKey">Contact Person Email</div>
+		              <div id="contactPersonEmailText" class="storeDetailsValue"></div>
+
+		              <div class="storeDetailsKey">Contact Person Phone</div>
+		              <div id="contactPersonPhoneText" class="storeDetailsValue mono"></div>
+		            </div>
+		          </div>
+
+		          <div id="storeDetailsEdit" class="storeDetailsEdit" aria-label="Store details (edit)" hidden>
+		            <div class="storeDetailsGrid storeDetailsGrid3 storeDetailsGridTight">
+		              <label class="field">
+		                <span>Store Name</span>
+		                <input id="storeName" type="text" placeholder="Store Name" />
+		              </label>
+		              <label class="field">
+		                <span>GST Number</span>
+		                <input id="gstNumber" type="text" placeholder="GST Number" />
+		              </label>
+		              <label class="field">
+		                <span>Website Address</span>
+		                <input id="websiteAddress" type="text" placeholder="https://example.com" />
+		              </label>
+		              <label class="field fieldSpanAll">
+		                <span>Registered Address</span>
+		                <textarea id="registeredAddress" rows="3" placeholder="Registered Address"></textarea>
+		              </label>
+		              <label class="field">
+		                <span>Contact Person Name</span>
+		                <input id="contactPersonName" type="text" placeholder="Name" />
+		              </label>
+		              <label class="field">
+		                <span>Contact Person Email</span>
+		                <input id="contactPersonEmail" type="email" placeholder="Email" />
+		              </label>
+		              <label class="field">
+		                <span>Contact Person Phone</span>
+		                <input id="contactPersonPhone" type="text" inputmode="numeric" placeholder="10-digit phone" />
+		              </label>
+		            </div>
+		          </div>
+		        </div>
+
+		        <div class="storeSectionDivider"></div>
+		        <div class="shopifyConfig">
+		          <div class="shopifyConfigTitle">Shopify Store Configuration</div>
+		          <div class="shopifyConfigRow">
+		            <span id="shopifyStatusPill" class="shopifyPill shopifyPillMuted">Not Configured</span>
+		            <span id="shopifyStoreDomain" class="shopifyDomain" hidden></span>
+		            <a id="connectShopifyLink" class="btn btnPrimary btnIcon btnShopifyConnect" href="#" target="_blank" rel="noopener noreferrer">
+		              <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+		              Connect Shopify Store
+		            </a>
+		          </div>
+		          <label id="authenticateWrap" class="shopifyAuthRow">
+		            <input id="authenticateCheckbox" type="checkbox" />
+		            <a id="authenticateShopifyLink" href="#" target="_blank" rel="noopener noreferrer">Authenticate us to fetch the orders from store</a>
+		          </label>
+		        </div>
+		      </section>
 
       <section class="panel">
         <div class="panelHeader">
