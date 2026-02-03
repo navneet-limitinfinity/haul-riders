@@ -60,7 +60,7 @@ function renderNavDrawer({ role, userLabel, activePath }) {
 }
 
 function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
-  const assetVersion = "48";
+  const assetVersion = "49";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
   const safeFirestoreCollectionId = escapeHtml(firestoreCollectionId);
@@ -460,7 +460,7 @@ function renderBulkUploadPage({ userLabel }) {
 }
 
 function renderFulfillmentCentersPage({ userLabel, storeId }) {
-  const assetVersion = "48";
+  const assetVersion = "49";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
 
@@ -617,7 +617,7 @@ function renderFulfillmentCentersPage({ userLabel, storeId }) {
 }
 
 function renderStoreDetailsPage({ userLabel, storeId }) {
-  const assetVersion = "48";
+  const assetVersion = "49";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
 
@@ -685,62 +685,58 @@ function renderStoreDetailsPage({ userLabel, storeId }) {
 		          </div>
 		        </div>
 
-	        <div id="status" class="status" aria-live="polite"></div>
+		        <div id="status" class="status" aria-live="polite"></div>
 
 		        <div class="storeDetailsWrap">
 		          <section class="profileCard" aria-label="Store details card">
-		            <div class="profileCardHeader">
-		              <div class="profileCardHeaderLeft">
-		                <div class="profileIconCircle" aria-hidden="true">
-		                  <i class="fa-solid fa-user" aria-hidden="true"></i>
-		                </div>
-		                <div class="profileCardTitle">Account Details</div>
-		              </div>
-		              <a id="editStoreDetailsLink" class="profileEditLink" href="#" aria-label="Edit details">
-		                <i class="fa-solid fa-pen" aria-hidden="true"></i>
-		                Edit Details
-		              </a>
-		            </div>
-		            <div class="profileCardDivider" aria-hidden="true"></div>
-		            <div class="profileInfoGrid">
-	              <div class="profileInfoItem">
-	                <div class="profileInfoLabel">Store Name</div>
-	                <div id="storeNameText" class="profileInfoValue"></div>
-	              </div>
-	              <div class="profileInfoItem">
-	                <div class="profileInfoLabel">Contact No.</div>
-	                <div id="contactPersonPhoneText" class="profileInfoValue mono"></div>
-	              </div>
-	              <div class="profileInfoItem">
-	                <div class="profileInfoLabel">Email</div>
-	                <div id="contactPersonEmailText" class="profileInfoValue"></div>
-	              </div>
+				            <div class="profileCardHeader">
+				              <div class="profileCardHeaderLeft">
+				                <div class="profileIconCircle" aria-hidden="true">
+				                  <i class="fa-solid fa-user" aria-hidden="true"></i>
+				                </div>
+			                <div class="profileCardTitle">Account Details</div>
+			              </div>
+			              <a id="editStoreDetailsLink" class="profileEditLink" href="#" aria-label="Edit details">
+			                <i class="fa-solid fa-pen" aria-hidden="true"></i>
+			                Edit Details
+			              </a>
+			            </div>
+			            <div class="profileCardDivider" aria-hidden="true"></div>
+			            <div class="profileInfoGrid">
+			              <div class="profileInfoItem">
+			                <div class="profileInfoLabel">Store Name</div>
+			                <div id="storeNameText" class="profileInfoValue"></div>
+			              </div>
+			              <div class="profileInfoItem">
+			                <div class="profileInfoLabel">Contact No.</div>
+			                <div id="contactPersonPhoneText" class="profileInfoValue mono"></div>
+			              </div>
+			              <div class="profileInfoItem">
+			                <div class="profileInfoLabel">Email</div>
+			                <div id="contactPersonEmailText" class="profileInfoValue"></div>
+			              </div>
 
-	              <div class="profileInfoItem">
-	                <div class="profileInfoLabel">GST Number</div>
-	                <div id="gstNumberText" class="profileInfoValue mono"></div>
-	              </div>
-	              <div class="profileInfoItem">
-	                <div class="profileInfoLabel">Website Address</div>
-	                <div id="websiteAddressText" class="profileInfoValue"></div>
-	              </div>
-	              <div class="profileInfoItem">
-	                <div class="profileInfoLabel">Contact Person Name</div>
-	                <div id="contactPersonNameText" class="profileInfoValue"></div>
-	              </div>
+			              <div class="profileInfoItem">
+			                <div class="profileInfoLabel">GST Number</div>
+			                <div id="gstNumberText" class="profileInfoValue mono"></div>
+			              </div>
+			              <div class="profileInfoItem">
+			                <div class="profileInfoLabel">Website Address</div>
+			                <div id="websiteAddressText" class="profileInfoValue"></div>
+			              </div>
+			              <div class="profileInfoItem">
+			                <div class="profileInfoLabel">Contact Person Name</div>
+			                <div id="contactPersonNameText" class="profileInfoValue"></div>
+			              </div>
 
-	              <div class="profileInfoItem profileInfoItemSpanAll">
-	                <div class="profileInfoLabel">Registered Address</div>
-	                <div id="registeredAddressText" class="profileInfoValue profileInfoValueMultiline"></div>
-	              </div>
-		            </div>
-		          </section>
-		        </div>
-			      </section>
+			              <div class="profileInfoItem profileInfoItemSpanAll">
+			                <div class="profileInfoLabel">Registered Address</div>
+			                <div id="registeredAddressText" class="profileInfoValue profileInfoValueMultiline"></div>
+				              </div>
+				            </div>
+				          </section>
 
-			      <section class="panel">
-			        <div class="storeDetailsWrap">
-			          <section class="profileCard" aria-label="Fulfillment centers card">
+				          <section class="profileCard" aria-label="Fulfillment centers card">
 			            <div class="profileCardHeader">
 			              <div class="profileCardHeaderLeft">
 			                <div class="profileIconCircle" aria-hidden="true">
@@ -775,11 +771,7 @@ function renderStoreDetailsPage({ userLabel, storeId }) {
 			              </table>
 			            </div>
 			          </section>
-			        </div>
-			      </section>
 
-			      <section class="panel">
-			        <div class="storeDetailsWrap">
 			          <section class="profileCard" aria-label="Branding card">
 			            <div class="profileCardHeader">
 			              <div class="profileCardHeaderLeft">
@@ -805,8 +797,8 @@ function renderStoreDetailsPage({ userLabel, storeId }) {
 			                <img id="brandingLogoPreview" alt="Brand logo preview" style="max-width: 220px; max-height: 220px; border-radius: 12px; border: 1px solid var(--border);" />
 			              </div>
 			            </div>
-			          </section>
-			        </div>
+				          </section>
+				        </div>
 			      </section>
 	    </main>
 

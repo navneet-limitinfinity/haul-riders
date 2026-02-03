@@ -730,6 +730,10 @@ body[data-page="store"] .profileCard {
   padding: 18px 18px 16px;
 }
 
+body[data-page="store"] .storeDetailsWrap .profileCard + .profileCard {
+  margin-top: 16px;
+}
+
 @media (prefers-color-scheme: light) {
   body[data-page="store"] .profileCard {
     background: #fff;
