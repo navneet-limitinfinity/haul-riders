@@ -460,7 +460,7 @@ function renderBulkUploadPage({ userLabel }) {
 }
 
 function renderFulfillmentCentersPage({ userLabel, storeId }) {
-  const assetVersion = "53";
+  const assetVersion = "54";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
 
@@ -570,17 +570,21 @@ function renderFulfillmentCentersPage({ userLabel, storeId }) {
 	          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
 	        </button>
 	      </div>
-	      <div class="sideDrawerBody">
-	        <input type="hidden" id="centerId" value="" />
-	        <label class="field">
-	          <span>Origin Name</span>
-	          <input id="originName" type="text" placeholder="e.g. ORG L02" required />
-	        </label>
-	        <div class="modalGrid">
-	          <label class="field">
-	            <span>Address 1</span>
-	            <input id="address1" type="text" />
-	          </label>
+      <div class="sideDrawerBody">
+        <input type="hidden" id="centerId" value="" />
+        <label class="field">
+          <span>Origin Name</span>
+          <input id="originName" type="text" placeholder="e.g. ORG L02" required />
+        </label>
+        <label class="field">
+          <span>Contact Person Name</span>
+          <input id="contactPersonName" type="text" placeholder="Name" />
+        </label>
+        <div class="modalGrid">
+          <label class="field">
+            <span>Address 1</span>
+            <input id="address1" type="text" />
+          </label>
 	          <label class="field">
 	            <span>Address 2</span>
 	            <input id="address2" type="text" />
@@ -617,7 +621,7 @@ function renderFulfillmentCentersPage({ userLabel, storeId }) {
 }
 
 function renderStoreDetailsPage({ userLabel, storeId }) {
-  const assetVersion = "53";
+  const assetVersion = "54";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
 
@@ -874,6 +878,10 @@ function renderStoreDetailsPage({ userLabel, storeId }) {
 	        <label class="field">
 	          <span>Origin Name</span>
 	          <input id="originName" type="text" placeholder="e.g. ORG L02" required />
+	        </label>
+	        <label class="field">
+	          <span>Contact Person Name</span>
+	          <input id="contactPersonName" type="text" placeholder="Name" />
 	        </label>
 	        <div class="modalGrid">
 	          <label class="field">

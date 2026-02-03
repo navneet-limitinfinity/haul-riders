@@ -380,6 +380,7 @@ export function createFirestoreOrdersRouter({ env, auth }) {
 
     return {
       originName: String(body?.originName ?? "").trim(),
+      contactPersonName: String(body?.contactPersonName ?? "").trim(),
       address1: String(body?.address1 ?? "").trim(),
       address2: String(body?.address2 ?? "").trim(),
       city: String(body?.city ?? "").trim(),
@@ -462,7 +463,8 @@ export function createFirestoreOrdersRouter({ env, auth }) {
           }
         }
 
-        batch.set(docRef, { ...payload, default: makeDefault, createdAt: new Date().toISOString() });
+        const createdAt = new Date().toISOString();
+        batch.set(docRef, { ...payload, default: makeDefault, createdAt, updatedAt: createdAt });
         await batch.commit();
 
         res.setHeader("Cache-Control", "no-store");
@@ -519,6 +521,7 @@ export function createFirestoreOrdersRouter({ env, auth }) {
           for (const doc of all.docs) {
             batch.update(doc.ref, { default: doc.id === centerId });
           }
+          batch.update(docRef, { ...payload, default: true, updatedAt: new Date().toISOString() });
         } else {
           batch.update(docRef, { ...payload, default: Boolean(snap.data()?.default), updatedAt: new Date().toISOString() });
         }

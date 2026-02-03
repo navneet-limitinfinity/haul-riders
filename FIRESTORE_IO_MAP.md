@@ -72,6 +72,7 @@ Stored under the shops collection:
 
 Keys written in a center doc:
 - `originName`
+- `contactPersonName`
 - `address1`
 - `address2`
 - `city`

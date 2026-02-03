@@ -277,8 +277,10 @@ function renderCenterRows(centers) {
 
     const isDefault = Boolean(c.default);
     const originTd = document.createElement("td");
+    const contact = String(c.contactPersonName ?? "").trim();
     originTd.innerHTML = `<div class="cellStack">
       <div class="cellPrimary">${escapeHtml(c.originName ?? "")}</div>
+      ${contact ? `<div class="cellSecondary">${escapeHtml(contact)}</div>` : ""}
     </div>`;
     tr.appendChild(originTd);
 
@@ -322,6 +324,7 @@ function renderCenterRows(centers) {
 function readDialogValues() {
   return {
     originName: String($("originName")?.value ?? "").trim(),
+    contactPersonName: String($("contactPersonName")?.value ?? "").trim(),
     address1: String($("address1")?.value ?? "").trim(),
     address2: String($("address2")?.value ?? "").trim(),
     city: String($("city")?.value ?? "").trim(),
@@ -344,6 +347,7 @@ function openDialog({ mode, center }) {
   $("centerDrawerTitle").textContent = mode === "edit" ? "Edit center" : "Add center";
   $("centerId").value = center?.id ?? "";
   $("originName").value = center?.originName ?? "";
+  $("contactPersonName").value = center?.contactPersonName ?? "";
   $("address1").value = center?.address1 ?? "";
   $("address2").value = center?.address2 ?? "";
   $("city").value = center?.city ?? "";
