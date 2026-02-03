@@ -310,10 +310,56 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   let initialDetails = normalizeStoreDetails({});
   let canEdit = true;
+  let currentDetails = normalizeStoreDetails({});
+
+  const getDrawerPayload = () => ({
+    storeName: String($("drawerStoreName")?.value ?? "").trim(),
+    gstNumber: String($("drawerGstNumber")?.value ?? "").trim(),
+    websiteAddress: String($("drawerWebsiteAddress")?.value ?? "").trim(),
+    registeredAddress: String($("drawerRegisteredAddress")?.value ?? "").trim(),
+    contactPersonName: String($("drawerContactPersonName")?.value ?? "").trim(),
+    contactPersonEmail: String($("drawerContactPersonEmail")?.value ?? "").trim(),
+    contactPersonPhone: String($("drawerContactPersonPhone")?.value ?? "").trim(),
+  });
+
+  const setDrawerValues = (details) => {
+    const d = normalizeStoreDetails(details);
+    if ($("drawerStoreName")) $("drawerStoreName").value = d.storeName;
+    if ($("drawerGstNumber")) $("drawerGstNumber").value = d.gstNumber;
+    if ($("drawerWebsiteAddress")) $("drawerWebsiteAddress").value = d.websiteAddress;
+    if ($("drawerRegisteredAddress")) $("drawerRegisteredAddress").value = d.registeredAddress;
+    if ($("drawerContactPersonName")) $("drawerContactPersonName").value = d.contactPersonName;
+    if ($("drawerContactPersonEmail")) $("drawerContactPersonEmail").value = d.contactPersonEmail;
+    if ($("drawerContactPersonPhone")) $("drawerContactPersonPhone").value = d.contactPersonPhone;
+  };
+
+  const openAccountDrawer = () => {
+    const overlay = $("accountDrawerOverlay");
+    const drawer = $("accountDrawer");
+    if (overlay) overlay.hidden = false;
+    if (drawer) {
+      drawer.dataset.open = "true";
+      drawer.setAttribute("aria-hidden", "false");
+    }
+    document.body.classList.add("drawerOpen");
+  };
+
+  const closeAccountDrawer = () => {
+    const overlay = $("accountDrawerOverlay");
+    const drawer = $("accountDrawer");
+    if (overlay) overlay.hidden = true;
+    if (drawer) {
+      drawer.dataset.open = "false";
+      drawer.setAttribute("aria-hidden", "true");
+    }
+    document.body.classList.remove("drawerOpen");
+  };
 
   try {
     initialDetails = (await loadStoreDetails()) || normalizeStoreDetails({});
+    currentDetails = initialDetails;
     canEdit = hasStoreDetails(initialDetails);
+    if (!canEdit) setStatus("Add store details using Edit Details.", { kind: "info" });
 
     setStoreDetailsMode(canEdit ? "read" : "edit");
   } catch (error) {
@@ -322,7 +368,28 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   $("editStoreDetailsLink")?.addEventListener("click", (e) => {
     e.preventDefault();
-    setStatus("Edit flow will be enabled later.", { kind: "info" });
+    setDrawerValues(currentDetails);
+    openAccountDrawer();
+  });
+
+  $("accountDrawerOverlay")?.addEventListener("click", () => closeAccountDrawer());
+  $("accountDrawerClose")?.addEventListener("click", () => closeAccountDrawer());
+  $("accountDrawerCancel")?.addEventListener("click", () => closeAccountDrawer());
+
+  $("accountDrawerUpdate")?.addEventListener("click", async () => {
+    const btn = $("accountDrawerUpdate");
+    if (btn) btn.disabled = true;
+    try {
+      const payload = getDrawerPayload();
+      await postJson("/api/store/details", payload);
+      setStatus("Store details updated.", { kind: "ok" });
+      currentDetails = (await loadStoreDetails()) || normalizeStoreDetails({});
+      closeAccountDrawer();
+    } catch (error) {
+      setStatus(error?.message ?? "Failed to update store details.", { kind: "error" });
+    } finally {
+      if (btn) btn.disabled = false;
+    }
   });
 
   $("uploadBrandingLogo")?.addEventListener("click", async () => {

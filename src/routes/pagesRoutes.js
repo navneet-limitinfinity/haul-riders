@@ -60,7 +60,7 @@ function renderNavDrawer({ role, userLabel, activePath }) {
 }
 
 function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
-  const assetVersion = "46";
+  const assetVersion = "47";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
   const safeFirestoreCollectionId = escapeHtml(firestoreCollectionId);
@@ -460,7 +460,7 @@ function renderBulkUploadPage({ userLabel }) {
 }
 
 function renderFulfillmentCentersPage({ userLabel, storeId }) {
-  const assetVersion = "46";
+  const assetVersion = "47";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
 
@@ -617,7 +617,7 @@ function renderFulfillmentCentersPage({ userLabel, storeId }) {
 }
 
 function renderStoreDetailsPage({ userLabel, storeId }) {
-  const assetVersion = "46";
+  const assetVersion = "47";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
 
@@ -791,12 +791,58 @@ function renderStoreDetailsPage({ userLabel, storeId }) {
 		          </section>
 		        </div>
 			      </section>
-    </main>
+	    </main>
 
-    <dialog id="centerDialog" class="modal">
-      <form method="dialog" class="modalCard">
-        <div class="modalHeader">
-          <div class="modalTitle" id="centerDialogTitle">Add center</div>
+	    <div id="accountDrawerOverlay" class="sideDrawerOverlay" hidden></div>
+	    <aside id="accountDrawer" class="sideDrawer" aria-label="Edit account details" aria-hidden="true">
+	      <div class="sideDrawerHeader">
+	        <div class="sideDrawerTitle">Edit Details</div>
+	        <button id="accountDrawerClose" type="button" class="btn btnSecondary btnIcon" aria-label="Close">
+	          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+	        </button>
+	      </div>
+	      <div class="sideDrawerBody">
+	        <div class="modalGrid">
+	          <label class="field">
+	            <span>Store Name</span>
+	            <input id="drawerStoreName" type="text" placeholder="Store Name" />
+	          </label>
+	          <label class="field">
+	            <span>GST Number</span>
+	            <input id="drawerGstNumber" type="text" placeholder="GST Number" />
+	          </label>
+	          <label class="field">
+	            <span>Website Address</span>
+	            <input id="drawerWebsiteAddress" type="text" placeholder="https://example.com" />
+	          </label>
+	          <label class="field" style="grid-column: 1 / -1;">
+	            <span>Registered Address</span>
+	            <textarea id="drawerRegisteredAddress" rows="3" placeholder="Registered Address"></textarea>
+	          </label>
+	          <label class="field">
+	            <span>Contact Person Name</span>
+	            <input id="drawerContactPersonName" type="text" placeholder="Name" />
+	          </label>
+	          <label class="field">
+	            <span>Contact Person Email</span>
+	            <input id="drawerContactPersonEmail" type="email" placeholder="Email" />
+	          </label>
+	          <label class="field">
+	            <span>Contact Person Phone</span>
+	            <input id="drawerContactPersonPhone" type="text" inputmode="numeric" placeholder="10-digit phone" />
+	          </label>
+	        </div>
+	      </div>
+	      <div class="sideDrawerFooter">
+	        <button id="accountDrawerCancel" type="button" class="btn btnSecondary">Cancel</button>
+	        <button id="accountDrawerUpdate" type="button" class="btn btnPrimary">Update</button>
+	      </div>
+	    </aside>
+
+	    <dialog id="centerDialog" class="modal">
+	      <form method="dialog" class="modalCard">
+	        <div class="modalHeader">
+	          <div class="modalTitle" id="centerDialogTitle">Add center</div>
           <button type="button" class="btn btnSecondary btnCompact" data-action="close-dialog">Close</button>
         </div>
 
