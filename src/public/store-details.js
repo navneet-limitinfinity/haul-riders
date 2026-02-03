@@ -94,19 +94,6 @@ function escapeHtml(value) {
 // Store details + branding
 // -----------------------------
 
-function getStoreDetailsFields() {
-  const ids = [
-    "storeName",
-    "registeredAddress",
-    "gstNumber",
-    "websiteAddress",
-    "contactPersonName",
-    "contactPersonEmail",
-    "contactPersonPhone",
-  ];
-  return ids.map((id) => $(id)).filter(Boolean);
-}
-
 function normalizeStoreDetails(details) {
   const d = details && typeof details === "object" ? details : {};
   return {
@@ -123,17 +110,6 @@ function normalizeStoreDetails(details) {
 function hasStoreDetails(details) {
   const d = normalizeStoreDetails(details);
   return Object.values(d).some((v) => String(v ?? "").trim().length > 0);
-}
-
-function fillStoreDetails(details) {
-  const d = normalizeStoreDetails(details);
-  $("storeName").value = d.storeName;
-  $("registeredAddress").value = d.registeredAddress;
-  $("gstNumber").value = d.gstNumber;
-  $("websiteAddress").value = d.websiteAddress;
-  $("contactPersonName").value = d.contactPersonName;
-  $("contactPersonEmail").value = d.contactPersonEmail;
-  $("contactPersonPhone").value = d.contactPersonPhone;
 }
 
 function fillStoreDetailsRead(details) {
@@ -155,44 +131,14 @@ function fillStoreDetailsRead(details) {
 async function loadStoreDetails() {
   const data = await requestJson("/api/store/details");
   const details = normalizeStoreDetails(data?.storeDetails ?? {});
-  fillStoreDetails(details);
   fillStoreDetailsRead(details);
   renderShopifyConfig(data?.shopify ?? null);
   return details;
 }
 
-function readStoreDetails() {
-  return normalizeStoreDetails({
-    storeName: String($("storeName")?.value ?? "").trim(),
-    registeredAddress: String($("registeredAddress")?.value ?? "").trim(),
-    gstNumber: String($("gstNumber")?.value ?? "").trim(),
-    websiteAddress: String($("websiteAddress")?.value ?? "").trim(),
-    contactPersonName: String($("contactPersonName")?.value ?? "").trim(),
-    contactPersonEmail: String($("contactPersonEmail")?.value ?? "").trim(),
-    contactPersonPhone: String($("contactPersonPhone")?.value ?? "").trim(),
-  });
-}
-
 function setStoreDetailsMode(mode) {
-  const m = String(mode ?? "").trim().toLowerCase() === "edit" ? "edit" : "read";
-  const readWrap = $("storeDetailsRead");
-  const editWrap = $("storeDetailsEdit");
-  if (readWrap) readWrap.hidden = m !== "read";
-  if (editWrap) editWrap.hidden = m !== "edit";
-
-  const editBtn = $("editStoreDetails");
-  const cancelBtn = $("cancelStoreDetails");
-  const saveBtn = $("saveStoreDetails");
-  if (editBtn) editBtn.hidden = m !== "read";
-  if (cancelBtn) cancelBtn.hidden = m !== "edit";
-  if (saveBtn) saveBtn.hidden = m !== "edit";
-
-  const fields = getStoreDetailsFields();
-  for (const el of fields) {
-    el.readOnly = m !== "edit";
-  }
-
-  document.body.dataset.storeDetailsMode = m;
+  document.body.dataset.storeDetailsMode =
+    String(mode ?? "").trim().toLowerCase() === "edit" ? "edit" : "read";
 }
 
 function renderShopifyConfig(shopify) {
@@ -419,29 +365,9 @@ window.addEventListener("DOMContentLoaded", async () => {
     setStatus(error?.message ?? "Failed to load store details.", { kind: "error" });
   }
 
-  $("editStoreDetails")?.addEventListener("click", () => {
-    initialDetails = readStoreDetails();
-    setStoreDetailsMode("edit");
-    $("storeName")?.focus?.();
-  });
-
-  $("cancelStoreDetails")?.addEventListener("click", () => {
-    fillStoreDetails(initialDetails);
-    fillStoreDetailsRead(initialDetails);
-    setStoreDetailsMode("read");
-  });
-
-  $("saveStoreDetails")?.addEventListener("click", async () => {
-    try {
-      await postJson("/api/store/details", readStoreDetails());
-      setStatus("Store details saved.", { kind: "ok" });
-      initialDetails = readStoreDetails();
-      canEdit = true;
-      fillStoreDetailsRead(initialDetails);
-      setStoreDetailsMode("read");
-    } catch (error) {
-      setStatus(error?.message ?? "Failed to save store details.", { kind: "error" });
-    }
+  $("editStoreDetailsLink")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    setStatus("Edit flow will be enabled later.", { kind: "info" });
   });
 
   $("authenticateWrap")?.addEventListener("click", (e) => {

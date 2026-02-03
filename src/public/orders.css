@@ -722,6 +722,112 @@ body[data-page="store"] .storeDetailsWrap {
   padding: 6px 2px 2px;
 }
 
+body[data-page="store"] .profileCard {
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 16px;
+  box-shadow: var(--shadow2);
+  padding: 18px 18px 16px;
+}
+
+@media (prefers-color-scheme: light) {
+  body[data-page="store"] .profileCard {
+    background: #fff;
+  }
+}
+
+body[data-page="store"] .profileCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+body[data-page="store"] .profileCardHeaderLeft {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+body[data-page="store"] .profileIconCircle {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(148, 163, 184, 0.14);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+
+body[data-page="store"] .profileCardTitle {
+  font-size: 18px;
+  font-weight: 900;
+}
+
+body[data-page="store"] .profileEditLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #6d28d9;
+  text-decoration: none;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+body[data-page="store"] .profileEditLink:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+body[data-page="store"] .profileCardDivider {
+  height: 1px;
+  background: rgba(148, 163, 184, 0.35);
+  margin: 14px 0 12px;
+}
+
+body[data-page="store"] .profileInfoGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px 36px;
+}
+
+@media (max-width: 980px) {
+  body[data-page="store"] .profileInfoGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  body[data-page="store"] .profileInfoGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+body[data-page="store"] .profileInfoItemSpanAll {
+  grid-column: 1 / -1;
+}
+
+body[data-page="store"] .profileInfoLabel {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+body[data-page="store"] .profileInfoValue {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+body[data-page="store"] .profileInfoValueMultiline {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 body[data-page="store"] .storeDetailsGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
