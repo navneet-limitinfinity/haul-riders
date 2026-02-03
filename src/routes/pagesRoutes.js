@@ -60,7 +60,7 @@ function renderNavDrawer({ role, userLabel, activePath }) {
 }
 
 function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
-  const assetVersion = "47";
+  const assetVersion = "48";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
   const safeFirestoreCollectionId = escapeHtml(firestoreCollectionId);
@@ -460,7 +460,7 @@ function renderBulkUploadPage({ userLabel }) {
 }
 
 function renderFulfillmentCentersPage({ userLabel, storeId }) {
-  const assetVersion = "47";
+  const assetVersion = "48";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
 
@@ -617,7 +617,7 @@ function renderFulfillmentCentersPage({ userLabel, storeId }) {
 }
 
 function renderStoreDetailsPage({ userLabel, storeId }) {
-  const assetVersion = "47";
+  const assetVersion = "48";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
 
@@ -689,20 +689,20 @@ function renderStoreDetailsPage({ userLabel, storeId }) {
 
 		        <div class="storeDetailsWrap">
 		          <section class="profileCard" aria-label="Store details card">
-	            <div class="profileCardHeader">
-	              <div class="profileCardHeaderLeft">
-	                <div class="profileIconCircle" aria-hidden="true">
-	                  <i class="fa-solid fa-user" aria-hidden="true"></i>
-	                </div>
-	                <div class="profileCardTitle">Account Details</div>
-	              </div>
-	              <a id="editStoreDetailsLink" class="profileEditLink" href="#" aria-label="Edit details">
-	                <i class="fa-solid fa-pen" aria-hidden="true"></i>
-	                Edit Details
-	              </a>
-	            </div>
-	            <div class="profileCardDivider" aria-hidden="true"></div>
-	            <div class="profileInfoGrid">
+		            <div class="profileCardHeader">
+		              <div class="profileCardHeaderLeft">
+		                <div class="profileIconCircle" aria-hidden="true">
+		                  <i class="fa-solid fa-user" aria-hidden="true"></i>
+		                </div>
+		                <div class="profileCardTitle">Account Details</div>
+		              </div>
+		              <a id="editStoreDetailsLink" class="profileEditLink" href="#" aria-label="Edit details">
+		                <i class="fa-solid fa-pen" aria-hidden="true"></i>
+		                Edit Details
+		              </a>
+		            </div>
+		            <div class="profileCardDivider" aria-hidden="true"></div>
+		            <div class="profileInfoGrid">
 	              <div class="profileInfoItem">
 	                <div class="profileInfoLabel">Store Name</div>
 	                <div id="storeNameText" class="profileInfoValue"></div>
@@ -733,63 +733,80 @@ function renderStoreDetailsPage({ userLabel, storeId }) {
 	                <div class="profileInfoLabel">Registered Address</div>
 	                <div id="registeredAddressText" class="profileInfoValue profileInfoValueMultiline"></div>
 	              </div>
-	            </div>
-		          </section>
-		          <div class="storeInnerDivider" aria-hidden="true"></div>
-
-		          <section class="storeInnerSection" aria-label="Branding">
-		            <div class="storeInnerHeader">
-		              <div class="storeInnerTitle">
-		                <div class="storeInnerH">Branding</div>
-		                <div class="storeInnerHint">Upload a logo (PNG/JPG, max 1MB). Used on dashboard (top-right) and shipping labels.</div>
-		              </div>
-		              <div class="storeInnerActions">
-		                <input id="brandingLogoFile" type="file" accept="image/png,image/jpeg" />
-		                <button id="uploadBrandingLogo" class="btn btnSecondary btnIcon" type="button">
-		                  <i class="fa-solid fa-upload" aria-hidden="true"></i>
-		                  Upload Logo
-		                </button>
-		              </div>
-		            </div>
-		            <div class="tableWrap">
-		              <div style="padding: 12px;">
-		                <img id="brandingLogoPreview" alt="Brand logo preview" style="max-width: 220px; max-height: 220px; border-radius: 12px; border: 1px solid var(--border);" />
-		              </div>
-		            </div>
-		          </section>
-
-		          <div class="storeInnerDivider" aria-hidden="true"></div>
-
-		          <section class="storeInnerSection" aria-label="Fulfillment centers">
-		            <div class="storeInnerHeader">
-		              <div class="storeInnerTitle">
-		                <div class="storeInnerH">Fulfillment Centers</div>
-		                <div class="storeInnerHint">Ship-from address on labels is taken from the fulfillment center selected per order (or default center when missing).</div>
-		              </div>
-		              <div class="storeInnerActions">
-		                <button id="addCenterBtn" class="btn btnPrimary btnIcon" type="button">
-		                  <i class="fa-solid fa-plus" aria-hidden="true"></i>
-		                  Add Center
-		                </button>
-		              </div>
-		            </div>
-		            <div class="tableWrap">
-		              <table class="table" aria-label="Fulfillment centers">
-		                <thead>
-		                  <tr>
-		                    <th>Origin Name</th>
-		                    <th>Address</th>
-		                    <th>PIN</th>
-		                    <th>Phone</th>
-		                    <th>Default</th>
-		                    <th>Action</th>
-		                  </tr>
-		                </thead>
-		                <tbody id="centersRows"></tbody>
-		              </table>
 		            </div>
 		          </section>
 		        </div>
+			      </section>
+
+			      <section class="panel">
+			        <div class="storeDetailsWrap">
+			          <section class="profileCard" aria-label="Branding card">
+			            <div class="profileCardHeader">
+			              <div class="profileCardHeaderLeft">
+			                <div class="profileIconCircle" aria-hidden="true">
+			                  <i class="fa-solid fa-image" aria-hidden="true"></i>
+			                </div>
+			                <div class="profileCardTitle">Branding</div>
+			              </div>
+			              <div class="storeInnerActions">
+			                <input id="brandingLogoFile" type="file" accept="image/png,image/jpeg" />
+			                <button id="uploadBrandingLogo" class="btn btnSecondary btnIcon" type="button">
+			                  <i class="fa-solid fa-upload" aria-hidden="true"></i>
+			                  Upload Logo
+			                </button>
+			              </div>
+			            </div>
+			            <div class="profileCardDivider" aria-hidden="true"></div>
+			            <div class="storeInnerHint" style="padding: 0 2px 10px;">
+			              Upload a logo (PNG/JPG, max 1MB). Used on dashboard (top-right) and shipping labels.
+			            </div>
+			            <div class="tableWrap">
+			              <div style="padding: 12px;">
+			                <img id="brandingLogoPreview" alt="Brand logo preview" style="max-width: 220px; max-height: 220px; border-radius: 12px; border: 1px solid var(--border);" />
+			              </div>
+			            </div>
+			          </section>
+			        </div>
+			      </section>
+
+			      <section class="panel">
+			        <div class="storeDetailsWrap">
+			          <section class="profileCard" aria-label="Fulfillment centers card">
+			            <div class="profileCardHeader">
+			              <div class="profileCardHeaderLeft">
+			                <div class="profileIconCircle" aria-hidden="true">
+			                  <i class="fa-solid fa-warehouse" aria-hidden="true"></i>
+			                </div>
+			                <div class="profileCardTitle">Fulfillment Centers</div>
+			              </div>
+			              <div class="storeInnerActions">
+			                <button id="addCenterBtn" class="btn btnPrimary btnIcon" type="button">
+			                  <i class="fa-solid fa-plus" aria-hidden="true"></i>
+			                  Add Center
+			                </button>
+			              </div>
+			            </div>
+			            <div class="profileCardDivider" aria-hidden="true"></div>
+			            <div class="storeInnerHint" style="padding: 0 2px 10px;">
+			              Ship-from address on labels is taken from the fulfillment center selected per order (or default center when missing).
+			            </div>
+			            <div class="tableWrap">
+			              <table class="table" aria-label="Fulfillment centers">
+			                <thead>
+			                  <tr>
+			                    <th>Origin Name</th>
+			                    <th>Address</th>
+			                    <th>PIN</th>
+			                    <th>Phone</th>
+			                    <th>Default</th>
+			                    <th>Action</th>
+			                  </tr>
+			                </thead>
+			                <tbody id="centersRows"></tbody>
+			              </table>
+			            </div>
+			          </section>
+			        </div>
 			      </section>
 	    </main>
 
