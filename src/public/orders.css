@@ -827,6 +827,12 @@ body[data-page="store"] .profileInfoValue {
   color: var(--text);
 }
 
+body[data-page="store"] .profileInfoValueSubtle {
+  color: var(--muted);
+  font-size: 13px;
+  margin-left: 10px;
+}
+
 body[data-page="store"] .profileInfoValueMultiline {
   white-space: pre-wrap;
   overflow-wrap: anywhere;

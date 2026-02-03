@@ -617,7 +617,7 @@ function renderFulfillmentCentersPage({ userLabel, storeId }) {
 }
 
 function renderStoreDetailsPage({ userLabel, storeId }) {
-  const assetVersion = "49";
+  const assetVersion = "50";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
 
@@ -721,6 +721,13 @@ function renderStoreDetailsPage({ userLabel, storeId }) {
 			                <div id="gstNumberText" class="profileInfoValue mono"></div>
 			              </div>
 			              <div class="profileInfoItem">
+			                <div class="profileInfoLabel">State Code - State</div>
+			                <div class="profileInfoValue">
+			                  <span id="stateCodeText" class="mono"></span>
+			                  <span id="stateNameText" class="profileInfoValueSubtle"></span>
+			                </div>
+			              </div>
+			              <div class="profileInfoItem">
 			                <div class="profileInfoLabel">Website Address</div>
 			                <div id="websiteAddressText" class="profileInfoValue"></div>
 			              </div>
@@ -819,6 +826,12 @@ function renderStoreDetailsPage({ userLabel, storeId }) {
 	          <label class="field">
 	            <span>GST Number</span>
 	            <input id="drawerGstNumber" type="text" placeholder="GST Number" />
+	          </label>
+	          <label class="field">
+	            <span>State Code - State</span>
+	            <select id="drawerStateCode">
+	              <option value="">Select State</option>
+	            </select>
 	          </label>
 	          <label class="field">
 	            <span>Website Address</span>

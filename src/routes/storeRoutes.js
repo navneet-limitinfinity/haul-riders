@@ -27,6 +27,8 @@ const normalizeDetailsPayload = (body) => {
   const storeName = String(body?.storeName ?? "").trim();
   const registeredAddress = String(body?.registeredAddress ?? "").trim();
   const gstNumber = String(body?.gstNumber ?? "").trim();
+  const stateCode = String(body?.stateCode ?? "").trim();
+  const stateName = String(body?.stateName ?? "").trim();
   const websiteAddress = String(body?.websiteAddress ?? "").trim();
   const contactPersonName = String(body?.contactPersonName ?? "").trim();
   const contactPersonEmail = String(body?.contactPersonEmail ?? "").trim();
@@ -36,6 +38,8 @@ const normalizeDetailsPayload = (body) => {
     storeName,
     registeredAddress,
     gstNumber,
+    stateCode,
+    stateName,
     websiteAddress,
     contactPerson: {
       name: contactPersonName,
@@ -106,6 +110,8 @@ export function createStoreRouter({ env, auth }) {
           storeName: String(details?.storeName ?? "").trim(),
           registeredAddress: String(details?.registeredAddress ?? "").trim(),
           gstNumber: String(details?.gstNumber ?? "").trim(),
+          stateCode: String(details?.stateCode ?? "").trim(),
+          stateName: String(details?.stateName ?? "").trim(),
           websiteAddress: String(details?.websiteAddress ?? "").trim(),
           contactPersonName: String(details?.contactPerson?.name ?? "").trim(),
           contactPersonEmail: String(details?.contactPerson?.email ?? "").trim(),

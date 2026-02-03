@@ -96,6 +96,8 @@ Stored under the shops collection:
   - `storeName`
   - `registeredAddress`
   - `gstNumber`
+  - `stateCode` (GST state code; e.g. `06`)
+  - `stateName` (state/UT name; e.g. `Haryana`)
   - `websiteAddress`
   - `contactPerson { name, email, phone }`
   - `updatedAt`
