@@ -60,7 +60,7 @@ function renderNavDrawer({ role, userLabel, activePath }) {
 }
 
 function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
-  const assetVersion = "44";
+  const assetVersion = "45";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
   const safeFirestoreCollectionId = escapeHtml(firestoreCollectionId);
@@ -460,7 +460,7 @@ function renderBulkUploadPage({ userLabel }) {
 }
 
 function renderFulfillmentCentersPage({ userLabel, storeId }) {
-  const assetVersion = "44";
+  const assetVersion = "45";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
 
@@ -617,7 +617,7 @@ function renderFulfillmentCentersPage({ userLabel, storeId }) {
 }
 
 function renderStoreDetailsPage({ userLabel, storeId }) {
-  const assetVersion = "44";
+  const assetVersion = "45";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
 
@@ -735,23 +735,6 @@ function renderStoreDetailsPage({ userLabel, storeId }) {
 	              </div>
 	            </div>
 	          </section>
-	        </div>
-
-	        <div class="storeSectionDivider"></div>
-	        <div class="shopifyConfig">
-	          <div class="shopifyConfigTitle">Shopify Store Configuration</div>
-	          <div class="shopifyConfigRow">
-	            <span id="shopifyStatusPill" class="shopifyPill shopifyPillMuted">Not Configured</span>
-	            <span id="shopifyStoreDomain" class="shopifyDomain" hidden></span>
-	            <a id="connectShopifyLink" class="btn btnPrimary btnIcon btnShopifyConnect" href="#" target="_blank" rel="noopener noreferrer">
-	              <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
-	              Connect Shopify Store
-	            </a>
-	          </div>
-	          <label id="authenticateWrap" class="shopifyAuthRow">
-	            <input id="authenticateCheckbox" type="checkbox" />
-	            <a id="authenticateShopifyLink" href="#" target="_blank" rel="noopener noreferrer">Authenticate us to fetch the orders from store</a>
-	          </label>
 	        </div>
 		      </section>
 

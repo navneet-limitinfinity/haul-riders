@@ -132,57 +132,12 @@ async function loadStoreDetails() {
   const data = await requestJson("/api/store/details");
   const details = normalizeStoreDetails(data?.storeDetails ?? {});
   fillStoreDetailsRead(details);
-  renderShopifyConfig(data?.shopify ?? null);
   return details;
 }
 
 function setStoreDetailsMode(mode) {
   document.body.dataset.storeDetailsMode =
     String(mode ?? "").trim().toLowerCase() === "edit" ? "edit" : "read";
-}
-
-function renderShopifyConfig(shopify) {
-  const cfg = shopify && typeof shopify === "object" ? shopify : {};
-  const connected = Boolean(cfg.connected);
-  const storeDomain = String(cfg.storeDomain ?? "").trim();
-  const connectUrl = String(cfg.connectUrl ?? "").trim();
-  const authenticateUrl = String(cfg.authenticateUrl ?? "").trim();
-
-  const pill = $("shopifyStatusPill");
-  const domainEl = $("shopifyStoreDomain");
-  const connectLink = $("connectShopifyLink");
-  const authWrap = $("authenticateWrap");
-  const authLink = $("authenticateShopifyLink");
-  const authCheckbox = $("authenticateCheckbox");
-
-  if (pill) {
-    pill.className = `shopifyPill ${connected ? "shopifyPillOk" : "shopifyPillMuted"}`;
-    pill.textContent = connected ? "Connected" : "Not Configured";
-  }
-
-  if (domainEl) {
-    domainEl.hidden = !connected;
-    domainEl.textContent = storeDomain || "";
-  }
-
-  if (connectLink) {
-    const showConnect = !connected && Boolean(connectUrl);
-    connectLink.style.display = showConnect ? "inline-flex" : "none";
-    connectLink.setAttribute("href", connectUrl || "#");
-  }
-
-  if (authLink) {
-    authLink.setAttribute("href", authenticateUrl || "#");
-    authLink.style.pointerEvents = authenticateUrl ? "auto" : "none";
-  }
-
-  if (authWrap) {
-    authWrap.style.display = !connected && Boolean(authenticateUrl) ? "flex" : "none";
-  }
-
-  if (authCheckbox) {
-    authCheckbox.checked = false;
-  }
 }
 
 function refreshBrandingLogoImages() {
@@ -368,17 +323,6 @@ window.addEventListener("DOMContentLoaded", async () => {
   $("editStoreDetailsLink")?.addEventListener("click", (e) => {
     e.preventDefault();
     setStatus("Edit flow will be enabled later.", { kind: "info" });
-  });
-
-  $("authenticateWrap")?.addEventListener("click", (e) => {
-    const link = $("authenticateShopifyLink");
-    const url = String(link?.getAttribute?.("href") ?? "").trim();
-    if (!url || url === "#") return;
-    const target = e.target;
-    if (target && target.tagName === "INPUT") return;
-    window.open(url, "_blank", "noopener,noreferrer");
-    const cb = $("authenticateCheckbox");
-    if (cb) cb.checked = false;
   });
 
   $("uploadBrandingLogo")?.addEventListener("click", async () => {
