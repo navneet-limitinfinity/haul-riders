@@ -740,37 +740,6 @@ function renderStoreDetailsPage({ userLabel, storeId }) {
 
 			      <section class="panel">
 			        <div class="storeDetailsWrap">
-			          <section class="profileCard" aria-label="Branding card">
-			            <div class="profileCardHeader">
-			              <div class="profileCardHeaderLeft">
-			                <div class="profileIconCircle" aria-hidden="true">
-			                  <i class="fa-solid fa-image" aria-hidden="true"></i>
-			                </div>
-			                <div class="profileCardTitle">Branding</div>
-			              </div>
-			              <div class="storeInnerActions">
-			                <input id="brandingLogoFile" type="file" accept="image/png,image/jpeg" />
-			                <button id="uploadBrandingLogo" class="btn btnSecondary btnIcon" type="button">
-			                  <i class="fa-solid fa-upload" aria-hidden="true"></i>
-			                  Upload Logo
-			                </button>
-			              </div>
-			            </div>
-			            <div class="profileCardDivider" aria-hidden="true"></div>
-			            <div class="storeInnerHint" style="padding: 0 2px 10px;">
-			              Upload a logo (PNG/JPG, max 1MB). Used on dashboard (top-right) and shipping labels.
-			            </div>
-			            <div class="tableWrap">
-			              <div style="padding: 12px;">
-			                <img id="brandingLogoPreview" alt="Brand logo preview" style="max-width: 220px; max-height: 220px; border-radius: 12px; border: 1px solid var(--border);" />
-			              </div>
-			            </div>
-			          </section>
-			        </div>
-			      </section>
-
-			      <section class="panel">
-			        <div class="storeDetailsWrap">
 			          <section class="profileCard" aria-label="Fulfillment centers card">
 			            <div class="profileCardHeader">
 			              <div class="profileCardHeaderLeft">
@@ -804,6 +773,37 @@ function renderStoreDetailsPage({ userLabel, storeId }) {
 			                </thead>
 			                <tbody id="centersRows"></tbody>
 			              </table>
+			            </div>
+			          </section>
+			        </div>
+			      </section>
+
+			      <section class="panel">
+			        <div class="storeDetailsWrap">
+			          <section class="profileCard" aria-label="Branding card">
+			            <div class="profileCardHeader">
+			              <div class="profileCardHeaderLeft">
+			                <div class="profileIconCircle" aria-hidden="true">
+			                  <i class="fa-solid fa-image" aria-hidden="true"></i>
+			                </div>
+			                <div class="profileCardTitle">Branding</div>
+			              </div>
+			              <div class="storeInnerActions">
+			                <input id="brandingLogoFile" type="file" accept="image/png,image/jpeg" />
+			                <button id="uploadBrandingLogo" class="btn btnSecondary btnIcon" type="button">
+			                  <i class="fa-solid fa-upload" aria-hidden="true"></i>
+			                  Upload Logo
+			                </button>
+			              </div>
+			            </div>
+			            <div class="profileCardDivider" aria-hidden="true"></div>
+			            <div class="storeInnerHint" style="padding: 0 2px 10px;">
+			              Upload a logo (PNG/JPG, max 1MB). Used on dashboard (top-right) and shipping labels.
+			            </div>
+			            <div class="tableWrap">
+			              <div style="padding: 12px;">
+			                <img id="brandingLogoPreview" alt="Brand logo preview" style="max-width: 220px; max-height: 220px; border-radius: 12px; border: 1px solid var(--border);" />
+			              </div>
 			            </div>
 			          </section>
 			        </div>
