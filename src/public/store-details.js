@@ -551,12 +551,21 @@ window.addEventListener("DOMContentLoaded", async () => {
   $("centerDrawerCancel")?.addEventListener("click", () => closeDialog());
 
   $("saveCenterBtn")?.addEventListener("click", async () => {
+    const btn = $("saveCenterBtn");
+    const cancelBtn = $("centerDrawerCancel");
+    const closeBtn = $("centerDrawerClose");
+    const originalHtml = btn ? btn.innerHTML : "";
     const id = String($("centerId")?.value ?? "").trim();
     const values = readDialogValues();
     if (!values.originName) {
       setStatus("Origin Name is required.", { kind: "error" });
       return;
     }
+
+    if (btn) btn.disabled = true;
+    if (cancelBtn) cancelBtn.disabled = true;
+    if (closeBtn) closeBtn.disabled = true;
+    if (btn) btn.innerHTML = `<span class="btnSpinner" aria-hidden="true"></span> Saving…`;
 
     try {
       if (id) {
@@ -577,6 +586,11 @@ window.addEventListener("DOMContentLoaded", async () => {
       centers = await loadCenters();
     } catch (error) {
       setStatus(error?.message ?? "Failed to save center.", { kind: "error" });
+    } finally {
+      if (btn) btn.disabled = false;
+      if (cancelBtn) cancelBtn.disabled = false;
+      if (closeBtn) closeBtn.disabled = false;
+      if (btn) btn.innerHTML = originalHtml || "Save";
     }
   });
 
