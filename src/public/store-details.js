@@ -378,7 +378,16 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   $("accountDrawerUpdate")?.addEventListener("click", async () => {
     const btn = $("accountDrawerUpdate");
+    const cancelBtn = $("accountDrawerCancel");
+    const closeBtn = $("accountDrawerClose");
+    const originalHtml = btn ? btn.innerHTML : "";
     if (btn) btn.disabled = true;
+    if (cancelBtn) cancelBtn.disabled = true;
+    if (closeBtn) closeBtn.disabled = true;
+    if (btn) {
+      btn.dataset.loading = "true";
+      btn.innerHTML = `<span class="btnSpinner" aria-hidden="true"></span> Updating…`;
+    }
     try {
       const payload = getDrawerPayload();
       await postJson("/api/store/details", payload);
@@ -389,6 +398,12 @@ window.addEventListener("DOMContentLoaded", async () => {
       setStatus(error?.message ?? "Failed to update store details.", { kind: "error" });
     } finally {
       if (btn) btn.disabled = false;
+      if (cancelBtn) cancelBtn.disabled = false;
+      if (closeBtn) closeBtn.disabled = false;
+      if (btn) {
+        btn.dataset.loading = "false";
+        btn.innerHTML = originalHtml || "Update";
+      }
     }
   });
 
