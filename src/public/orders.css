@@ -935,6 +935,28 @@ body[data-page="store"] #brandingLogoFile {
   gap: 10px;
 }
 
+/* Drawer form controls (Store/Fulfillment Centers) */
+body[data-page="store"] .sideDrawer .field input,
+body[data-page="store"] .sideDrawer .field textarea,
+body[data-page="store"] .sideDrawer select,
+body[data-page="fulfillment-centers"] .sideDrawer .field input,
+body[data-page="fulfillment-centers"] .sideDrawer .field textarea,
+body[data-page="fulfillment-centers"] .sideDrawer select {
+  width: 100%;
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+body[data-page="store"] .sideDrawer .field textarea,
+body[data-page="fulfillment-centers"] .sideDrawer .field textarea {
+  min-height: 92px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  resize: vertical;
+}
+
 body.drawerOpen {
   overflow: hidden;
 }
