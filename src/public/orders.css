@@ -717,7 +717,7 @@ body.navOpen .navDrawer {
 
 /* Store details page layout */
 body[data-page="store"] .storeDetailsWrap {
-  max-width: 980px;
+  max-width: none;
   margin: 0;
   padding: 6px 2px 2px;
 }
@@ -818,14 +818,55 @@ body[data-page="store"] .profileInfoLabel {
 }
 
 body[data-page="store"] .profileInfoValue {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 400;
   color: var(--text);
 }
 
 body[data-page="store"] .profileInfoValueMultiline {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+body[data-page="store"] .storeInnerDivider {
+  height: 1px;
+  background: rgba(148, 163, 184, 0.25);
+  margin: 18px 0;
+}
+
+body[data-page="store"] .storeInnerHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 2px 2px 10px;
+}
+
+body[data-page="store"] .storeInnerTitle {
+  display: grid;
+  gap: 4px;
+}
+
+body[data-page="store"] .storeInnerH {
+  font-size: 18px;
+  font-weight: 900;
+}
+
+body[data-page="store"] .storeInnerHint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+body[data-page="store"] .storeInnerActions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+body[data-page="store"] #brandingLogoFile {
+  display: none;
 }
 
 body[data-page="store"] .storeDetailsGrid {

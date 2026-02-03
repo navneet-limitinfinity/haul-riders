@@ -329,7 +329,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     const input = $("brandingLogoFile");
     const file = input?.files?.[0] ?? null;
     if (!file) {
-      setStatus("Select a logo file first.", { kind: "error" });
+      input?.click?.();
       return;
     }
     try {
@@ -339,6 +339,21 @@ window.addEventListener("DOMContentLoaded", async () => {
       if (input) input.value = "";
     } catch (error) {
       setStatus(error?.message ?? "Failed to upload logo.", { kind: "error" });
+    }
+  });
+
+  $("brandingLogoFile")?.addEventListener("change", async () => {
+    const input = $("brandingLogoFile");
+    const file = input?.files?.[0] ?? null;
+    if (!file) return;
+    try {
+      setStatus("Uploading logo…", { kind: "info" });
+      await uploadBrandingLogo(file);
+      setStatus("Logo uploaded.", { kind: "ok" });
+    } catch (error) {
+      setStatus(error?.message ?? "Failed to upload logo.", { kind: "error" });
+    } finally {
+      if (input) input.value = "";
     }
   });
 
