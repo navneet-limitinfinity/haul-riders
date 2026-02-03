@@ -617,7 +617,7 @@ function renderFulfillmentCentersPage({ userLabel, storeId }) {
 }
 
 function renderStoreDetailsPage({ userLabel, storeId }) {
-  const assetVersion = "50";
+  const assetVersion = "51";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
 
@@ -696,10 +696,10 @@ function renderStoreDetailsPage({ userLabel, storeId }) {
 				                </div>
 			                <div class="profileCardTitle">Account Details</div>
 			              </div>
-			              <a id="editStoreDetailsLink" class="profileEditLink" href="#" aria-label="Edit details">
+			              <button id="editStoreDetailsLink" class="btn btnPrimary btnIcon" type="button" aria-label="Edit details">
 			                <i class="fa-solid fa-pen" aria-hidden="true"></i>
 			                Edit Details
-			              </a>
+			              </button>
 			            </div>
 			            <div class="profileCardDivider" aria-hidden="true"></div>
 			            <div class="profileInfoGrid">
@@ -789,7 +789,7 @@ function renderStoreDetailsPage({ userLabel, storeId }) {
 			              </div>
 			              <div class="storeInnerActions">
 			                <input id="brandingLogoFile" type="file" accept="image/png,image/jpeg" />
-			                <button id="uploadBrandingLogo" class="btn btnSecondary btnIcon" type="button">
+			                <button id="uploadBrandingLogo" class="btn btnPrimary btnIcon" type="button">
 			                  <i class="fa-solid fa-upload" aria-hidden="true"></i>
 			                  Upload Logo
 			                </button>
