@@ -1,0 +1,3 @@
+orderName,order_date,fullName,customerEmail,phone1,phone2,address1,address2,city,state,pinCode,totalPrice,financialStatus,invoice_value,content_and_quantity
+O000001,2026-02-04,Navneet Sinha,navneet@example.com,9815582923,0981558292,"P No.-90B, Sector-18","Near Medcity",Gurugram,Haryana,122001,499.00,paid,499.00,"T-Shirt x1"
+

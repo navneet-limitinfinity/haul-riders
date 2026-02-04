@@ -1012,8 +1012,18 @@ function renderCreateOrdersPage({ role, userLabel, storeId }) {
                     <select id="storeId" class="storeSelect" aria-label="Select store"></select>
                   </label>
                 </div>`
-              : ""
+              : html`<div class="controls"></div>`
           }
+          <div class="controls">
+            <a class="btn btnSecondary btnIcon" href="/static/sample_create_orders.xlsx" download>
+              <i class="fa-solid fa-file-arrow-down" aria-hidden="true"></i>
+              Sample XLSX
+            </a>
+            <a class="btn btnSecondary btnIcon" href="/static/sample_create_orders.csv" download>
+              <i class="fa-solid fa-file-arrow-down" aria-hidden="true"></i>
+              Sample CSV
+            </a>
+          </div>
         </div>
 
         <div id="status" class="status" aria-live="polite"></div>
