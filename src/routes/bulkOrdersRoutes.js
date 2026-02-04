@@ -1,10 +1,12 @@
 import { Router } from "express";
 import crypto from "node:crypto";
 import multer from "multer";
-import { parse } from "csv-parse/sync";
 import { getFirebaseAdmin } from "../auth/firebaseAdmin.js";
 import { getShopCollectionInfo } from "../firestore/shopCollections.js";
 import { toOrderDocId } from "../firestore/ids.js";
+import { reserveOrderSequences, formatManualOrderName } from "../firestore/orderSequence.js";
+import { parseCsvRows } from "../orders/import/parseCsvRows.js";
+import { parseXlsxRows } from "../orders/import/parseXlsxRows.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -192,15 +194,21 @@ function validateRow(row, rowIndex) {
   return { ok: true, error: "" };
 }
 
-function parseCsvBuffer(buffer) {
-  const raw = Buffer.isBuffer(buffer) ? buffer.toString("utf8") : String(buffer ?? "");
-  const clean = raw.replace(/^\uFEFF/, "");
-  return parse(clean, {
-    columns: true,
-    skip_empty_lines: true,
-    trim: true,
-    relax_column_count: true,
-  });
+function detectFileKind(file) {
+  const name = String(file?.originalname ?? "").trim().toLowerCase();
+  if (name.endsWith(".csv")) return "csv";
+  if (name.endsWith(".xlsx")) return "xlsx";
+  if (name.endsWith(".xls")) return "xls";
+  return "";
+}
+
+function parseRowsFromFile(file) {
+  const kind = detectFileKind(file);
+  if (!file?.buffer) throw new Error("file_required");
+  if (kind === "csv") return parseCsvRows(file.buffer);
+  if (kind === "xlsx") return parseXlsxRows(file.buffer);
+  if (kind === "xls") throw new Error("xls_not_supported");
+  throw new Error("unsupported_file_type");
 }
 
 function normalizeShipmentStatus(value) {
@@ -263,9 +271,9 @@ export function createBulkOrdersRouter({ env, auth }) {
 
       let rows;
       try {
-        rows = parseCsvBuffer(file.buffer);
+        rows = parseRowsFromFile(file);
       } catch (error) {
-        res.status(400).json({ error: "invalid_csv", message: String(error?.message ?? "") });
+        res.status(400).json({ error: "invalid_file", message: String(error?.message ?? "") });
         return;
       }
 
@@ -293,6 +301,26 @@ export function createBulkOrdersRouter({ env, auth }) {
             storeId,
           });
           const firestore = admin.firestore();
+
+          const missingNameIndexes = [];
+          for (let i = 0; i < rows.length; i += 1) {
+            const row = rows[i];
+            const name = getRowValue(row, "orderName");
+            if (!name) missingNameIndexes.push(i);
+          }
+
+          let sequences = [];
+          if (missingNameIndexes.length) {
+            sequences = await reserveOrderSequences({ firestore, count: missingNameIndexes.length });
+          }
+
+          for (let i = 0; i < missingNameIndexes.length; i += 1) {
+            const idx = missingNameIndexes[i];
+            const seq = sequences[i];
+            const orderName = formatManualOrderName(seq);
+            rows[idx].orderName = orderName;
+            if (!getRowValue(rows[idx], "orderKey")) rows[idx].orderKey = orderName;
+          }
 
           const assignedAt = nowIso();
           for (let i = 0; i < rows.length; i += 1) {
@@ -470,7 +498,7 @@ export function createBulkOrdersRouter({ env, auth }) {
 
       let rows;
       try {
-        rows = parseCsvBuffer(file.buffer);
+        rows = parseCsvRows(file.buffer);
       } catch (error) {
         res.status(400).json({ error: "invalid_csv", message: String(error?.message ?? "") });
         return;

@@ -129,6 +129,15 @@ Stored under the shops collection:
 - `src/public/store-details.js` (shop UI to edit store details + upload logo)
 - `src/shipments/label/shippingLabelPdf.js` (embeds logo into label PDF when present)
 
+### 1.5 Meta Counters (Global)
+Used for generating unique, increasing manual `orderName` values (non-Shopify orders).
+
+- Path: `meta/counters`
+- Keys written:
+  - `nextOrderSeq` (number)
+  - `updatedAt` (ISO)
+- File: `src/firestore/orderSequence.js`
+
 ## 2) Shop Orders/Shipments Collection (Per-Store)
 
 Path:
@@ -211,6 +220,29 @@ Writes/updates keys (top-level):
 - `event: "ship_requested"`
 - `requestedBy { uid, email, role }`
 - `requestedAt`
+
+### 3.1b Manual Orders: Create/Import (Shop + Admin)
+Creates **manual “New” orders** (not fetched from Shopify).
+
+- File: `src/routes/manualOrdersRoutes.js`, `src/orders/manualOrdersService.js`
+- Endpoints:
+  - `POST /api/orders/import` (multipart; field: `file`; roles: `admin|shop`)
+  - `GET /api/orders/import/jobs/:jobId` (polling; roles: `admin|shop`)
+  - `POST /api/orders/create` (JSON; roles: `admin|shop`)
+- Writes to `/<collectionId>/<orderDocId>` with `{ merge:true }`
+- Keys written (top-level snake_case + legacy compatibility):
+  - `shipmentStatus: "new"`
+  - `shipment_status: "New"`
+  - `courier_partner`, `consignment_number`, `weight`, `courier_type`, `shipping_date`, `expected_delivery_date`, `updated_at`
+  - `order` (object), `shipment` (object), `requestedBy`, `requestedAt`, `updatedAt`
+
+### 3.1c Manual Orders: Assign to Ship (Shop + Admin)
+Marks existing manual orders as `Assigned` so they appear in the Assigned tab.
+
+- File: `src/routes/manualOrdersRoutes.js`, `src/orders/manualOrdersService.js`
+- Endpoint: `POST /api/orders/assign` (roles: `admin|shop`)
+- Writes updates to `/<collectionId>/<orderDocId>` with `{ merge:true }`
+  - sets `shipmentStatus: "assigned"`, `shipment_status: "Assigned"`, `shipment.assignedAt`, `shipping_date`, `updated_at`
 
 ### 3.2 Shipments: Update Status/Tracking (Admin)
 - File: `src/routes/shipmentsRoutes.js`

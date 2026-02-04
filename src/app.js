@@ -61,7 +61,8 @@ export function createApp({ env, logger }) {
           p.endsWith(`${path.sep}orders.js`) ||
           p.endsWith(`${path.sep}orders.css`) ||
           p.endsWith(`${path.sep}fulfillment-centers.js`) ||
-          p.endsWith(`${path.sep}store-details.js`)
+          p.endsWith(`${path.sep}store-details.js`) ||
+          p.endsWith(`${path.sep}create-orders.js`)
         ) {
           res.setHeader("Cache-Control", "no-store");
         }

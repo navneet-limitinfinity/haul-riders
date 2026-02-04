@@ -20,6 +20,10 @@ function renderNavDrawer({ role, userLabel, activePath }) {
       <i class="fa-solid fa-list" aria-hidden="true"></i>
       Orders
     </a>
+    <a class="navItem ${isActive(role === "admin" ? "/admin/create-orders" : "/shop/create-orders")}" href="${role === "admin" ? "/admin/create-orders" : "/shop/create-orders"}">
+      <i class="fa-solid fa-file-circle-plus" aria-hidden="true"></i>
+      Create Orders
+    </a>
     ${role === "shop"
       ? html`<a class="navItem ${isActive("/shop/store")}" href="/shop/store">
           <i class="fa-solid fa-store" aria-hidden="true"></i>
@@ -923,6 +927,274 @@ function renderStoreDetailsPage({ userLabel, storeId }) {
 </html>`;
 }
 
+function renderCreateOrdersPage({ role, userLabel, storeId }) {
+  const assetVersion = "1";
+  const safeUserLabel = escapeHtml(userLabel);
+  const safeStoreId = escapeHtml(storeId);
+
+  return html`<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Create Orders</title>
+    <link rel="stylesheet" href="/static/orders.css?v=54" />
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/fontawesome.min.css?v=54" />
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/solid.min.css?v=54" />
+    <link rel="stylesheet" href="/static/bulk-upload.css?v=3" />
+    <link rel="icon" type="image/png" href="/static/icon.png?v=54" />
+    <script src="/static/create-orders.js?v=${assetVersion}" defer></script>
+  </head>
+  <body data-role="${role}" data-page="create-orders" data-store-id="${safeStoreId}">
+    ${renderNavDrawer({
+      role,
+      userLabel,
+      activePath: role === "admin" ? "/admin/create-orders" : "/shop/create-orders",
+    })}
+    <header class="topbar">
+      <div class="topbarInner">
+        <div class="brand">
+          <label id="navToggle" class="navToggle" for="navState" role="button" tabindex="0" aria-label="Open navigation">
+            <i class="fa-solid fa-bars" aria-hidden="true"></i>
+          </label>
+          <img class="brandLogo" src="/static/haul_riders_logo.jpeg?v=54" alt="Haul Riders" decoding="async" />
+          <div class="brandText">
+            <div class="brandTitle">Create Orders</div>
+            <div class="brandSub">Bulk upload (CSV/XLSX) or create a single order</div>
+          </div>
+        </div>
+
+        <div class="topbarActions">
+          ${
+            role === "shop"
+              ? html`<img
+                  class="brandingLogoTopbar"
+                  src="/api/store/branding/logo"
+                  alt="Brand logo"
+                  decoding="async"
+                  onerror="this.style.display='none'"
+                />`
+              : ""
+          }
+          <details class="userMenu" aria-label="User menu">
+            <summary class="userMenuSummary" aria-label="Open user menu">
+              <span class="userAvatar userAvatarIcon" aria-hidden="true">
+                <i class="fa-solid fa-user" aria-hidden="true"></i>
+              </span>
+            </summary>
+            <div class="userMenuList">
+              <div class="userMenuSection">
+                <strong>${safeUserLabel}</strong>
+              </div>
+              <a class="userMenuItem" href="${role === "admin" ? "/admin/orders" : "/shop/orders"}">Dashboard</a>
+              <button type="button" class="userMenuItem userMenuButton" data-action="logout">
+                Logout
+              </button>
+            </div>
+          </details>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="panel">
+        <div class="panelHeader">
+          <div class="panelTitle">
+            <h1>Create Orders</h1>
+            <div class="panelHint">Upload a file to create orders, then optionally assign them to ship.</div>
+          </div>
+
+          ${
+            role === "admin"
+              ? html`<div class="controls">
+                  <label class="field">
+                    <span>Store (required)</span>
+                    <select id="storeId" class="storeSelect" aria-label="Select store"></select>
+                  </label>
+                </div>`
+              : ""
+          }
+        </div>
+
+        <div id="status" class="status" aria-live="polite"></div>
+
+        <div class="bulkBody" style="padding: 0;">
+          <div class="bulkColumns" style="grid-template-columns: repeat(2, minmax(0, 1fr));">
+            <div class="bulkCard">
+              <div class="bulkCardHeader">
+                <div>
+                  <div class="bulkCardTitle">Bulk upload (CSV/XLSX)</div>
+                  <div class="bulkCardHint">Creates “New” orders in Firestore.</div>
+                </div>
+              </div>
+              <div class="bulkForm">
+                <div class="bulkFields">
+                  <label class="field">
+                    <span>File</span>
+                    <input id="ordersFile" type="file" accept=".csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+                  </label>
+                </div>
+                <button id="ordersUploadBtn" class="btn btnPrimary bulkBtnFull" type="button">
+                  <i class="fa-solid fa-file-arrow-up" aria-hidden="true"></i>
+                  Upload Orders
+                </button>
+              </div>
+              <div class="progressWrap" aria-label="Upload progress">
+                <div class="progressBar">
+                  <div id="progressFill" class="progressFill" style="width: 0%"></div>
+                </div>
+                <div id="progressText" class="progressText">0%</div>
+              </div>
+              <details class="bulkDetails">
+                <summary>Columns</summary>
+                <ul class="bulkList">
+                  <li><code>orderName</code> (optional; auto-generated if missing)</li>
+                  <li><code>fullName</code>, <code>phone1</code>, <code>address1</code>, <code>city</code>, <code>state</code>, <code>pinCode</code></li>
+                  <li><code>totalPrice</code>, <code>financialStatus</code></li>
+                </ul>
+                <div class="bulkHint">Optional: <code>customerEmail</code>, <code>address2</code>, <code>phone2</code>, <code>content_and_quantity</code>, <code>invoice_value</code>, <code>order_date</code>.</div>
+              </details>
+            </div>
+
+            <div class="bulkCard bulkCardPrimary">
+              <div class="bulkCardHeader">
+                <div>
+                  <div class="bulkCardTitle">Create single order</div>
+                  <div class="bulkCardHint">Creates one “New” order.</div>
+                </div>
+              </div>
+              <div class="bulkForm">
+                <button id="openSingleDrawer" class="btn btnSecondary bulkBtnFull" type="button">
+                  <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                  Create Order
+                </button>
+              </div>
+              <div class="bulkHint" style="padding: 0 2px;">Order ID is auto-generated if you leave it blank.</div>
+            </div>
+          </div>
+
+          <div class="storeInnerDivider"></div>
+
+          <div class="bulkCard" style="margin-top: 0;">
+            <div class="bulkCardHeader" style="align-items: center;">
+              <div>
+                <div class="bulkCardTitle">Recently created orders</div>
+                <div class="bulkCardHint">Select orders to assign them to ship.</div>
+              </div>
+              <div class="controls">
+                <button id="assignSelectedBtn" class="btn btnPrimary btnIcon" type="button" disabled>
+                  <i class="fa-solid fa-truck" aria-hidden="true"></i>
+                  Assign to Ship
+                </button>
+              </div>
+            </div>
+
+            <div class="tableWrap">
+              <table class="table" aria-label="Created orders">
+                <thead>
+                  <tr>
+                    <th style="width: 42px;"><input id="selectAllCreated" type="checkbox" aria-label="Select all" /></th>
+                    <th>Order</th>
+                    <th>Customer</th>
+                    <th>Phone</th>
+                    <th>City</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody id="createdRows"></tbody>
+              </table>
+            </div>
+
+            <details class="bulkDetails" style="margin-top: 10px;">
+              <summary>Rejected rows</summary>
+              <div id="rejectedRows" class="bulkHint"></div>
+            </details>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div id="singleDrawerOverlay" class="sideDrawerOverlay" hidden></div>
+    <aside id="singleDrawer" class="sideDrawer" aria-label="Create order" aria-hidden="true">
+      <div class="sideDrawerHeader">
+        <div class="sideDrawerTitle">Create Order</div>
+        <button id="singleDrawerClose" type="button" class="btn btnSecondary btnIcon" aria-label="Close">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="sideDrawerBody">
+        <div class="modalGrid">
+          <label class="field">
+            <span>Order Name (optional)</span>
+            <input id="singleOrderName" type="text" placeholder="Leave blank to auto-generate" />
+          </label>
+          <label class="field">
+            <span>Order Date (optional)</span>
+            <input id="singleOrderDate" type="text" placeholder="YYYY-MM-DD or ISO" />
+          </label>
+          <label class="field">
+            <span>Customer Name</span>
+            <input id="singleFullName" type="text" />
+          </label>
+          <label class="field">
+            <span>Customer Email (optional)</span>
+            <input id="singleCustomerEmail" type="email" />
+          </label>
+          <label class="field">
+            <span>Phone 1</span>
+            <input id="singlePhone1" type="text" inputmode="numeric" />
+          </label>
+          <label class="field">
+            <span>Phone 2 (optional)</span>
+            <input id="singlePhone2" type="text" inputmode="numeric" />
+          </label>
+          <label class="field" style="grid-column: 1 / -1;">
+            <span>Address Line 1</span>
+            <input id="singleAddress1" type="text" />
+          </label>
+          <label class="field" style="grid-column: 1 / -1;">
+            <span>Address Line 2 (optional)</span>
+            <input id="singleAddress2" type="text" />
+          </label>
+          <label class="field">
+            <span>City</span>
+            <input id="singleCity" type="text" />
+          </label>
+          <label class="field">
+            <span>State</span>
+            <input id="singleState" type="text" />
+          </label>
+          <label class="field">
+            <span>PIN Code</span>
+            <input id="singlePinCode" type="text" inputmode="numeric" />
+          </label>
+          <label class="field">
+            <span>Total Price</span>
+            <input id="singleTotalPrice" type="text" inputmode="decimal" />
+          </label>
+          <label class="field">
+            <span>Financial Status</span>
+            <input id="singleFinancialStatus" type="text" placeholder="paid / pending" />
+          </label>
+          <label class="field">
+            <span>Invoice Value (optional)</span>
+            <input id="singleInvoiceValue" type="text" inputmode="decimal" />
+          </label>
+          <label class="field" style="grid-column: 1 / -1;">
+            <span>Content & Quantity (optional)</span>
+            <input id="singleProductDescription" type="text" />
+          </label>
+        </div>
+      </div>
+      <div class="sideDrawerFooter">
+        <button id="singleDrawerCancel" type="button" class="btn btnSecondary">Cancel</button>
+        <button id="singleDrawerCreate" type="button" class="btn btnPrimary">Create</button>
+      </div>
+    </aside>
+  </body>
+</html>`;
+}
+
 export function createPagesRouter({ env, auth } = {}) {
   const router = Router();
 
@@ -955,6 +1227,19 @@ export function createPagesRouter({ env, auth } = {}) {
     const userLabel = String(req.user?.email ?? env?.adminName ?? "Admin").trim() || "Admin";
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(renderBulkUploadPage({ userLabel }));
+  });
+
+  router.get("/admin/create-orders", auth.requireRole("admin"), (req, res) => {
+    const userLabel = String(req.user?.email ?? env?.adminName ?? "Admin").trim() || "Admin";
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(renderCreateOrdersPage({ role: "admin", userLabel, storeId: "" }));
+  });
+
+  router.get("/shop/create-orders", auth.requireRole("shop"), (req, res) => {
+    const userLabel = String(req.user?.email ?? "Shop").trim() || "Shop";
+    const storeId = String(req.user?.storeId ?? "").trim();
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(renderCreateOrdersPage({ role: "shop", userLabel, storeId }));
   });
 
   router.get("/shop/fulfillment-centers", auth.requireRole("shop"), (req, res) => {
