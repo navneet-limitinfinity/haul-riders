@@ -71,7 +71,8 @@ function validateManualRow(normalized, rowIndex) {
 }
 
 function buildManualOrderDoc({ normalized, index, storeId, displayName, user }) {
-  const createdAt = normalized.orderDate || nowIso();
+  // Per requirement: Order Date should reflect upload/create time.
+  const createdAt = nowIso();
 
   const phoneNumbers = [normalized.phone1, normalized.phone2].filter(Boolean);
 
@@ -298,4 +299,3 @@ export async function assignManualOrders({
 
   return { ok: true, updated, missing };
 }
-

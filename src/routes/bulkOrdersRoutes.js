@@ -368,7 +368,8 @@ export function createBulkOrdersRouter({ env, auth }) {
               orderKey,
               orderId: getRowValue(row, "orderId"),
               orderName: getRowValue(row, "orderName"),
-              createdAt: getRowValue(row, "createdAt") || assignedAt,
+              // Per requirement: Order Date should reflect bulk upload time.
+              createdAt: assignedAt,
               customerEmail: getRowValue(row, "customerEmail"),
               financialStatus: getRowValue(row, "financialStatus"),
               paymentStatus: getRowValue(row, "financialStatus"),
