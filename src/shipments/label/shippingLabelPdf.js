@@ -324,10 +324,14 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
 
   const fields = map?.fields ?? {};
   const fixedText = Array.isArray(map?.fixedText) ? map.fixedText : [];
+  const productDescriptionLabel =
+    fixedText.find((t) => t && typeof t === "object" && String(t.key ?? "") === "productDescription") ??
+    null;
 
   // Render fixed labels (field names) from the template map.
   for (const t of fixedText) {
     if (!t || typeof t !== "object") continue;
+    if (String(t.key ?? "") === "productDescription") continue;
     const text = String(t.text ?? "").trim();
     if (!text) continue;
     const font = t.bold ? fontBold : fontRegular;
@@ -335,7 +339,7 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
     page.drawText(text, { x: Number(t.x ?? 0), y: Number(t.y ?? 0), size, font, color: black });
   }
 
-  // Branding logo (top-right).
+  // Branding logo (placed in Product Description area; label removed).
   if (brandingLogo) {
     try {
       const { contentType, bytes } = brandingLogo;
@@ -344,16 +348,18 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
           ? await pdfDoc.embedPng(bytes)
           : await pdfDoc.embedJpg(bytes);
 
-      const maxW = 72;
-      const maxH = 72;
+      const anchorX = Number(productDescriptionLabel?.x ?? 31);
+      const anchorY = Number(productDescriptionLabel?.y ?? 286.76);
+
+      const maxW = 180;
+      const maxH = 44;
       const scale = Math.min(maxW / img.width, maxH / img.height, 1);
       const w = img.width * scale;
       const h = img.height * scale;
 
-      // Keep away from the edge and away from the date/value text.
       page.drawImage(img, {
-        x: 493 - 12 - w,
-        y: 700 - 12 - h,
+        x: anchorX,
+        y: Math.max(0, anchorY - h + 8),
         width: w,
         height: h,
       });
