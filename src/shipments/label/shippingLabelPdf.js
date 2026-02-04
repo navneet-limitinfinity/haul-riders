@@ -274,6 +274,25 @@ async function resolveBrandingLogo({ env, shopDomain }) {
   return { contentType, bytes };
 }
 
+async function resolveStoreName({ env, shopDomain }) {
+  if (env?.auth?.provider !== "firebase") return "";
+  const domain = normalizeDomain(shopDomain);
+  if (!domain) return "";
+
+  const admin = await getFirebaseAdmin({ env });
+  const firestore = admin.firestore();
+  const shopsCollection = String(env.auth.firebase.shopsCollection ?? "shops").trim() || "shops";
+
+  try {
+    const snap = await firestore.collection(shopsCollection).doc(domain).get();
+    const data = snap.exists ? snap.data() ?? {} : {};
+    const details = data?.storeDetails && typeof data.storeDetails === "object" ? data.storeDetails : {};
+    return String(details?.storeName ?? "").trim();
+  } catch {
+    return "";
+  }
+}
+
 export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestoreDoc }) {
   const data = firestoreDoc && typeof firestoreDoc === "object" ? firestoreDoc : {};
   const order = data.order && typeof data.order === "object" ? data.order : null;
@@ -307,6 +326,7 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
     fulfillmentCenterName ||
     (await resolveDefaultFulfillmentCenterName({ env, shopDomain }));
   const brandingLogo = await resolveBrandingLogo({ env, shopDomain });
+  const storeName = await resolveStoreName({ env, shopDomain });
   const shipTo = getBestShipTo(order) ?? {};
   const pin = String(shipTo?.pinCode ?? "").trim();
 
@@ -339,7 +359,7 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
     page.drawText(text, { x: Number(t.x ?? 0), y: Number(t.y ?? 0), size, font, color: black });
   }
 
-  // Branding logo (placed in Product Description area; label removed).
+  // Branding logo + Store Name (placed in Product Description area; label removed).
   if (brandingLogo) {
     try {
       const { contentType, bytes } = brandingLogo;
@@ -351,20 +371,62 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
       const anchorX = Number(productDescriptionLabel?.x ?? 31);
       const anchorY = Number(productDescriptionLabel?.y ?? 286.76);
 
-      const maxW = 180;
-      const maxH = 44;
+      const maxW = 240;
+      const maxH = 64;
       const scale = Math.min(maxW / img.width, maxH / img.height, 1);
       const w = img.width * scale;
       const h = img.height * scale;
 
+      const imgX = anchorX;
+      const imgY = Math.max(0, anchorY - h + 10);
       page.drawImage(img, {
-        x: anchorX,
-        y: Math.max(0, anchorY - h + 8),
+        x: imgX,
+        y: imgY,
         width: w,
         height: h,
       });
+
+      if (storeName) {
+        const size = 14;
+        const preferredX = imgX + w + 10;
+        const preferredMaxW = Math.max(1, 250 - (w + 10));
+        const canPlaceRight = preferredX <= 260 && preferredMaxW >= 60;
+        if (canPlaceRight) {
+          const lines = wrapText({
+            text: storeName,
+            font: fontBold,
+            size,
+            maxWidth: preferredMaxW,
+          }).slice(0, 1);
+          if (lines[0]) {
+            page.drawText(lines[0], { x: preferredX, y: imgY + h - size - 2, size, font: fontBold, color: black });
+          }
+        } else {
+          const lines = wrapText({
+            text: storeName,
+            font: fontBold,
+            size,
+            maxWidth: 260,
+          }).slice(0, 1);
+          if (lines[0]) {
+            page.drawText(lines[0], { x: imgX, y: Math.max(0, imgY - size - 6), size, font: fontBold, color: black });
+          }
+        }
+      }
     } catch {
       // ignore branding render failures
+    }
+  } else if (storeName) {
+    try {
+      const anchorX = Number(productDescriptionLabel?.x ?? 31);
+      const anchorY = Number(productDescriptionLabel?.y ?? 286.76);
+      const size = 14;
+      const lines = wrapText({ text: storeName, font: fontBold, size, maxWidth: 260 }).slice(0, 1);
+      if (lines[0]) {
+        page.drawText(lines[0], { x: anchorX, y: Math.max(0, anchorY - size), size, font: fontBold, color: black });
+      }
+    } catch {
+      // ignore
     }
   }
 
@@ -391,7 +453,8 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
 
   // FROM block (multiline).
   if (fields.fromBlock) {
-    const fromName = [shipFrom.name, fulfillmentCenterLabel].filter(Boolean).join(" - ");
+    // Per requirements: show direct fulfillment address only (no "Haul Riders -" prefix/suffix).
+    const fromName = fulfillmentCenterLabel || "";
     const fromAddress1 = fulfillmentCenter?.address1 || shipFrom.address1;
     const fromAddress2 = fulfillmentCenter?.address2 || shipFrom.address2;
     const fromCity = fulfillmentCenter?.city || shipFrom.city;
