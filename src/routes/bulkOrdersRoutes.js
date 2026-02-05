@@ -322,6 +322,14 @@ export function createBulkOrdersRouter({ env, auth }) {
             if (!getRowValue(rows[idx], "orderKey")) rows[idx].orderKey = orderName;
           }
 
+          // If orderName is provided but orderKey is missing, fall back to orderName.
+          for (let i = 0; i < rows.length; i += 1) {
+            const row = rows[i];
+            if (getRowValue(row, "orderKey")) continue;
+            const name = getRowValue(row, "orderName");
+            if (name) row.orderKey = name;
+          }
+
           const assignedAt = nowIso();
           for (let i = 0; i < rows.length; i += 1) {
             const row = rows[i];
