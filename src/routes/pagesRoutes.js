@@ -424,7 +424,7 @@ function renderBulkUploadPage({ userLabel }) {
               <div class="bulkFields">
                 <label class="field">
                   <span>Order CSV file</span>
-                  <input id="csvFile" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+                  <input id="csvFile" type="file" accept=".csv,text/csv" />
                 </label>
               </div>
               <button id="uploadBtn" class="btn btnSecondary bulkBtnFull" type="button">
@@ -445,13 +445,12 @@ function renderBulkUploadPage({ userLabel }) {
             <details class="bulkDetails">
               <summary>CSV columns</summary>
               <ul class="bulkList">
-                <li><code>orderKey</code> (unique id; any string)</li>
-                <li><code>orderName</code> (include <code>#</code>, e.g. <code>#1001</code>)</li>
+                <li><code>orderId</code> (unique id; e.g. <code>#1001</code> or <code>O000001</code>; auto-generated if blank)</li>
                 <li><code>fullName</code>, <code>phone1</code>, <code>address1</code>, <code>city</code>, <code>state</code>, <code>pinCode</code></li>
                 <li><code>totalPrice</code>, <code>financialStatus</code> (e.g. <code>paid</code> or <code>pending</code>)</li>
               </ul>
               <div class="bulkHint">
-                Optional (order): <code>orderId</code>, <code>orderGid</code>, <code>customerEmail</code>, <code>paymentStatus</code>, <code>address2</code>, <code>phone2</code>, <code>itemAndQuantity</code> (or <code>content_and_quantity</code>), <code>invoiceValue</code> (or <code>invoice_value</code>), <code>fulfillmentCenter</code>, <code>fulfillmentStatus</code>.
+                Optional (order): <code>customerEmail</code>, <code>paymentStatus</code>, <code>address2</code>, <code>phone2</code>, <code>itemAndQuantity</code> (or <code>content_and_quantity</code>), <code>invoiceValue</code> (or <code>invoice_value</code>), <code>fulfillmentCenter</code>, <code>fulfillmentStatus</code>.
                 Optional (shipment): <code>shipmentStatus</code>, <code>courierPartner</code>, <code>consignmentNumber</code>, <code>courierType</code>, <code>weightKg</code>, <code>shippingDate</code>, <code>expectedDeliveryDate</code>, <code>updatedAt</code>.
               </div>
             </details>
@@ -961,7 +960,7 @@ function renderCreateOrdersPage({ role, userLabel, storeId }) {
           <img class="brandLogo" src="/static/haul_riders_logo.jpeg?v=54" alt="Haul Riders" decoding="async" />
           <div class="brandText">
             <div class="brandTitle">Create Orders</div>
-            <div class="brandSub">Bulk upload (CSV/XLSX) or create a single order</div>
+            <div class="brandSub">Bulk upload (CSV) or create a single order</div>
           </div>
         </div>
 
@@ -1016,10 +1015,6 @@ function renderCreateOrdersPage({ role, userLabel, storeId }) {
               : html`<div class="controls"></div>`
           }
           <div class="controls">
-            <a class="btn btnSecondary btnIcon" href="/static/sample_create_orders.xlsx" download>
-              <i class="fa-solid fa-file-arrow-down" aria-hidden="true"></i>
-              Sample XLSX
-            </a>
             <a class="btn btnSecondary btnIcon" href="/static/sample_create_orders.csv" download>
               <i class="fa-solid fa-file-arrow-down" aria-hidden="true"></i>
               Sample CSV
@@ -1034,7 +1029,7 @@ function renderCreateOrdersPage({ role, userLabel, storeId }) {
             <div class="bulkCard">
               <div class="bulkCardHeader">
                 <div>
-                  <div class="bulkCardTitle">Bulk upload (CSV/XLSX)</div>
+                  <div class="bulkCardTitle">Bulk upload (CSV)</div>
                   <div class="bulkCardHint">Creates “New” orders in Firestore.</div>
                 </div>
               </div>
@@ -1042,7 +1037,7 @@ function renderCreateOrdersPage({ role, userLabel, storeId }) {
                 <div class="bulkFields">
                   <label class="field">
                     <span>File</span>
-                    <input id="ordersFile" type="file" accept=".csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+                    <input id="ordersFile" type="file" accept=".csv,text/csv" />
                   </label>
                 </div>
                 <button id="ordersUploadBtn" class="btn btnPrimary bulkBtnFull" type="button">
@@ -1059,11 +1054,11 @@ function renderCreateOrdersPage({ role, userLabel, storeId }) {
               <details class="bulkDetails">
                 <summary>Columns</summary>
                 <ul class="bulkList">
-                  <li><code>orderName</code> (optional; auto-generated if missing)</li>
+                  <li><code>orderId</code> (optional; auto-generated if missing)</li>
                   <li><code>fullName</code>, <code>phone1</code>, <code>address1</code>, <code>city</code>, <code>state</code>, <code>pinCode</code></li>
                   <li><code>invoiceValue</code>, <code>paymentStatus</code></li>
                 </ul>
-                <div class="bulkHint">Optional: <code>orderKey</code>, <code>orderId</code>, <code>orderGid</code>, <code>customerEmail</code>, <code>address2</code>, <code>phone2</code>, <code>productDescription</code>, <code>fulfillmentCenter</code>, <code>fulfillmentStatus</code>, <code>orderDate</code>, <code>weightKg</code>, <code>courierType</code>.</div>
+                <div class="bulkHint">Optional: <code>customerEmail</code>, <code>address2</code>, <code>phone2</code>, <code>productDescription</code>, <code>fulfillmentCenter</code>, <code>fulfillmentStatus</code>, <code>orderDate</code>, <code>weightKg</code>, <code>courierType</code>, <code>courierPartner</code>.</div>
               </details>
             </div>
 
@@ -1137,21 +1132,8 @@ function renderCreateOrdersPage({ role, userLabel, storeId }) {
         <div class="drawerSectionHeader">Order</div>
         <div class="orderCreateGrid">
           <label class="field span-4">
-            <span>Order Name (optional)</span>
-            <input id="singleOrderName" type="text" placeholder="Leave blank to auto-generate" />
-          </label>
-          <label class="field span-4">
-            <span>Order Key (optional)</span>
-            <input id="singleOrderKey" type="text" placeholder="Leave blank to use Order Name" />
-          </label>
-          <label class="field span-4">
             <span>Order ID (optional)</span>
-            <input id="singleOrderId" type="text" class="mono" inputmode="numeric" />
-          </label>
-
-          <label class="field span-8">
-            <span>Order GID (optional)</span>
-            <input id="singleOrderGid" type="text" class="mono" placeholder="Shopify GraphQL ID (optional)" />
+            <input id="singleOrderId" type="text" class="mono" inputmode="numeric" placeholder="Leave Blank" />
           </label>
           <label class="field span-4">
             <span>Order Date (optional)</span>
@@ -1172,7 +1154,7 @@ function renderCreateOrdersPage({ role, userLabel, storeId }) {
           </label>
           <label class="field span-3">
             <span>Contact No</span>
-            <input id="singlePhone1" type="text" class="mono" inputmode="numeric" />
+            <input id="singlePhone1" type="text" class="mono" inputmode="numeric" placeholder="Exclude +91 or 0)" />
           </label>
           <label class="field span-3">
             <span>Alternate Contact (optional)</span>
@@ -1222,6 +1204,10 @@ function renderCreateOrdersPage({ role, userLabel, storeId }) {
             <input id="singleInvoiceValue" type="text" class="mono" inputmode="decimal" required />
           </label>
           <label class="field span-4">
+            <span>Courier Partner (optional)</span>
+            <input id="singleCourierPartner" type="text" value="DTDC" />
+          </label>
+          <label class="field span-4">
             <span>Fulfillment Center (optional)</span>
             <select id="singleFulfillmentCenter">
               <option value="" disabled selected>Fulfillment Center</option>
@@ -1244,7 +1230,7 @@ function renderCreateOrdersPage({ role, userLabel, storeId }) {
           </label>
           <label class="field span-4">
             <span>Fulfillment Status (optional)</span>
-            <input id="singleFulfillmentStatus" type="text" placeholder="fulfilled / unfulfilled" />
+            <input id="singleFulfillmentStatus" type="text" value="fulfilled" placeholder="fulfilled / unfulfilled" />
           </label>
 
           <label class="field span-12">

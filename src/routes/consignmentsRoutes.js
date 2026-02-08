@@ -83,9 +83,7 @@ const projectConsignmentRow = ({ docId, data }) => {
   const order = getDocOrder(data) ?? {};
   const shipping = order?.shipping && typeof order.shipping === "object" ? order.shipping : {};
 
-  const orderKey = String(data?.orderKey ?? order?.orderKey ?? docId ?? "").trim();
-  const orderName = String(order?.orderName ?? order?.order_name ?? order?.name ?? "").trim();
-  const orderId = String(order?.orderId ?? order?.order_id ?? order?.orderID ?? order?.id ?? "").trim();
+  const orderId = String(order?.orderId ?? order?.orderName ?? order?.order_id ?? order?.orderID ?? "").trim();
   const orderDate = String(order?.order_date ?? order?.orderDate ?? order?.createdAt ?? order?.created_at ?? "").trim();
 
   const courierPartner = String(data?.courierPartner ?? data?.courier_partner ?? "").trim();
@@ -99,10 +97,10 @@ const projectConsignmentRow = ({ docId, data }) => {
   const paymentStatus = String(order?.paymentStatus ?? order?.financialStatus ?? "").trim();
 
   return {
-    orderKey,
+    docId,
 
     // Order Details
-    order_name: orderName,
+    order_name: orderId,
     order_id: orderId,
     order_date: orderDate,
 
@@ -464,8 +462,9 @@ export function createConsignmentsRouter({ env, auth }) {
           return;
         }
 
+        const docIdFromBody = String(req.body?.docId ?? "").trim();
         const orderKey = String(req.body?.orderKey ?? "").trim();
-        if (!orderKey) {
+        if (!docIdFromBody && !orderKey) {
           res.status(400).json({ error: "order_key_required" });
           return;
         }
@@ -490,7 +489,7 @@ export function createConsignmentsRouter({ env, auth }) {
 
         const admin = await getFirebaseAdmin({ env });
         const { collectionId, storeId: normalizedStoreId } = getShopCollectionInfo({ storeId });
-        const docId = toOrderDocId(orderKey);
+        const docId = docIdFromBody || toOrderDocId(orderKey);
         const docRef = admin.firestore().collection(collectionId).doc(docId);
 
         const changedAt = nowIso();
@@ -508,7 +507,6 @@ export function createConsignmentsRouter({ env, auth }) {
           tx.set(
             docRef,
             {
-              orderKey,
               docId,
               storeId: normalizedStoreId,
               shipmentStatus: nextDisplay,
@@ -541,6 +539,7 @@ export function createConsignmentsRouter({ env, auth }) {
         res.setHeader("Cache-Control", "no-store");
         res.json({
           ok: true,
+          docId,
           orderKey,
           storeId: normalizedStoreId,
           shipmentStatus: nextDisplay,

@@ -116,8 +116,10 @@ export const projectOrderRow = ({ order, index, overrides = null }) => {
 
   return {
     index: index + 1,
+    // Project-level standard: Shopify order name is stored/treated as orderId.
+    orderId: String(order?.name ?? "").trim(),
+    // Kept for UI/backward compatibility (not persisted in Firestore).
     orderName: order?.name,
-    orderId: order?.id == null ? "" : String(order.id),
     orderKey,
     orderGid,
     createdAt: order?.created_at ?? "",

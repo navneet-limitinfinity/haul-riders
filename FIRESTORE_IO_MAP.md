@@ -19,7 +19,7 @@ Examples:
 - `64dd6e-2` → `storeKey: 64dd6e-2` → `collectionId: 64dd6e-2`
 
 ### Order Document ID
-Order docs are stored as deterministic IDs derived from `orderKey`:
+Order docs are stored as deterministic IDs derived from an internal **order key** (not persisted as `orderKey` in Firestore):
 - Source: `src/firestore/ids.js`
 - Function: `toOrderDocId(orderKey)` → `order_<sha256(orderKey)>`
 
@@ -115,7 +115,7 @@ Keys in a center doc:
 - `src/shipments/label/shippingLabelPdf.js` (embeds logo into PDF)
 
 ### 1.5 Meta Counters (Global)
-Used for generating unique, increasing manual `orderName` values (non-Shopify orders).
+Used for generating unique, increasing manual `orderId` values (non-Shopify orders).
 - Path: `meta/counters`
 - File: `src/firestore/orderSequence.js`
 - Keys written:
@@ -134,18 +134,15 @@ This project enforces a **single canonical schema** for order docs. Any legacy/d
 
 ### 2.1 Canonical Keys (Order Doc)
 Identity / ownership:
-- `orderKey` (string; primary key used throughout UI)
-- `docId` (string; `order_<sha256(orderKey)>`)
+- `docId` (string; Firestore document id; `order_<sha256(orderKey)>`)
 - `storeId` (string; normalized store key)
 - `shopName` (string; display)
 
 Order object (sanitized; no tracking/status duplicates inside):
 - `order` (object)
   - `index`
-  - `orderKey`
-  - `orderId`
-  - `orderGid`
-  - `orderName`
+  - `orderId` (Shopify order name, e.g. `#1001`, or manual `O000001`)
+  - `orderGid` (Shopify GraphQL ID; Shopify-only)
   - `createdAt` (ISO)
   - `customerEmail`
   - `financialStatus`
@@ -153,7 +150,7 @@ Order object (sanitized; no tracking/status duplicates inside):
   - `totalPrice`
   - `invoiceValue`
   - `productDescription`
-  - `fulfillmentCenter`
+  - `fulfillmentCenter` (string; stored as `"Contact Person Name | Phone | Full Address"` for manual/bulk/assigned flows; origin name is not included)
   - `fulfillmentStatus`
   - `shipping`:
     - `fullName`
@@ -201,7 +198,7 @@ Written on every status change (admin update + bulk status + consignments update
 - Writes to `/<collectionId>/<orderDocId>` with `{ merge:true }`
 
 Keys written/updated:
-- `orderKey`, `docId`, `storeId`, `shopName`
+- `docId`, `storeId`, `shopName`
 - `order` (sanitized order object from client)
 - `shipmentStatus: "Assigned"`
 - `shippingDate` (ISO; set to assign time)
@@ -218,7 +215,7 @@ Keys written/updated:
   - `POST /api/orders/create` (JSON)
 
 Keys written:
-- `orderKey`, `docId`, `storeId`, `shopName`
+- `docId`, `storeId`, `shopName`
 - `order` (sanitized order object)
 - `shipmentStatus: "New"`
 - `courierPartner`, `consignmentNumber`, `weightKg`, `courierType`, `shippingDate`, `expectedDeliveryDate`
@@ -257,7 +254,7 @@ Keys updated:
 - Writes to `/<collectionId>/<orderDocId>` with `{ merge:true }`
 
 Keys written/updated:
-- `orderKey`, `docId`, `storeId`, `shopName`
+- `docId`, `storeId`, `shopName`
 - `order` (sanitized order object; `createdAt` is the upload timestamp)
 - `shipmentStatus: "Assigned"` (or preserved if already present)
 - `courierPartner`, `consignmentNumber`
@@ -314,7 +311,7 @@ Keys updated:
 - `src/routes/firestoreOrdersRoutes.js`
   - `GET /api/firestore/orders` (shop)
   - `GET /api/firestore/admin/orders` (admin)
-  - Reads: `order`, `orderKey`, `shipmentStatus`, `consignmentNumber`, `courierPartner`, `weightKg`, `courierType`, `shippingDate`, `expectedDeliveryDate`, `updatedAt`, `requestedAt` (with legacy fallbacks during migration).
+  - Reads: `order`, `docId`, `shipmentStatus`, `consignmentNumber`, `courierPartner`, `weightKg`, `courierType`, `shippingDate`, `expectedDeliveryDate`, `updatedAt`, `requestedAt` (with legacy fallbacks during migration).
 
 - `src/routes/consignmentsRoutes.js`
   - `GET /api/consignments/in_transit|delivered|rto` (shop/admin)

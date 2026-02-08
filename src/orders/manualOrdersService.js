@@ -18,16 +18,116 @@ function normalizePhone10(value) {
   return digits.slice(-10);
 }
 
+function formatFulfillmentCenterString(center) {
+  const c = center && typeof center === "object" ? center : null;
+  if (!c) return "";
+  const phone = String(c.phone ?? "").trim();
+  const contactPersonName = String(c.contactPersonName ?? "").trim();
+  const parts = [
+    String(c.address1 ?? "").trim(),
+    String(c.address2 ?? "").trim(),
+    String(c.city ?? "").trim(),
+    String(c.state ?? "").trim(),
+    String(c.pinCode ?? "").trim(),
+    String(c.country ?? "").trim(),
+  ].filter(Boolean);
+  const addr = parts.join(", ");
+  // Per requirement: do NOT include originName in orders (originName is shop reference only).
+  return [contactPersonName, phone, addr].filter(Boolean).join(" | ");
+}
+
 function getRowValue(row, key) {
   return String(row?.[key] ?? "").trim();
 }
 
+function normalizeHeaderKey(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]/g, "");
+}
+
 function pickRowValue(row, keys) {
-  for (const key of Array.isArray(keys) ? keys : []) {
+  const aliases = Array.isArray(keys) ? keys : [];
+  for (const key of aliases) {
     const v = String(row?.[key] ?? "").trim();
     if (v) return v;
   }
+
+  // XLSX/CSV exporters often change header casing/spaces. Try normalized header matching.
+  const data = row && typeof row === "object" ? row : {};
+  const normalized = new Map();
+  for (const [k, vRaw] of Object.entries(data)) {
+    const v = String(vRaw ?? "").trim();
+    if (!v) continue;
+    const nk = normalizeHeaderKey(k);
+    if (!nk) continue;
+    if (!normalized.has(nk)) normalized.set(nk, v);
+  }
+
+  for (const key of aliases) {
+    const nk = normalizeHeaderKey(key);
+    if (!nk) continue;
+    const direct = normalized.get(nk);
+    if (direct) return direct;
+  }
+
+  // Last-resort: match common suffixes like "customerCity" / "townCity".
+  for (const key of aliases) {
+    const nk = normalizeHeaderKey(key);
+    if (!nk || nk.length < 3) continue;
+    for (const [k2, v2] of normalized.entries()) {
+      if (k2.endsWith(nk)) return v2;
+    }
+  }
+
   return "";
+}
+
+function resolveShopDomainFromStoreId(storeId) {
+  const raw = String(storeId ?? "").trim().toLowerCase();
+  if (!raw) return "";
+  if (raw.includes(".")) return raw;
+  return `${raw}.myshopify.com`;
+}
+
+function normalizeCenterForOrder(data) {
+  const d = data && typeof data === "object" ? data : {};
+  const originName = String(d.originName ?? "").trim();
+  if (!originName) return null;
+  return {
+    originName,
+    contactPersonName: String(d.contactPersonName ?? "").trim(),
+    address1: String(d.address1 ?? "").trim(),
+    address2: String(d.address2 ?? "").trim(),
+    city: String(d.city ?? "").trim(),
+    state: String(d.state ?? "").trim(),
+    pinCode: String(d.pinCode ?? "").trim(),
+    country: String(d.country ?? "IN").trim() || "IN",
+    phone: String(d.phone ?? "").trim(),
+    default: Boolean(d.default),
+  };
+}
+
+async function loadFulfillmentCentersMap({ firestore, shopsCollection, storeId }) {
+  const domain = resolveShopDomainFromStoreId(storeId);
+  if (!domain) return { byName: new Map(), defaultCenter: null };
+  const col = firestore.collection(shopsCollection).doc(domain).collection("fulfillmentCenter");
+  try {
+    const snap = await col.get();
+    const byName = new Map();
+    let defaultCenter = null;
+    for (const doc of snap.docs) {
+      const center = normalizeCenterForOrder(doc.data());
+      if (!center) continue;
+      byName.set(center.originName, center);
+      if (!defaultCenter && center.default) defaultCenter = center;
+    }
+    if (!defaultCenter) defaultCenter = byName.values().next().value ?? null;
+    return { byName, defaultCenter };
+  } catch {
+    return { byName: new Map(), defaultCenter: null };
+  }
 }
 
 function normalizeManualRow(row) {
@@ -51,20 +151,20 @@ function normalizeManualRow(row) {
     (String(paymentStatusRaw).trim().toLowerCase() === "paid" ? "paid" : paymentStatusRaw ? "pending" : "");
 
   return {
+    // Kept for backward compatibility (we no longer persist orderKey/orderName in Firestore).
     orderKey: getRowValue(row, "orderKey") || getRowValue(row, "order_key"),
-    orderName: getRowValue(row, "orderName") || getRowValue(row, "order_name") || getRowValue(row, "Order Name"),
-    orderId: pickRowValue(row, ["orderId", "order_id", "Order ID"]),
+    orderId: pickRowValue(row, ["orderId", "order_id", "Order ID", "orderName", "order_name", "Order Name"]),
     orderGid: pickRowValue(row, ["orderGid", "order_gid", "orderGID"]),
     orderDate: pickRowValue(row, ["orderDate", "order_date", "createdAt", "orderCreatedAt"]),
-    fullName: pickRowValue(row, ["fullName", "name", "customer_name", "customerName"]),
-    customerEmail: pickRowValue(row, ["customerEmail", "email"]),
+    fullName: pickRowValue(row, ["fullName", "Full Name", "name", "Name", "customer_name", "customerName"]),
+    customerEmail: pickRowValue(row, ["customerEmail", "Customer Email", "email", "Email"]),
     phone1: normalizePhone10(pickRowValue(row, ["phone1", "phone_1", "phone", "phone_1"])),
     phone2: normalizePhone10(pickRowValue(row, ["phone2", "phone_2"])),
-    address1: pickRowValue(row, ["address1", "address_line_1", "address_line1", "address_line_1"]),
-    address2: pickRowValue(row, ["address2", "address_line_2", "address_line2", "address_line_2"]),
-    city: pickRowValue(row, ["city"]),
-    state: pickRowValue(row, ["state"]),
-    pinCode: pickRowValue(row, ["pinCode", "pincode", "pin_code"]),
+    address1: pickRowValue(row, ["address1", "Address 1", "address_line_1", "addressLine1", "address_line1"]),
+    address2: pickRowValue(row, ["address2", "Address 2", "address_line_2", "addressLine2", "address_line2"]),
+    city: pickRowValue(row, ["city", "City"]),
+    state: pickRowValue(row, ["state", "State"]),
+    pinCode: pickRowValue(row, ["pinCode", "PIN Code", "Pin Code", "pincode", "pin_code"]),
     totalPrice: totalPriceRaw || invoiceValueRaw,
     financialStatus: financialStatusRaw,
     paymentStatus: paymentStatusRaw,
@@ -74,6 +174,7 @@ function normalizeManualRow(row) {
     fulfillmentStatus: pickRowValue(row, ["fulfillmentStatus", "fulfillment_status"]),
     weight: safeNumber(pickRowValue(row, ["weightKg", "weight", "weight_kg"])),
     courier_type: pickRowValue(row, ["courierType", "courier_type", "courierTypeName", "courierTypeValue"]),
+    courierPartner: pickRowValue(row, ["courierPartner", "courier_partner", "Courier Partner", "courier"]),
   };
 }
 
@@ -95,16 +196,14 @@ function validateManualRow(normalized, rowIndex) {
   return { ok: true, error: "" };
 }
 
-function buildManualOrderDoc({ normalized, index, storeId, displayName, user }) {
+function buildManualOrderDoc({ normalized, index, storeId, displayName, user, fulfillmentCenterString }) {
   // Per requirement: Order Date should reflect upload/create time.
   const createdAt = nowIso();
 
   const order = {
     index,
-    orderKey: normalized.orderKey,
-    orderId: String(normalized.orderId ?? "").trim(),
+    orderId: String(normalized.orderId ?? normalized.orderKey ?? "").trim(),
     orderGid: String(normalized.orderGid ?? "").trim(),
-    orderName: normalized.orderName,
     createdAt,
     customerEmail: normalized.customerEmail,
     financialStatus: normalized.financialStatus,
@@ -112,8 +211,8 @@ function buildManualOrderDoc({ normalized, index, storeId, displayName, user }) 
     totalPrice: safeNumber(normalized.totalPrice),
     invoiceValue: safeNumber(normalized.invoiceValue || normalized.totalPrice),
     productDescription: normalized.productDescription,
-    fulfillmentCenter: normalized.fulfillmentCenter,
-    fulfillmentStatus: normalized.fulfillmentStatus || "unfulfilled",
+    fulfillmentCenter: fulfillmentCenterString || "",
+    fulfillmentStatus: normalized.fulfillmentStatus || "fulfilled",
     shipping: {
       fullName: normalized.fullName,
       address1: normalized.address1,
@@ -128,13 +227,12 @@ function buildManualOrderDoc({ normalized, index, storeId, displayName, user }) 
 
   const ts = nowIso();
   return {
-    orderKey: normalized.orderKey,
     docId: toOrderDocId(normalized.orderKey),
     storeId,
     shopName: displayName,
     order,
     shipmentStatus: "New",
-    courierPartner: "",
+    courierPartner: String(normalized.courierPartner ?? "").trim() || "DTDC",
     consignmentNumber: "",
     weightKg: normalized.weight || "",
     courierType: normalized.courier_type || "",
@@ -157,6 +255,7 @@ export async function createManualOrders({
   storeId,
   displayName,
   user,
+  shopsCollection = "shops",
   rows,
 }) {
   const inputRows = Array.isArray(rows) ? rows : [];
@@ -164,29 +263,35 @@ export async function createManualOrders({
 
   const normalizedRows = inputRows.map((r) => normalizeManualRow(r));
 
-  const missingNameIndexes = [];
+  const { byName: centersByName, defaultCenter } = await loadFulfillmentCentersMap({
+    firestore,
+    shopsCollection,
+    storeId,
+  });
+
+  const missingOrderIdIndexes = [];
   for (let i = 0; i < normalizedRows.length; i += 1) {
-    if (!String(normalizedRows[i].orderName ?? "").trim()) missingNameIndexes.push(i);
-  }
-
-  let sequences = [];
-  if (missingNameIndexes.length) {
-    sequences = await reserveOrderSequences({ firestore, count: missingNameIndexes.length });
-  }
-
-  for (let i = 0; i < missingNameIndexes.length; i += 1) {
-    const idx = missingNameIndexes[i];
-    const seq = sequences[i];
-    const orderName = formatManualOrderName(seq);
-    normalizedRows[idx].orderName = orderName;
-    if (!String(normalizedRows[idx].orderKey ?? "").trim()) {
-      normalizedRows[idx].orderKey = orderName;
+    if (!String(normalizedRows[i].orderId ?? "").trim() && !String(normalizedRows[i].orderKey ?? "").trim()) {
+      missingOrderIdIndexes.push(i);
     }
   }
 
-  // If orderKey still missing but orderName present, use orderName.
+  let sequences = [];
+  if (missingOrderIdIndexes.length) {
+    sequences = await reserveOrderSequences({ firestore, count: missingOrderIdIndexes.length });
+  }
+
+  for (let i = 0; i < missingOrderIdIndexes.length; i += 1) {
+    const idx = missingOrderIdIndexes[i];
+    const seq = sequences[i];
+    const orderId = formatManualOrderName(seq);
+    normalizedRows[idx].orderId = orderId;
+    normalizedRows[idx].orderKey = orderId;
+  }
+
   for (const r of normalizedRows) {
-    if (!String(r.orderKey ?? "").trim() && String(r.orderName ?? "").trim()) r.orderKey = r.orderName;
+    if (!String(r.orderKey ?? "").trim()) r.orderKey = String(r.orderId ?? "").trim();
+    if (!String(r.orderId ?? "").trim()) r.orderId = String(r.orderKey ?? "").trim();
   }
 
   const errors = [];
@@ -203,20 +308,24 @@ export async function createManualOrders({
       errors.push(validation.error);
       continue;
     }
-    if (!String(norm.orderKey ?? "").trim() || !String(norm.orderName ?? "").trim()) {
+    if (!String(norm.orderKey ?? "").trim() || !String(norm.orderId ?? "").trim()) {
       failed += 1;
-      errors.push(`Row ${i + 2}: missing orderKey/orderName`);
+      errors.push(`Row ${i + 2}: missing orderId`);
       continue;
     }
 
     const docId = toOrderDocId(norm.orderKey);
     const docRef = firestore.collection(collectionId).doc(docId);
+    const centerName = String(norm.fulfillmentCenter ?? "").trim();
+    const fulfillmentCenterAddress = centerName ? centersByName.get(centerName) ?? null : defaultCenter;
+    const fulfillmentCenterString = fulfillmentCenterAddress ? formatFulfillmentCenterString(fulfillmentCenterAddress) : "";
     const doc = buildManualOrderDoc({
-      normalized: { ...norm, orderKey: norm.orderKey, orderName: norm.orderName },
+      normalized: { ...norm, orderKey: norm.orderKey, orderId: norm.orderId },
       index: i + 1,
       storeId,
       displayName,
       user,
+      fulfillmentCenterString,
     });
 
     try {
@@ -226,8 +335,8 @@ export async function createManualOrders({
       else created += 1;
 
       orders.push({
-        orderKey: norm.orderKey,
-        orderName: norm.orderName,
+        orderId: norm.orderId,
+        docId,
         fullName: norm.fullName,
         phone1: norm.phone1,
         city: norm.city,

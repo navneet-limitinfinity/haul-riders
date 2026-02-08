@@ -1,2 +1,2 @@
-orderName,orderKey,orderId,orderGid,orderDate,fullName,customerEmail,phone1,phone2,address1,address2,city,state,pinCode,paymentStatus,invoiceValue,productDescription,fulfillmentCenter,fulfillmentStatus,weightKg,courierType
-O000001,,,,08-02-2026,Navneet Sinha,navneet@example.com,9815582923,,"P No.-90B, Sector-18",Near Medcity,Gurugram,HARYANA,122001,paid,499.00,T-Shirt x1,,unfulfilled,0.1,Z- Express
+orderId,orderDate,fullName,customerEmail,phone1,phone2,address1,address2,city,state,pinCode,paymentStatus,invoiceValue,productDescription,fulfillmentCenter,fulfillmentStatus,weightKg,courierType,courierPartner
+O000001,08-02-2026,Navneet Sinha,navneet@example.com,9815582923,,"P No.-90B, Sector-18",Near Medcity,Gurugram,HARYANA,122001,paid,499.00,T-Shirt x1,,fulfilled,0.1,Z- Express,DTDC

@@ -131,7 +131,7 @@ function pruneSelectionToVisible(orders) {
 }
 let loadingCount = 0;
 
-const getOrderKey = (row) => String(row?.orderKey ?? row?.orderId ?? "");
+const getOrderKey = (row) => String(row?.docId ?? row?.orderKey ?? row?.orderId ?? "");
 
 const escapeHtml = (value) =>
   String(value ?? "")
@@ -635,9 +635,12 @@ function getAuthHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-async function downloadShipmentLabelPdf({ orderKey, storeId, filenameHint }) {
+async function downloadShipmentLabelPdf({ orderKey, docId, storeId, filenameHint }) {
   const url = new URL("/api/shipments/label.pdf", window.location.origin);
-  url.searchParams.set("orderKey", String(orderKey ?? "").trim());
+  const safeDocId = String(docId ?? "").trim();
+  const safeOrderKey = String(orderKey ?? "").trim();
+  if (safeDocId) url.searchParams.set("docId", safeDocId);
+  else url.searchParams.set("orderKey", safeOrderKey);
   if (storeId) url.searchParams.set("storeId", String(storeId));
 
   setStatus("Generating label…", { kind: "busy" });
@@ -675,14 +678,15 @@ function syncBulkDownloadButton() {
   btn.disabled = disabled;
 }
 
-async function downloadBulkShipmentLabelsPdf({ orderKeys, storeId }) {
+async function downloadBulkShipmentLabelsPdf({ docIds, storeId }) {
   const url = new URL("/api/shipments/labels/bulk.pdf", window.location.origin);
-  setStatus(`Generating ${orderKeys.length} label(s)…`, { kind: "busy" });
+  const ids = Array.isArray(docIds) ? docIds : [];
+  setStatus(`Generating ${ids.length} label(s)…`, { kind: "busy" });
 
   const response = await fetch(url.toString(), {
     method: "POST",
     headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-    body: JSON.stringify({ orderKeys, ...(storeId ? { storeId } : {}) }),
+    body: JSON.stringify({ docIds: ids, ...(storeId ? { storeId } : {}) }),
   });
 
   if (!response.ok) {
@@ -704,7 +708,7 @@ async function downloadBulkShipmentLabelsPdf({ orderKeys, storeId }) {
   const objectUrl = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = objectUrl;
-  a.download = `shipping_labels_${orderKeys.length}.pdf`;
+  a.download = `shipping_labels_${ids.length}.pdf`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -961,8 +965,9 @@ async function ensureFirestoreAssignedRealtime() {
           const data = doc.data() ?? {};
           if (String(data.shipmentStatus ?? data.shipment_status ?? "") !== "Assigned") continue;
           const order = data.order && typeof data.order === "object" ? data.order : null;
-          const orderKey = String(data.orderKey ?? "").trim();
-          if (orderKey) sessionAssignedOrderKeys.add(orderKey);
+          const docId = String(doc.id ?? "").trim();
+          const shopifyKey = String(order?.orderGid ?? "").trim();
+          if (shopifyKey) sessionAssignedOrderKeys.add(shopifyKey);
           const consignmentNumber = String(
             data.consignmentNumber ?? data.consignment_number ?? ""
           ).trim();
@@ -976,7 +981,9 @@ async function ensureFirestoreAssignedRealtime() {
           const updatedAt = String(data.updatedAt ?? data.updated_at ?? "").trim();
           rows.push({
             ...(order ?? {}),
-            orderKey,
+            docId,
+            orderName: String(order?.orderName ?? order?.orderId ?? "").trim(),
+            orderId: String(order?.orderId ?? "").trim(),
             shipmentStatus: "Assigned",
             consignmentNumber,
             courierPartner,
@@ -2828,8 +2835,8 @@ window.addEventListener("DOMContentLoaded", () => {
   $("exportCsv")?.addEventListener("click", exportSelectedToCsv);
   $("bulkDownloadLabels")?.addEventListener("click", async (e) => {
     const btn = e.target?.closest?.("button");
-    const orderKeys = Array.from(selectedOrderIds);
-    if (orderKeys.length === 0) {
+    const docIds = Array.from(selectedOrderIds);
+    if (docIds.length === 0) {
       setStatus("Select at least one order to download labels.", { kind: "error" });
       return;
     }
@@ -2842,7 +2849,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
     btn.disabled = true;
     try {
-      await downloadBulkShipmentLabelsPdf({ orderKeys, storeId });
+      await downloadBulkShipmentLabelsPdf({ docIds, storeId });
     } catch (error) {
       setStatus(error?.message ?? "Failed to download labels.", { kind: "error" });
     } finally {
@@ -2932,8 +2939,10 @@ window.addEventListener("DOMContentLoaded", () => {
       const nextValue = String(target.value ?? "").trim();
       target.disabled = true;
       try {
+        const row = currentOrders.find((r) => getOrderKey(r) === orderKey) ?? null;
         await postJson("/api/consignments/update-status", {
-          orderKey,
+          docId: String(row?.docId ?? "").trim(),
+          orderKey: String(row?.orderKey ?? "").trim(),
           storeId,
           shipmentStatus: nextValue,
         });
@@ -3092,6 +3101,7 @@ window.addEventListener("DOMContentLoaded", () => {
       if (!orderKey) return;
       const row = currentOrders.find((r) => getOrderKey(r) === orderKey) ?? null;
       const filenameHint = row?.orderName ? `label_${row.orderName}` : `label_${orderKey}`;
+      const docId = String(row?.docId ?? "").trim();
 
       const storeId = activeRole === "admin" ? getActiveStoreId() : "";
       if (activeRole === "admin" && !storeId) {
@@ -3101,7 +3111,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
       item.disabled = true;
       try {
-        await downloadShipmentLabelPdf({ orderKey, storeId, filenameHint });
+        await downloadShipmentLabelPdf({ docId, orderKey: docId ? "" : orderKey, storeId, filenameHint });
       } catch (error) {
         setStatus(error?.message ?? "Failed to download label.", { kind: "error" });
       } finally {
@@ -3126,10 +3136,17 @@ window.addEventListener("DOMContentLoaded", () => {
       const trackingInput = details?.querySelector?.("[data-role='tracking-number']");
       const shipmentStatus = String(statusSelect?.value ?? "").trim();
       const trackingNumber = String(trackingInput?.value ?? "").trim();
+      const row = currentOrders.find((r) => getOrderKey(r) === orderKey) ?? null;
 
       item.disabled = true;
       try {
-        await postJson("/api/shipments/update", { orderKey, storeId, shipmentStatus, trackingNumber });
+        await postJson("/api/shipments/update", {
+          docId: String(row?.docId ?? "").trim(),
+          orderKey: String(row?.orderKey ?? "").trim(),
+          storeId,
+          shipmentStatus,
+          trackingNumber,
+        });
         setStatus("Shipment updated.", { kind: "ok" });
         await refresh({ forceNetwork: true });
       } catch (error) {
@@ -3176,7 +3193,11 @@ window.addEventListener("DOMContentLoaded", () => {
 
       item.disabled = true;
       try {
-        await postJson("/api/firestore/orders/update-shipping", { orderKey, shipping });
+        await postJson("/api/firestore/orders/update-shipping", {
+          docId: String(row?.docId ?? "").trim(),
+          orderKey: String(row?.orderKey ?? "").trim(),
+          shipping,
+        });
         row.shipping = { ...(row.shipping ?? {}), ...shipping };
         assignedEditState.set(orderKey, { ...shipping });
         assignedEditMode.delete(orderKey);

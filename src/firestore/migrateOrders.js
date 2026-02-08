@@ -44,12 +44,11 @@ function pickFirstString(...values) {
 function canonicalOrderObject(order) {
   const o = order && typeof order === "object" ? order : {};
   const shipping = o.shipping && typeof o.shipping === "object" ? o.shipping : {};
+  const orderId = String(o.orderId ?? o.orderName ?? o.name ?? o.order_id ?? o.id ?? "").trim();
   return {
     index: o.index ?? "",
-    orderKey: String(o.orderKey ?? "").trim(),
-    orderId: String(o.orderId ?? o.id ?? "").trim(),
+    orderId,
     orderGid: String(o.orderGid ?? o.admin_graphql_api_id ?? "").trim(),
-    orderName: String(o.orderName ?? o.name ?? "").trim(),
     createdAt: String(o.createdAt ?? o.created_at ?? "").trim(),
     customerEmail: String(o.customerEmail ?? o.email ?? "").trim(),
     financialStatus: String(o.financialStatus ?? o.financial_status ?? "").trim(),
@@ -140,6 +139,7 @@ function computeCanonicalPatch(data) {
   // Remove legacy/duplicate keys via FieldValue.delete() in the caller.
   const deletes = [
     // old/duplicate keys (snake_case + legacy objects)
+    "orderKey",
     "shipment_status",
     "consignment_number",
     "courier_partner",
@@ -152,6 +152,10 @@ function computeCanonicalPatch(data) {
     "awbNumber",
     "trackingCompany",
     "shipment",
+    "order.orderKey",
+    "order.orderName",
+    "order.fulfillmentCenterAddress",
+    "fulfillmentCenterAddress",
     "order.trackingNumbers",
     "order.trackingNumbersText",
     "order.trackingCompany",
@@ -167,6 +171,7 @@ function hasLegacyKeys(data) {
   const order = d.order && typeof d.order === "object" ? d.order : {};
   const shipment = d.shipment && typeof d.shipment === "object" ? d.shipment : {};
   return Boolean(
+    d.orderKey !== undefined ||
     d.shipment_status !== undefined ||
       d.consignment_number !== undefined ||
       d.courier_partner !== undefined ||
@@ -184,6 +189,8 @@ function hasLegacyKeys(data) {
       shipment.awbNumber !== undefined ||
       shipment.courierType !== undefined ||
       shipment.weightKg !== undefined ||
+      order.orderKey !== undefined ||
+      order.orderName !== undefined ||
       order.trackingNumbers !== undefined ||
       order.trackingNumbersText !== undefined ||
       order.trackingCompany !== undefined
@@ -243,8 +250,6 @@ export async function migrateAllOrdersAtStartup({ env, logger }) {
           {
             ...patch,
             ...deletePatch,
-            // Keep these unchanged if already present, but ensure core identity keys exist.
-            orderKey: String(data?.orderKey ?? "").trim() || String(patch?.order?.orderName ?? doc.id),
             docId: String(data?.docId ?? "").trim() || doc.id,
             storeId: String(data?.storeId ?? "").trim() || storeId,
             shopName: String(data?.shopName ?? "").trim(),

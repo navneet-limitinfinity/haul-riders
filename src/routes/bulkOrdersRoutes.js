@@ -6,7 +6,6 @@ import { getShopCollectionInfo } from "../firestore/shopCollections.js";
 import { toOrderDocId } from "../firestore/ids.js";
 import { reserveOrderSequences, formatManualOrderName } from "../firestore/orderSequence.js";
 import { parseCsvRows } from "../orders/import/parseCsvRows.js";
-import { parseXlsxRows } from "../orders/import/parseXlsxRows.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -114,11 +113,47 @@ function getRowValue(row, key) {
   return String(row?.[key] ?? "").trim();
 }
 
+function normalizeHeaderKey(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]/g, "");
+}
+
 function pickRowValue(row, keys) {
-  for (const key of Array.isArray(keys) ? keys : []) {
+  const aliases = Array.isArray(keys) ? keys : [];
+  for (const key of aliases) {
     const v = String(row?.[key] ?? "").trim();
     if (v) return v;
   }
+
+  // XLSX/CSV exporters often change header casing/spaces. Try normalized header matching.
+  const data = row && typeof row === "object" ? row : {};
+  const normalized = new Map();
+  for (const [k, vRaw] of Object.entries(data)) {
+    const v = String(vRaw ?? "").trim();
+    if (!v) continue;
+    const nk = normalizeHeaderKey(k);
+    if (!nk) continue;
+    if (!normalized.has(nk)) normalized.set(nk, v);
+  }
+
+  for (const key of aliases) {
+    const nk = normalizeHeaderKey(key);
+    if (!nk) continue;
+    const direct = normalized.get(nk);
+    if (direct) return direct;
+  }
+
+  // Last-resort: match common suffixes like "customerCity" / "townCity".
+  for (const key of aliases) {
+    const nk = normalizeHeaderKey(key);
+    if (!nk || nk.length < 3) continue;
+    for (const [k2, v2] of normalized.entries()) {
+      if (k2.endsWith(nk)) return v2;
+    }
+  }
+
   return "";
 }
 
@@ -153,32 +188,23 @@ function createJob({ total }) {
 
 function validateRow(row, rowIndex) {
   const required = [
-    "orderKey",
-    "orderName",
-    "fullName",
-    "phone1",
-    "address1",
-    "city",
-    "state",
-    "pinCode",
-    "totalPrice",
-    "financialStatus",
+    { key: "fullName", keys: ["fullName", "Full Name", "name", "Name"] },
+    { key: "phone1", keys: ["phone1", "Phone 1", "phone_1", "phone", "Phone"] },
+    { key: "address1", keys: ["address1", "Address 1", "address_line_1", "addressLine1"] },
+    { key: "city", keys: ["city", "City"] },
+    { key: "state", keys: ["state", "State"] },
+    { key: "pinCode", keys: ["pinCode", "PIN Code", "pincode", "pin_code"] },
+    { key: "totalPrice", keys: ["totalPrice", "Total Price", "invoiceValue", "invoice_value"] },
+    { key: "financialStatus", keys: ["financialStatus", "Financial Status", "paymentStatus", "Payment Status"] },
   ];
-  const missing = required.filter((k) => !getRowValue(row, k));
-  if (missing.length) {
-    return {
-      ok: false,
-      error: `Row ${rowIndex + 2}: missing ${missing.join(", ")}`,
-    };
-  }
+  const missing = required.filter((r) => !pickRowValue(row, r.keys)).map((r) => r.key);
+  if (missing.length) return { ok: false, error: `Row ${rowIndex + 2}: missing ${missing.join(", ")}` };
   return { ok: true, error: "" };
 }
 
 function detectFileKind(file) {
   const name = String(file?.originalname ?? "").trim().toLowerCase();
   if (name.endsWith(".csv")) return "csv";
-  if (name.endsWith(".xlsx")) return "xlsx";
-  if (name.endsWith(".xls")) return "xls";
   return "";
 }
 
@@ -186,9 +212,71 @@ function parseRowsFromFile(file) {
   const kind = detectFileKind(file);
   if (!file?.buffer) throw new Error("file_required");
   if (kind === "csv") return parseCsvRows(file.buffer);
-  if (kind === "xlsx") return parseXlsxRows(file.buffer);
-  if (kind === "xls") throw new Error("xls_not_supported");
   throw new Error("unsupported_file_type");
+}
+
+function resolveShopDomainFromStoreId(storeId) {
+  const raw = String(storeId ?? "").trim().toLowerCase();
+  if (!raw) return "";
+  if (raw.includes(".")) return raw;
+  return `${raw}.myshopify.com`;
+}
+
+function normalizeCenterForOrder(data) {
+  const d = data && typeof data === "object" ? data : {};
+  const originName = String(d.originName ?? "").trim();
+  if (!originName) return null;
+  return {
+    originName,
+    contactPersonName: String(d.contactPersonName ?? "").trim(),
+    address1: String(d.address1 ?? "").trim(),
+    address2: String(d.address2 ?? "").trim(),
+    city: String(d.city ?? "").trim(),
+    state: String(d.state ?? "").trim(),
+    pinCode: String(d.pinCode ?? "").trim(),
+    country: String(d.country ?? "IN").trim() || "IN",
+    phone: String(d.phone ?? "").trim(),
+    default: Boolean(d.default),
+  };
+}
+
+function formatFulfillmentCenterString(center) {
+  const c = center && typeof center === "object" ? center : null;
+  if (!c) return "";
+  const phone = String(c.phone ?? "").trim();
+  const contactPersonName = String(c.contactPersonName ?? "").trim();
+  const parts = [
+    String(c.address1 ?? "").trim(),
+    String(c.address2 ?? "").trim(),
+    String(c.city ?? "").trim(),
+    String(c.state ?? "").trim(),
+    String(c.pinCode ?? "").trim(),
+    String(c.country ?? "").trim(),
+  ].filter(Boolean);
+  const addr = parts.join(", ");
+  // Per requirement: do NOT include originName in orders (originName is shop reference only).
+  return [contactPersonName, phone, addr].filter(Boolean).join(" | ");
+}
+
+async function loadFulfillmentCentersMap({ firestore, shopsCollection, storeId }) {
+  const domain = resolveShopDomainFromStoreId(storeId);
+  if (!domain) return { byName: new Map(), defaultCenter: null };
+  const col = firestore.collection(shopsCollection).doc(domain).collection("fulfillmentCenter");
+  try {
+    const snap = await col.get();
+    const byName = new Map();
+    let defaultCenter = null;
+    for (const doc of snap.docs) {
+      const center = normalizeCenterForOrder(doc.data());
+      if (!center) continue;
+      byName.set(center.originName, center);
+      if (!defaultCenter && center.default) defaultCenter = center;
+    }
+    if (!defaultCenter) defaultCenter = byName.values().next().value ?? null;
+    return { byName, defaultCenter };
+  } catch {
+    return { byName: new Map(), defaultCenter: null };
+  }
 }
 
 function normalizeShipmentStatus(value) {
@@ -281,33 +369,49 @@ export function createBulkOrdersRouter({ env, auth }) {
             storeId,
           });
           const firestore = admin.firestore();
+          const shopsCollection = String(env?.auth?.firebase?.shopsCollection ?? "shops").trim() || "shops";
+          const { byName: centersByName, defaultCenter } = await loadFulfillmentCentersMap({
+            firestore,
+            shopsCollection,
+            storeId: normalizedStoreId,
+          });
+          const defaultFulfillmentCenterString = defaultCenter
+            ? formatFulfillmentCenterString(defaultCenter)
+            : "";
 
-          const missingNameIndexes = [];
+          const missingOrderIdIndexes = [];
           for (let i = 0; i < rows.length; i += 1) {
             const row = rows[i];
-            const name = getRowValue(row, "orderName");
-            if (!name) missingNameIndexes.push(i);
+            const existingId =
+              pickRowValue(row, ["orderId", "order_id", "Order ID"]) ||
+              getRowValue(row, "orderName") ||
+              getRowValue(row, "orderKey");
+            if (!existingId) missingOrderIdIndexes.push(i);
           }
 
           let sequences = [];
-          if (missingNameIndexes.length) {
-            sequences = await reserveOrderSequences({ firestore, count: missingNameIndexes.length });
+          if (missingOrderIdIndexes.length) {
+            sequences = await reserveOrderSequences({ firestore, count: missingOrderIdIndexes.length });
           }
 
-          for (let i = 0; i < missingNameIndexes.length; i += 1) {
-            const idx = missingNameIndexes[i];
+          for (let i = 0; i < missingOrderIdIndexes.length; i += 1) {
+            const idx = missingOrderIdIndexes[i];
             const seq = sequences[i];
-            const orderName = formatManualOrderName(seq);
-            rows[idx].orderName = orderName;
-            if (!getRowValue(rows[idx], "orderKey")) rows[idx].orderKey = orderName;
+            const orderId = formatManualOrderName(seq);
+            rows[idx].orderId = orderId;
+            if (!getRowValue(rows[idx], "orderKey")) rows[idx].orderKey = orderId;
           }
 
-          // If orderName is provided but orderKey is missing, fall back to orderName.
           for (let i = 0; i < rows.length; i += 1) {
             const row = rows[i];
-            if (getRowValue(row, "orderKey")) continue;
-            const name = getRowValue(row, "orderName");
-            if (name) row.orderKey = name;
+            if (!getRowValue(row, "orderId")) {
+              const fromLegacy =
+                pickRowValue(row, ["orderId", "order_id", "Order ID"]) ||
+                getRowValue(row, "orderName") ||
+                getRowValue(row, "orderKey");
+              if (fromLegacy) row.orderId = fromLegacy;
+            }
+            if (!getRowValue(row, "orderKey")) row.orderKey = getRowValue(row, "orderId");
           }
 
           const assignedAt = nowIso();
@@ -350,34 +454,44 @@ export function createBulkOrdersRouter({ env, auth }) {
               pickRowValue(row, ["shipmentStatus", "shipment_status", "Shipment Status", "Shipments Status"])
             );
 
+            const fulfillmentCenterName =
+              String(pickRowValue(row, ["fulfillmentCenter", "fulfillment_center"]) || "").trim() || "";
+            const fulfillmentCenterAddress = fulfillmentCenterName
+              ? centersByName.get(fulfillmentCenterName) ?? null
+              : null;
+            const fulfillmentCenterString = fulfillmentCenterAddress
+              ? formatFulfillmentCenterString(fulfillmentCenterAddress)
+              : defaultFulfillmentCenterString;
+
             const order = {
               index: i + 1,
-              orderKey,
-              orderId: pickRowValue(row, ["orderId", "order_id", "Order ID"]),
+              orderId: pickRowValue(row, ["orderId", "order_id", "Order ID", "orderName", "Order Name"]) || getRowValue(row, "orderId"),
               orderGid: pickRowValue(row, ["orderGid", "order_gid", "order_gid"]),
-              orderName: getRowValue(row, "orderName"),
               // Per requirement: Order Date should reflect bulk upload time.
               createdAt: assignedAt,
-              customerEmail: getRowValue(row, "customerEmail"),
-              financialStatus: getRowValue(row, "financialStatus"),
-              paymentStatus: pickRowValue(row, ["paymentStatus", "payment_status"]) || getRowValue(row, "financialStatus"),
-              totalPrice: safeNumber(getRowValue(row, "totalPrice")),
-              invoiceValue: safeNumber(pickRowValue(row, ["invoice_value", "invoiceValue"]) || getRowValue(row, "totalPrice")),
+              customerEmail: pickRowValue(row, ["customerEmail", "Customer Email", "email", "Email"]),
+              financialStatus: pickRowValue(row, ["financialStatus", "Financial Status"]) || getRowValue(row, "financialStatus"),
+              paymentStatus:
+                pickRowValue(row, ["paymentStatus", "payment_status", "Payment Status"]) ||
+                pickRowValue(row, ["financialStatus", "Financial Status"]) ||
+                getRowValue(row, "financialStatus"),
+              totalPrice: safeNumber(pickRowValue(row, ["totalPrice", "Total Price"]) || getRowValue(row, "totalPrice")),
+              invoiceValue: safeNumber(pickRowValue(row, ["invoice_value", "invoiceValue", "Invoice Value"]) || pickRowValue(row, ["totalPrice", "Total Price"]) || getRowValue(row, "totalPrice")),
               productDescription: pickRowValue(row, [
                 "itemAndQuantity",
                 "content_and_quantity",
                 "productDescription",
                 "product_description",
               ]),
-              fulfillmentCenter: pickRowValue(row, ["fulfillmentCenter", "fulfillment_center"]) || "",
-              fulfillmentStatus: pickRowValue(row, ["fulfillmentStatus", "fulfillment_status"]) || "unfulfilled",
+              fulfillmentCenter: fulfillmentCenterString,
+              fulfillmentStatus: pickRowValue(row, ["fulfillmentStatus", "fulfillment_status"]) || "fulfilled",
               shipping: {
-                fullName: getRowValue(row, "fullName"),
-                address1: getRowValue(row, "address1"),
-                address2: getRowValue(row, "address2"),
-                city: getRowValue(row, "city"),
-                state: getRowValue(row, "state"),
-                pinCode: getRowValue(row, "pinCode"),
+                fullName: pickRowValue(row, ["fullName", "Full Name", "name", "Name"]),
+                address1: pickRowValue(row, ["address1", "Address 1", "address_line_1", "addressLine1"]),
+                address2: pickRowValue(row, ["address2", "Address 2", "address_line_2", "addressLine2"]),
+                city: pickRowValue(row, ["city", "City"]),
+                state: pickRowValue(row, ["state", "State"]),
+                pinCode: pickRowValue(row, ["pinCode", "PIN Code", "pincode", "pin_code"]),
                 phone1,
                 phone2,
               },
@@ -398,7 +512,6 @@ export function createBulkOrdersRouter({ env, auth }) {
 
               await docRef.set(
                 {
-                  orderKey,
                   docId,
                   storeId: normalizedStoreId,
                   shopName: displayName,

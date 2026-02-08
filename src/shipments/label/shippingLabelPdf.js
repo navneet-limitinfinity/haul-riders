@@ -315,7 +315,20 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
   const shipTime = formatTimeHHMMSS(now);
 
   const shipFrom = await resolveShipFrom({ env, shopDomain });
-  const fulfillmentCenterName = String(order?.fulfillmentCenter ?? data?.fulfillmentCenter ?? "").trim();
+  const fulfillmentCenterRaw = String(order?.fulfillmentCenter ?? data?.fulfillmentCenter ?? "").trim();
+  const parsedFulfillment = (() => {
+    const raw = String(fulfillmentCenterRaw ?? "").trim();
+    if (!raw) return { name: "", phone: "", address: "" };
+    const parts = raw
+      .split("|")
+      .map((p) => String(p ?? "").trim())
+      .filter(Boolean);
+    if (parts.length >= 3) return { name: parts[0] ?? "", phone: parts[1] ?? "", address: parts.slice(2).join(" | ") };
+    if (parts.length === 2) return { name: "", phone: parts[0] ?? "", address: parts[1] ?? "" };
+    return { name: "", phone: "", address: raw };
+  })();
+  // originName is no longer stored on orders; only use default center lookup when needed.
+  const fulfillmentCenterName = "";
   const fulfillmentCenter = await resolveFulfillmentCenter({
     env,
     shopDomain,
@@ -323,7 +336,7 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
   });
   const fulfillmentCenterLabel =
     fulfillmentCenter?.originName ||
-    fulfillmentCenterName ||
+    parsedFulfillment?.name ||
     (await resolveDefaultFulfillmentCenterName({ env, shopDomain }));
   const brandingLogo = await resolveBrandingLogo({ env, shopDomain });
   const storeName = await resolveStoreName({ env, shopDomain });
@@ -332,7 +345,7 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
 
   const awb = extractAwbNumber({ firestoreDoc: data });
   const courierType = String(data?.courierType ?? data?.courier_type ?? "").trim();
-  const orderName = String(order?.orderName ?? order?.name ?? "").trim();
+  const orderName = String(order?.orderId ?? order?.orderName ?? order?.name ?? "").trim();
 
   const shipValue = String(order?.totalPrice ?? order?.total_price ?? "").trim();
   const paymentFlag = getPaymentFlag(order?.financialStatus ?? order?.financial_status);
@@ -453,13 +466,14 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
   // FROM block (multiline).
   if (fields.fromBlock) {
     // Per requirements: show direct fulfillment address only (no "Haul Riders -" prefix/suffix).
-    const fromName = fulfillmentCenterLabel || "";
-    const fromAddress1 = fulfillmentCenter?.address1 || shipFrom.address1;
-    const fromAddress2 = fulfillmentCenter?.address2 || shipFrom.address2;
-    const fromCity = fulfillmentCenter?.city || shipFrom.city;
-    const fromState = fulfillmentCenter?.state || shipFrom.state;
-    const fromPin = fulfillmentCenter?.pinCode || shipFrom.pinCode;
-    const fromCountry = fulfillmentCenter?.country || shipFrom.country;
+    const hasInline = Boolean(String(parsedFulfillment?.address ?? "").trim());
+    const fromName = hasInline ? String(parsedFulfillment?.name ?? "").trim() : fulfillmentCenterLabel || "";
+    const fromAddress1 = hasInline ? String(parsedFulfillment?.address ?? "").trim() : fulfillmentCenter?.address1 || shipFrom.address1;
+    const fromAddress2 = hasInline ? String(parsedFulfillment?.phone ?? "").trim() : fulfillmentCenter?.address2 || shipFrom.address2;
+    const fromCity = hasInline ? "" : fulfillmentCenter?.city || shipFrom.city;
+    const fromState = hasInline ? "" : fulfillmentCenter?.state || shipFrom.state;
+    const fromPin = hasInline ? "" : fulfillmentCenter?.pinCode || shipFrom.pinCode;
+    const fromCountry = hasInline ? "" : fulfillmentCenter?.country || shipFrom.country;
 
     const fromLines = [
       fromName,

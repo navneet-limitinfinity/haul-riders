@@ -4,7 +4,6 @@ import { getFirebaseAdmin } from "../auth/firebaseAdmin.js";
 import { ROLE_ADMIN, ROLE_SHOP } from "../auth/roles.js";
 import { getShopCollectionInfo } from "../firestore/shopCollections.js";
 import { parseCsvRows } from "../orders/import/parseCsvRows.js";
-import { parseXlsxRows } from "../orders/import/parseXlsxRows.js";
 import { assignManualOrders, createManualOrders } from "../orders/manualOrdersService.js";
 
 const upload = multer({
@@ -66,8 +65,6 @@ function resolveStoreIdForRequest(req) {
 function detectFileKind(file) {
   const name = String(file?.originalname ?? "").trim().toLowerCase();
   if (name.endsWith(".csv")) return "csv";
-  if (name.endsWith(".xlsx")) return "xlsx";
-  if (name.endsWith(".xls")) return "xls";
   return "";
 }
 
@@ -75,13 +72,12 @@ function parseRowsFromFile(file) {
   const kind = detectFileKind(file);
   if (!file?.buffer) throw new Error("file_required");
   if (kind === "csv") return parseCsvRows(file.buffer);
-  if (kind === "xlsx") return parseXlsxRows(file.buffer);
-  if (kind === "xls") throw new Error("xls_not_supported");
   throw new Error("unsupported_file_type");
 }
 
 export function createManualOrdersRouter({ env, auth }) {
   const router = Router();
+  const shopsCollection = String(env?.auth?.firebase?.shopsCollection ?? "shops").trim() || "shops";
 
   router.post(
     "/orders/import",
@@ -141,6 +137,7 @@ export function createManualOrdersRouter({ env, auth }) {
             storeId: normalizedStoreId,
             displayName,
             user: req.user,
+            shopsCollection,
             rows,
           });
 
@@ -205,6 +202,7 @@ export function createManualOrdersRouter({ env, auth }) {
           storeId: normalizedStoreId,
           displayName,
           user: req.user,
+          shopsCollection,
           rows: [row],
         });
 

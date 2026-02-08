@@ -125,14 +125,14 @@ function renderCreatedRows(rows) {
   const fragment = document.createDocumentFragment();
   for (const row of Array.isArray(rows) ? rows : []) {
     const tr = document.createElement("tr");
-    tr.dataset.orderKey = String(row?.orderKey ?? "");
+    tr.dataset.orderKey = String(row?.orderId ?? "");
 
     const tdCheck = document.createElement("td");
     tdCheck.innerHTML = `<input type="checkbox" data-role="pick" />`;
     tr.appendChild(tdCheck);
 
     const tdOrder = document.createElement("td");
-    tdOrder.textContent = String(row?.orderName ?? row?.orderKey ?? "");
+    tdOrder.textContent = String(row?.orderId ?? "");
     tr.appendChild(tdOrder);
 
     const tdCustomer = document.createElement("td");
@@ -234,6 +234,11 @@ function openDrawer() {
       });
   }
   document.body.classList.add("drawerOpen");
+
+  const fulfillmentStatus = $("singleFulfillmentStatus");
+  if (fulfillmentStatus && !String(fulfillmentStatus.value ?? "").trim()) {
+    fulfillmentStatus.value = "fulfilled";
+  }
 }
 
 function closeDrawer() {
@@ -343,10 +348,7 @@ function readSingleOrderPayload() {
   const financialStatus = paymentStatus === "paid" ? "paid" : "pending";
   const weightParsed = parseWeightKg($("singleWeightKg")?.value ?? "");
   return {
-    orderName: String($("singleOrderName")?.value ?? "").trim(),
-    orderKey: String($("singleOrderKey")?.value ?? "").trim(),
     orderId: String($("singleOrderId")?.value ?? "").trim(),
-    orderGid: String($("singleOrderGid")?.value ?? "").trim(),
     orderDate: String($("singleOrderDate")?.value ?? "").trim(),
     fullName: String($("singleFullName")?.value ?? "").trim(),
     customerEmail: String($("singleCustomerEmail")?.value ?? "").trim(),
@@ -366,6 +368,7 @@ function readSingleOrderPayload() {
     fulfillmentStatus: String($("singleFulfillmentStatus")?.value ?? "").trim(),
     weightKg: weightParsed.value,
     courierType: String($("singleCourierType")?.value ?? "").trim(),
+    courierPartner: String($("singleCourierPartner")?.value ?? "").trim() || "DTDC",
   };
 }
 
@@ -430,7 +433,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   $("ordersUploadBtn")?.addEventListener("click", async () => {
     const file = $("ordersFile")?.files?.[0] ?? null;
     if (!file) {
-      setStatus("Select a CSV/XLSX file first.", { kind: "error" });
+      setStatus("Select a CSV file first.", { kind: "error" });
       return;
     }
 

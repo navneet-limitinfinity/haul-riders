@@ -122,6 +122,7 @@ export function createFirestoreOrdersRouter({ env, auth }) {
       const rows = docs.map((doc) => {
         const data = doc.data() ?? {};
         const order = data.order && typeof data.order === "object" ? data.order : null;
+        const docId = String(doc.id ?? "").trim();
         const shipmentStatus = String(data?.shipmentStatus ?? data?.shipment_status ?? "").trim();
         const consignmentNumber = String(data?.consignmentNumber ?? data?.consignment_number ?? "").trim();
         const courierPartner = String(data?.courierPartner ?? data?.courier_partner ?? "").trim();
@@ -132,11 +133,16 @@ export function createFirestoreOrdersRouter({ env, auth }) {
           data?.expectedDeliveryDate ?? data?.expected_delivery_date ?? ""
         ).trim();
         const updatedAt = String(data?.updatedAt ?? data?.updated_at ?? "").trim();
-        const orderKey = String(data.orderKey ?? doc.id).trim();
+        const orderId = String(order?.orderId ?? order?.orderName ?? order?.order_id ?? "").trim();
+        const orderName = String(order?.orderName ?? orderId).trim();
+        const orderKey = String(data.orderKey ?? orderId).trim();
         const requestedAt = String(data.requestedAt ?? data.updatedAt ?? data.updated_at ?? "").trim();
         return {
           ...(order ?? {}),
+          docId,
           orderKey,
+          orderId,
+          orderName,
           shipmentStatus,
           consignmentNumber,
           courierPartner,
@@ -181,7 +187,7 @@ export function createFirestoreOrdersRouter({ env, auth }) {
           return;
         }
 
-        const orderKey = String(req.body?.orderKey ?? "").trim();
+        const orderKey = String(req.body?.orderKey ?? req.body?.orderId ?? "").trim();
         if (!orderKey) {
           res.status(400).json({ error: "order_key_required" });
           return;
@@ -241,6 +247,7 @@ export function createFirestoreOrdersRouter({ env, auth }) {
       const rows = docs.map((doc) => {
         const data = doc.data() ?? {};
         const order = data.order && typeof data.order === "object" ? data.order : null;
+        const docId = String(doc.id ?? "").trim();
         const shipmentStatus = String(data?.shipmentStatus ?? data?.shipment_status ?? "").trim();
         const consignmentNumber = String(data?.consignmentNumber ?? data?.consignment_number ?? "").trim();
         const courierPartner = String(data?.courierPartner ?? data?.courier_partner ?? "").trim();
@@ -251,11 +258,16 @@ export function createFirestoreOrdersRouter({ env, auth }) {
           data?.expectedDeliveryDate ?? data?.expected_delivery_date ?? ""
         ).trim();
         const updatedAt = String(data?.updatedAt ?? data?.updated_at ?? "").trim();
-        const orderKey = String(data.orderKey ?? doc.id).trim();
+        const orderId = String(order?.orderId ?? order?.orderName ?? order?.order_id ?? "").trim();
+        const orderName = String(order?.orderName ?? orderId).trim();
+        const orderKey = String(data.orderKey ?? orderId).trim();
         const requestedAt = String(data.requestedAt ?? data.updatedAt ?? data.updated_at ?? "").trim();
         return {
           ...(order ?? {}),
+          docId,
           orderKey,
+          orderId,
+          orderName,
           shipmentStatus,
           consignmentNumber,
           courierPartner,
@@ -297,8 +309,9 @@ export function createFirestoreOrdersRouter({ env, auth }) {
         return;
       }
 
+      const docIdFromBody = String(req.body?.docId ?? "").trim();
       const orderKey = String(req.body?.orderKey ?? "").trim();
-      if (!orderKey) {
+      if (!docIdFromBody && !orderKey) {
         res.status(400).json({ error: "order_key_required" });
         return;
       }
@@ -319,7 +332,7 @@ export function createFirestoreOrdersRouter({ env, auth }) {
 
       const admin = await getFirebaseAdmin({ env });
       const { collectionId } = getShopCollectionInfo({ storeId });
-      const docId = toOrderDocId(orderKey);
+      const docId = docIdFromBody || toOrderDocId(orderKey);
       const updatedAt = new Date().toISOString();
 
       await admin
@@ -328,7 +341,6 @@ export function createFirestoreOrdersRouter({ env, auth }) {
         .doc(docId)
         .set(
           {
-            orderKey,
             docId,
             storeId,
             order: {
@@ -350,7 +362,7 @@ export function createFirestoreOrdersRouter({ env, auth }) {
         );
 
       res.setHeader("Cache-Control", "no-store");
-      res.json({ ok: true, orderKey, updatedAt });
+      res.json({ ok: true, docId, orderKey, updatedAt });
     } catch (error) {
       next(error);
     }

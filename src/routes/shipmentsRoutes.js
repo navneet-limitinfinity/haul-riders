@@ -54,9 +54,72 @@ const normalizeShipmentStatus = (value) => {
 export function createShipmentsRouter({ env, auth }) {
   const router = Router();
 
+  const resolveShopDomain = ({ storeId }) => {
+    const raw = String(storeId ?? "").trim().toLowerCase();
+    if (!raw) return "";
+    if (raw.includes(".")) return raw;
+    return `${raw}.myshopify.com`;
+  };
+
+  const normalizeCenterForOrder = (data) => {
+    const d = data && typeof data === "object" ? data : {};
+    const originName = String(d.originName ?? "").trim();
+    if (!originName) return null;
+    return {
+      originName,
+      contactPersonName: String(d.contactPersonName ?? "").trim(),
+      address1: String(d.address1 ?? "").trim(),
+      address2: String(d.address2 ?? "").trim(),
+      city: String(d.city ?? "").trim(),
+      state: String(d.state ?? "").trim(),
+      pinCode: String(d.pinCode ?? "").trim(),
+      country: String(d.country ?? "IN").trim() || "IN",
+      phone: String(d.phone ?? "").trim(),
+      default: Boolean(d.default),
+    };
+  };
+
+  const resolveFulfillmentCenterAddress = async ({ firestore, shopDomain, originName }) => {
+    const domain = resolveShopDomain({ storeId: shopDomain });
+    if (!domain) return null;
+    const shopsCollection = String(env?.auth?.firebase?.shopsCollection ?? "shops").trim() || "shops";
+    const centersCol = firestore.collection(shopsCollection).doc(domain).collection("fulfillmentCenter");
+    const requested = String(originName ?? "").trim();
+    if (!requested) return null;
+    try {
+      const snap = await centersCol.where("originName", "==", requested).limit(1).get();
+      const doc = snap.docs[0];
+      if (!doc?.exists) return null;
+      return normalizeCenterForOrder(doc.data());
+    } catch {
+      return null;
+    }
+  };
+
+  const formatFulfillmentCenterString = (center) => {
+    const c = center && typeof center === "object" ? center : null;
+    if (!c) return "";
+    const phone = String(c.phone ?? "").trim();
+    const contactPersonName = String(c.contactPersonName ?? "").trim();
+    const parts = [
+      String(c.address1 ?? "").trim(),
+      String(c.address2 ?? "").trim(),
+      String(c.city ?? "").trim(),
+      String(c.state ?? "").trim(),
+      String(c.pinCode ?? "").trim(),
+      String(c.country ?? "").trim(),
+    ].filter(Boolean);
+    const addr = parts.join(", ");
+    // Per requirement: do NOT include originName in orders (originName is shop reference only).
+    return [contactPersonName, phone, addr].filter(Boolean).join(" | ");
+  };
+
   const sanitizeOrderForFirestore = (value) => {
     if (!value || typeof value !== "object") return null;
     const order = { ...value };
+    // Do not persist redundant identity fields.
+    delete order.orderKey;
+    delete order.orderName;
     delete order.shipmentStatus;
     delete order.trackingNumber;
     delete order.trackingNumbers;
@@ -93,7 +156,7 @@ export function createShipmentsRouter({ env, auth }) {
 
   router.post("/shipments/assign", auth.requireRole("shop"), async (req, res, next) => {
     try {
-      const orderKey = String(req.body?.orderKey ?? "").trim();
+      const orderKey = String(req.body?.orderKey ?? req.body?.orderId ?? "").trim();
       if (!orderKey) {
         res.status(400).json({ error: "order_key_required" });
         return;
@@ -139,13 +202,27 @@ export function createShipmentsRouter({ env, auth }) {
         return;
       }
 
+      const firestore = admin.firestore();
+      const centerName = String(order?.fulfillmentCenter ?? "").trim();
+      const centerAddress = centerName
+        ? await resolveFulfillmentCenterAddress({
+            firestore,
+            shopDomain: normalizedStoreId,
+            originName: centerName,
+          })
+        : null;
+      const centerString = centerAddress ? formatFulfillmentCenterString(centerAddress) : "";
+      const orderToPersist =
+        order && typeof order === "object"
+          ? { ...order, ...(centerString ? { fulfillmentCenter: centerString } : {}) }
+          : order;
+
       await docRef.set(
           {
-            orderKey,
             docId,
             storeId: normalizedStoreId,
             shopName: displayName,
-            order,
+            order: orderToPersist,
             shipmentStatus,
             shippingDate,
             ...(weightKg != null ? { weightKg } : {}),
@@ -174,12 +251,6 @@ export function createShipmentsRouter({ env, auth }) {
 
   router.post("/shipments/update", auth.requireRole("admin"), async (req, res, next) => {
     try {
-      const orderKey = String(req.body?.orderKey ?? "").trim();
-      if (!orderKey) {
-        res.status(400).json({ error: "order_key_required" });
-        return;
-      }
-
       if (env?.auth?.provider !== "firebase") {
         res.status(400).json({ error: "auth_provider_not_firebase" });
         return;
@@ -201,7 +272,11 @@ export function createShipmentsRouter({ env, auth }) {
       const { collectionId, displayName, storeId: normalizedStoreId } = getShopCollectionInfo({
         storeId,
       });
-      const docId = toOrderDocId(orderKey);
+      const docId = String(req.body?.docId ?? "").trim() || toOrderDocId(String(req.body?.orderKey ?? "").trim());
+      if (!docId) {
+        res.status(400).json({ error: "order_key_required" });
+        return;
+      }
       const docRef = admin.firestore().collection(collectionId).doc(docId);
       const historyRef = docRef.collection("shipment_status_history").doc();
 
@@ -214,7 +289,6 @@ export function createShipmentsRouter({ env, auth }) {
         tx.set(
           docRef,
           {
-            orderKey,
             docId,
             storeId: normalizedStoreId,
             shopName: displayName,
@@ -266,8 +340,9 @@ export function createShipmentsRouter({ env, auth }) {
           return;
         }
 
+        const docIdFromQuery = String(req.query?.docId ?? "").trim();
         const orderKey = String(req.query?.orderKey ?? "").trim();
-        if (!orderKey) {
+        if (!docIdFromQuery && !orderKey) {
           res.status(400).json({ error: "order_key_required" });
           return;
         }
@@ -284,7 +359,7 @@ export function createShipmentsRouter({ env, auth }) {
 
         const admin = await getFirebaseAdmin({ env });
         const { collectionId } = getShopCollectionInfo({ storeId });
-        const docId = toOrderDocId(orderKey);
+        const docId = docIdFromQuery || toOrderDocId(orderKey);
         const snap = await admin.firestore().collection(collectionId).doc(docId).get();
         if (!snap.exists) {
           res.status(404).json({ error: "shipment_not_found" });
@@ -329,11 +404,15 @@ export function createShipmentsRouter({ env, auth }) {
         const orderKeys = orderKeysRaw
           .map((v) => String(v ?? "").trim())
           .filter(Boolean);
-        if (orderKeys.length === 0) {
+        const docIdsRaw = Array.isArray(req.body?.docIds) ? req.body.docIds : [];
+        const docIds = docIdsRaw.map((v) => String(v ?? "").trim()).filter(Boolean);
+
+        if (orderKeys.length === 0 && docIds.length === 0) {
           res.status(400).json({ error: "order_keys_required" });
           return;
         }
-        if (orderKeys.length > 50) {
+        const totalCount = docIds.length || orderKeys.length;
+        if (totalCount > 50) {
           res.status(400).json({ error: "order_keys_limit_exceeded", limit: 50 });
           return;
         }
@@ -353,14 +432,15 @@ export function createShipmentsRouter({ env, auth }) {
 
         const missing = [];
         const docs = [];
-        for (const orderKey of orderKeys) {
-          const docId = toOrderDocId(orderKey);
+        const idsToFetch = docIds.length ? docIds : orderKeys.map((k) => toOrderDocId(k));
+        for (let i = 0; i < idsToFetch.length; i += 1) {
+          const docId = idsToFetch[i];
           const snap = await admin.firestore().collection(collectionId).doc(docId).get();
           if (!snap.exists) {
-            missing.push(orderKey);
+            missing.push(docIds.length ? docId : orderKeys[i]);
             continue;
           }
-          docs.push({ orderKey, docId, data: snap.data() ?? {} });
+          docs.push({ docId, data: snap.data() ?? {} });
         }
 
         if (missing.length) {
