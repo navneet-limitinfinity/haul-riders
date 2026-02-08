@@ -5,14 +5,14 @@ This file is the single reference for **where we read/write Firestore** in this 
 ## 0) Collection Naming & Document IDs
 
 ### Shop Orders/Shipments Collection ID
-All order/shipment documents for a shop live in a Firestore collection derived from `storeId`:
+All per-shop order/shipment documents live in a Firestore collection derived from `storeId`:
 - Source: `src/firestore/shopCollections.js`
 - Input `storeId` can be:
   - full domain: `smylo-devstore.myshopify.com`
   - store key: `64dd6e-2`
 - Normalization:
   - `storeKey` = domain without `.myshopify.com` (or already a key)
-  - `collectionId` = sanitized version of `storeKey` (lowercased, non `[a-z0-9_-]` replaced with `_`)
+  - `collectionId` = sanitized `storeKey` (lowercased, non `[a-z0-9_-]` replaced with `_`)
 
 Examples:
 - `smylo-devstore.myshopify.com` → `storeKey: smylo-devstore` → `collectionId: smylo-devstore`
@@ -28,159 +28,158 @@ Order docs are stored as deterministic IDs derived from `orderKey`:
 ### 1.1 Users Collection (`FIREBASE_USERS_COLLECTION`, default: `users`)
 **Reads**
 - `src/auth/createAuth.js`
-  - `users/<uid>` read to resolve:
+  - Reads `users/<uid>` to resolve:
     - `role` (`admin|shop`)
     - `storeId` (shop domain like `abc.myshopify.com`)
 
 **Writes**
-- None in this repo (auth only reads).
+- None in this repo.
 
 ### 1.2 Shops Collection (`FIREBASE_SHOPS_COLLECTION`, default: `shops`)
 **Reads**
 - `src/firestore/shops.js` (helper)
-- `src/routes/shopsRoutes.js`
-  - Lists all shops for admin store dropdown.
+- `src/routes/shopsRoutes.js` (admin store dropdown)
+- `src/shopify/resolveShopifyAccessToken.js` reads `shops/<shopDomain>/shopify/config.accessToken`
 
 **Writes**
 - `src/routes/shopifyOAuthRoutes.js`
-  - `shops/<shopDomain>` `.set(..., { merge:true })`
-    - Keys written (top-level):
-      - `shopDomain`
-      - `installedAt`
-      - `updatedAt`
-      - `oauth` (object; minimal metadata)
-  - `shops/<shopDomain>/shopify/config` `.set(..., { merge:true })`
-    - Keys written:
-      - `accessToken`
-      - `scopes`
-      - `updatedAt`
-
-**Reads (token fetch)**
-- `src/shopify/resolveShopifyAccessToken.js`
-  - Reads `shops/<shopDomain>/shopify/config.accessToken`
+  - `shops/<shopDomain>`:
+    - `shopDomain`
+    - `installedAt`
+    - `updatedAt`
+    - `oauth` (object; minimal metadata)
+  - `shops/<shopDomain>/shopify/config`:
+    - `accessToken`
+    - `scopes`
+    - `updatedAt`
 
 ### 1.3 Fulfillment Centers Subcollection
-Stored under the shops collection:
-- Path: `shops/<shopDomain>/fulfillmentCenter/<centerId>`
+Path:
+- `shops/<shopDomain>/fulfillmentCenter/<centerId>`
 
 **Reads/Writes**
 - `src/routes/firestoreOrdersRoutes.js`
-  - `GET /api/firestore/fulfillment-centers` → reads list ordered by `originName`
-  - `POST /api/firestore/fulfillment-centers` → creates new doc, may batch-update other docs to unset `default`
-  - `PUT /api/firestore/fulfillment-centers/:id` → updates center, may batch-update others to set/unset `default`
-  - `DELETE /api/firestore/fulfillment-centers/:id` → deletes center, may batch-update another center as next default
+  - `GET /api/firestore/fulfillment-centers`
+  - `POST /api/firestore/fulfillment-centers`
+  - `PUT /api/firestore/fulfillment-centers/:id`
+  - `DELETE /api/firestore/fulfillment-centers/:id`
 
-Keys written in a center doc:
+Keys in a center doc:
 - `originName`
 - `contactPersonName`
-- `address1`
-- `address2`
-- `city`
-- `state`
-- `pinCode`
-- `country`
+- `address1`, `address2`, `city`, `state`, `pinCode`, `country`
 - `phone`
 - `default` (boolean)
-- `createdAt`
-- `updatedAt`
+- `createdAt`, `updatedAt`
 
 ### 1.4 Store Details + Branding (Shop-only)
-Stored under the shops collection:
 
 **Store details**
-- Path: `shops/<shopDomain>` (doc fields)
+- Path: `shops/<shopDomain>` (doc field: `storeDetails`)
 - File: `src/routes/storeRoutes.js`
-- Endpoints (shop role):
+- Endpoints:
   - `GET /api/store/details`
   - `POST /api/store/details`
-- Keys written (under `storeDetails` object):
+- Keys written (under `storeDetails`):
   - `storeName`
   - `registeredAddress`
   - `gstNumber`
-  - `stateCode` (GST state code; e.g. `06`)
-  - `stateName` (state/UT name; e.g. `Haryana`)
+  - `stateCode`
+  - `stateName`
   - `websiteAddress`
   - `contactPerson { name, email, phone }`
   - `updatedAt`
 
 **Shopify UI links (Shop Store Details page)**
-- Path: `shops/<shopDomain>` (doc fields)
-- File: `src/routes/storeRoutes.js`, `src/public/store-details.js`
-- Keys read (under `shopifyUi` object):
-  - `connectUrl` (used for "Connect Shopify Store" button)
-  - `authenticateUrl` (used for "Authenticate us to fetch the orders from store" link)
-- Connected state:
-  - derived from `shops/<shopDomain>/shopify/config.accessToken` (read-only inference)
+- Path: `shops/<shopDomain>` (doc field: `shopifyUi`)
+- Files: `src/routes/storeRoutes.js`, `src/public/store-details.js`
+- Keys read:
+  - `connectUrl`
+  - `authenticateUrl`
 
 **Branding logo**
 - Path: `shops/<shopDomain>/branding/logo`
 - File: `src/routes/storeRoutes.js`
-- Endpoints (shop role):
-  - `GET /api/store/branding/logo` (returns image bytes)
+- Endpoints:
+  - `GET /api/store/branding/logo`
   - `POST /api/store/branding/logo` (multipart; field: `logo`)
 - Keys written:
-  - `contentType` (`image/png` or `image/jpeg`)
+  - `contentType`
   - `sizeBytes`
   - `updatedAt`
-  - `data` (Firestore `Blob`, image bytes; max 1MB)
+  - `data` (Firestore Blob; max 1MB)
 
 **Reads**
-- `src/routes/pagesRoutes.js` (shop pages render top-right `<img>` pointing to `/api/store/branding/logo`)
-- `src/public/store-details.js` (shop UI to edit store details + upload logo)
-- `src/shipments/label/shippingLabelPdf.js` (embeds logo into label PDF when present)
+- `src/public/store-details.js` (upload UI)
+- `src/routes/pagesRoutes.js` (shop pages render top-right logo `<img>`)
+- `src/shipments/label/shippingLabelPdf.js` (embeds logo into PDF)
 
 ### 1.5 Meta Counters (Global)
 Used for generating unique, increasing manual `orderName` values (non-Shopify orders).
-
 - Path: `meta/counters`
+- File: `src/firestore/orderSequence.js`
 - Keys written:
   - `nextOrderSeq` (number)
   - `updatedAt` (ISO)
-- File: `src/firestore/orderSequence.js`
 
 ## 2) Shop Orders/Shipments Collection (Per-Store)
 
 Path:
 - `/<collectionId>/<orderDocId>`
 
-This collection contains the “orders dashboard” documents (orders + shipment metadata).
+### 2.0 Canonical Schema + Startup Migration
+This project enforces a **single canonical schema** for order docs. Any legacy/duplicate keys are removed by a **startup migration**:
+- Migration: `src/firestore/migrateOrders.js`
+- Hook: `src/server.js` calls `migrateAllOrdersAtStartup({ env, logger })`
 
-### 2.1 Canonical/Current Keys Used by New Tabs + APIs
-These are the keys the **Consignments APIs** and **new tabs** aim to rely on:
+### 2.1 Canonical Keys (Order Doc)
+Identity / ownership:
+- `orderKey` (string; primary key used throughout UI)
+- `docId` (string; `order_<sha256(orderKey)>`)
+- `storeId` (string; normalized store key)
+- `shopName` (string; display)
 
-Top-level (snake_case “dashboard fields”):
-- `shipment_status` (display string; e.g. `In Transit`, `Delivered`, `RTO Accepted`, …)
-- `courier_partner` (e.g. `DTDC`)
-- `consignment_number` (AWB / tracking code)
-- `weight` (number, kg)
-- `courier_type` (string)
-- `shipping_date` (ISO string; used for sorting)
-- `expected_delivery_date` (ISO string; optional)
-- `updated_at` (ISO string; updated on each status change)
+Order object (sanitized; no tracking/status duplicates inside):
+- `order` (object)
+  - `index`
+  - `orderKey`
+  - `orderId`
+  - `orderGid`
+  - `orderName`
+  - `createdAt` (ISO)
+  - `customerEmail`
+  - `financialStatus`
+  - `paymentStatus`
+  - `totalPrice`
+  - `invoiceValue`
+  - `productDescription`
+  - `fulfillmentCenter`
+  - `fulfillmentStatus`
+  - `shipping`:
+    - `fullName`
+    - `address1`
+    - `address2`
+    - `city`
+    - `state`
+    - `pinCode`
+    - `phone1`
+    - `phone2`
 
-Top-level (existing/legacy keys still present and used):
-- `shipmentStatus` (internal string; e.g. `assigned`, `in_transit`, `delivered`, `rto_initiated`, …)
-- `trackingNumber` (tracking code, historically used)
-- `requestedAt` (ISO string; used historically for ordering)
-- `updatedAt` (ISO string; historically used)
-- `order` (object; projected from Shopify/bulk import)
-- `shipment` (object; internal shipment details)
+Shipment/dashboard fields (top-level):
+- `shipmentStatus` (display string; e.g. `Assigned`, `In Transit`, `Delivered`, `RTO Accepted`, …)
+- `courierPartner` (e.g. `DTDC`)
+- `consignmentNumber` (AWB / tracking code)
+- `weightKg` (number or string; kg; 1 decimal preferred)
+- `courierType` (string)
+- `shippingDate` (ISO; used for sorting in In Transit/Delivered/RTO)
+- `expectedDeliveryDate` (ISO; optional)
+- `updatedAt` (ISO; updated on every status change)
+
+Metadata:
+- `requestedAt` (ISO; “ship requested” timestamp used for ordering in Assigned)
 - `event` (string)
-- `requestedBy` (object)
-- `updatedBy` (object)
-- `storeId` (normalized store key, not full domain)
-- `shopName`
-- `docId`
-- `orderKey`
-
-Nested `shipment` object keys commonly used:
-- `shipment.shipmentStatus`
-- `shipment.trackingNumber`
-- `shipment.assignedAt`
-- `shipment.shippingDate`
-- `shipment.updatedAt`
-- `shipment.weightKg`
-- `shipment.courierType`
+- `requestedBy { uid, email, role }`
+- `updatedBy { uid, email, role }`
 
 ### 2.2 Status History Subcollection
 Path:
@@ -190,192 +189,149 @@ Written on every status change (admin update + bulk status + consignments update
 - `changed_at` (ISO)
 - `from_shipment_status` (display)
 - `to_shipment_status` (display)
-- `from_internal_status` (internal)
-- `to_internal_status` (internal)
-- `updated_by`:
-  - `uid`
-  - `email`
-  - `role`
+- `from_internal_status` (always empty string)
+- `to_internal_status` (always empty string)
+- `updated_by { uid, email, role }`
 
-## 3) Endpoints / Modules That WRITE Shop Order Docs
+## 3) Writers (Order Docs)
 
 ### 3.1 Shipments: Assign (Shop)
 - File: `src/routes/shipmentsRoutes.js`
 - Endpoint: `POST /api/shipments/assign` (role: shop)
-- Write: `/<collectionId>/<orderDocId>` with `{ merge:true }`
+- Writes to `/<collectionId>/<orderDocId>` with `{ merge:true }`
 
-Writes/updates keys (top-level):
+Keys written/updated:
 - `orderKey`, `docId`, `storeId`, `shopName`
-- `order` (full order object submitted by client)
-- `shipmentStatus: "assigned"`
-- `shipment_status: "Assigned"`
-- `shipping_date` (ISO)
-- `updated_at` (ISO)
-- `updatedAt` (ISO)
-- `weight` (from `weightKg`, if provided)
-- `courier_type` (from `courierType`, if provided)
-- `shipment`:
-  - `shipmentStatus`, `assignedAt`, `shippingDate`, `updatedAt`
-  - optional: `weightKg`, `courierType`
+- `order` (sanitized order object from client)
+- `shipmentStatus: "Assigned"`
+- `shippingDate` (ISO; set to assign time)
+- `updatedAt` (ISO; set to assign time)
+- optional: `weightKg`, `courierType`
 - `event: "ship_requested"`
 - `requestedBy { uid, email, role }`
 - `requestedAt`
 
-### 3.1b Manual Orders: Create/Import (Shop + Admin)
-Creates **manual “New” orders** (not fetched from Shopify).
-
-- File: `src/routes/manualOrdersRoutes.js`, `src/orders/manualOrdersService.js`
+### 3.2 Manual Orders: Create/Import (Admin/Shop)
+- Files: `src/routes/manualOrdersRoutes.js`, `src/orders/manualOrdersService.js`
 - Endpoints:
-  - `POST /api/orders/import` (multipart; field: `file`; roles: `admin|shop`)
-  - `GET /api/orders/import/jobs/:jobId` (polling; roles: `admin|shop`)
-  - `POST /api/orders/create` (JSON; roles: `admin|shop`)
-- Writes to `/<collectionId>/<orderDocId>` with `{ merge:true }`
-- Keys written (top-level snake_case + legacy compatibility):
-  - `shipmentStatus: "new"`
-  - `shipment_status: "New"`
-  - `courier_partner`, `consignment_number`, `weight`, `courier_type`, `shipping_date`, `expected_delivery_date`, `updated_at`
-  - `order` (object), `shipment` (object), `requestedBy`, `requestedAt`, `updatedAt`
+  - `POST /api/orders/import` (multipart; field: `file`)
+  - `POST /api/orders/create` (JSON)
 
-### 3.1c Manual Orders: Assign to Ship (Shop + Admin)
-Marks existing manual orders as `Assigned` so they appear in the Assigned tab.
-
-- File: `src/routes/manualOrdersRoutes.js`, `src/orders/manualOrdersService.js`
-- Endpoint: `POST /api/orders/assign` (roles: `admin|shop`)
-- Writes updates to `/<collectionId>/<orderDocId>` with `{ merge:true }`
-  - sets `shipmentStatus: "assigned"`, `shipment_status: "Assigned"`, `shipment.assignedAt`, `shipping_date`, `updated_at`
-
-### 3.2 Shipments: Update Status/Tracking (Admin)
-- File: `src/routes/shipmentsRoutes.js`
-- Endpoint: `POST /api/shipments/update` (role: admin)
-- Write: Firestore transaction:
-  - Updates `/<collectionId>/<orderDocId>` (merge)
-  - Inserts `shipment_status_history/<autoId>`
-
-Updates keys:
-- `shipmentStatus` (internal)
-- `shipment_status` (display)
-- `trackingNumber` (if provided)
-- `consignment_number` (mirrors trackingNumber, if provided)
-- `shipping_date` (preserved/backfilled)
-- `updated_at`, `updatedAt`
-- `shipment.{ shipmentStatus, trackingNumber?, shippingDate, updatedAt }`
-- `event: "admin_update"`
-- `updatedBy { uid, email, role }`
-
-### 3.3 Bulk Orders Upload (Admin)
-- File: `src/routes/bulkOrdersRoutes.js`
-- Endpoint: `POST /api/admin/bulk-orders/upload` (role: admin)
-- Write: `/<collectionId>/<orderDocId>` `{ merge:true }`
-
-Writes/updates keys:
+Keys written:
 - `orderKey`, `docId`, `storeId`, `shopName`
-- `order` (projected from CSV)
-- `shipmentStatus: "assigned"`
-- `shipment_status: "Assigned"`
-- `trackingNumber` (if AWB provided)
-- `consignment_number` (if AWB provided)
-- `courier_partner` (CSV `trackingCompany` or default)
-- `weight`, `courier_type` (if provided)
-- `shipping_date` (set to assignedAt)
-- `updated_at` (set to assignedAt)
-- `shipment`:
-  - `shipmentStatus`, `assignedAt`, `shippingDate`, `updatedAt`
-  - optional: `courierType`, `weightKg`, `awbNumber`, `trackingNumber`
-- `event: "bulk_csv_upload"`
-- `requestedBy { uid, email, role }`
-- `requestedAt`
+- `order` (sanitized order object)
+- `shipmentStatus: "New"`
+- `courierPartner`, `consignmentNumber`, `weightKg`, `courierType`, `shippingDate`, `expectedDeliveryDate`
 - `updatedAt`
+- `event: "manual_order_create"`
+- `requestedBy`, `requestedAt`
 
-### 3.4 Bulk Status Upload (Admin)
+### 3.3 Manual Orders: Assign to Ship (Admin/Shop)
+- Files: `src/routes/manualOrdersRoutes.js`, `src/orders/manualOrdersService.js`
+- Endpoint: `POST /api/orders/assign`
+
+Keys updated:
+- `shipmentStatus: "Assigned"`
+- `shippingDate`, `updatedAt`
+- `event: "manual_order_assign"`
+- `updatedBy`
+
+### 3.4 Shipments: Update Status/Tracking (Admin)
+- File: `src/routes/shipmentsRoutes.js`
+- Endpoint: `POST /api/shipments/update`
+- Transaction:
+  - Updates `/<collectionId>/<orderDocId>`
+  - Inserts `shipment_status_history/<autoId>`
+
+Keys updated:
+- `shipmentStatus` (display)
+- optional: `consignmentNumber`
+- `shippingDate` (preserved/backfilled)
+- `updatedAt`
+- `event: "admin_update"`
+- `updatedBy`
+
+### 3.5 Bulk Orders Upload (Admin)
 - File: `src/routes/bulkOrdersRoutes.js`
-- Endpoint: `POST /api/admin/bulk-status/upload` (role: admin)
-- Write: For each matched doc, Firestore transaction:
-  - Updates `/<collectionId>/<orderDocId>` (merge)
+- Endpoint: `POST /api/admin/bulk-orders/upload`
+- Writes to `/<collectionId>/<orderDocId>` with `{ merge:true }`
+
+Keys written/updated:
+- `orderKey`, `docId`, `storeId`, `shopName`
+- `order` (sanitized order object; `createdAt` is the upload timestamp)
+- `shipmentStatus: "Assigned"` (or preserved if already present)
+- `courierPartner`, `consignmentNumber`
+- optional: `weightKg`, `courierType`
+- `shippingDate`
+- optional: `expectedDeliveryDate`
+- `updatedAt`
+- `event: "bulk_csv_upload"`
+- `requestedBy`, `requestedAt`
+
+### 3.6 Bulk Status Upload (Admin)
+- File: `src/routes/bulkOrdersRoutes.js`
+- Endpoint: `POST /api/admin/bulk-status/upload`
+- Transaction:
+  - Updates `/<collectionId>/<orderDocId>`
   - Inserts `shipment_status_history/<autoId>`
 
-Updates keys:
-- `shipmentStatus` (internal, normalized)
-- `shipment_status` (display, normalized)
-- `trackingNumber` (from CSV)
-- `consignment_number` (mirrors trackingNumber)
-- `shipping_date` (preserved/backfilled)
-- `updated_at`, `updatedAt` (defaults to "now"; can be provided as `Updated On` / `updated_at` in CSV)
-- `shipment.{ shipmentStatus, trackingNumber, shippingDate, updatedAt }`
+Keys updated:
+- `shipmentStatus` (display)
+- `consignmentNumber` (from CSV)
+- `courierPartner` (from CSV or default)
+- `shippingDate` (preserved/backfilled)
+- `updatedAt` (defaults to now; CSV may provide `updatedAt` / `updated_at` / `Updated On`)
 - `event: "bulk_status_csv"`
-- `updatedBy { uid, email, role }`
+- `updatedBy`
 
-### 3.5 Consignments Status Update (Admin)
+### 3.7 Consignments Status Update (Admin)
 - File: `src/routes/consignmentsRoutes.js`
-- Endpoint: `POST /api/consignments/update-status` (role: admin)
-- Write: Firestore transaction:
-  - Updates `/<collectionId>/<orderDocId>` (merge)
+- Endpoint: `POST /api/consignments/update-status`
+- Transaction:
+  - Updates `/<collectionId>/<orderDocId>`
   - Inserts `shipment_status_history/<autoId>`
 
-Updates keys:
-- `shipment_status` (display; strict allowed values for that UI)
-- `shipmentStatus` (internal mapped value)
-- `shipping_date` (preserved/backfilled)
-- `updated_at`, `updatedAt`
-- `shipment.{ shipmentStatus, shippingDate, updatedAt }`
+Keys updated:
+- `shipmentStatus` (display; strict allowed values per tab)
+- `shippingDate` (preserved/backfilled)
+- `updatedAt`
 - `event: "status_update"`
-- `updatedBy { uid, email, role }`
+- `updatedBy`
 
-### 3.6 Shop Edit Shipping Address (Shop)
+### 3.8 Shop Edit Shipping Address (Shop)
 - File: `src/routes/firestoreOrdersRoutes.js`
-- Endpoint: `POST /api/firestore/orders/update-shipping` (role: shop)
-- Write: `/<collectionId>/<orderDocId>` `{ merge:true }`
+- Endpoint: `POST /api/firestore/orders/update-shipping`
+- Writes to `/<collectionId>/<orderDocId>` with `{ merge:true }`
 
-Updates keys:
+Keys updated:
 - `order.shipping.{ fullName, address1, address2, city, state, pinCode, phone1, phone2 }`
 - `event: "shop_edit"`
 - `updatedAt`
 
-## 4) Endpoints / Modules That READ Shop Order Docs
+## 4) Readers (Order Docs)
 
 ### 4.1 Server-side list endpoints (HTTP)
 - `src/routes/firestoreOrdersRoutes.js`
   - `GET /api/firestore/orders` (shop)
   - `GET /api/firestore/admin/orders` (admin)
-  - Reads:
-    - `order` (object)
-    - `orderKey`
-    - `shipmentStatus` OR `shipment.shipmentStatus`
-    - `trackingNumber` OR `shipment.trackingNumber`
-    - `requestedAt`
+  - Reads: `order`, `orderKey`, `shipmentStatus`, `consignmentNumber`, `courierPartner`, `weightKg`, `courierType`, `shippingDate`, `expectedDeliveryDate`, `updatedAt`, `requestedAt` (with legacy fallbacks during migration).
 
 - `src/routes/consignmentsRoutes.js`
   - `GET /api/consignments/in_transit|delivered|rto` (shop/admin)
-  - Reads (and backfills when missing):
-    - `shipping_date` (or derived)
-    - `shipment_status` (or derived from internal)
-    - `updated_at` (or derived)
-    - `consignment_number` (or derived from trackingNumber)
-    - `courier_partner` (or derived/default)
-    - order fields from `order` object (for UI display)
+  - Reads canonical top-level shipment fields + `order` to project tab rows.
 
 ### 4.2 Client-side Firestore realtime (Shop Assigned tab)
 - File: `src/public/orders.js`
-- Uses Firebase Web SDK to listen to `/<collectionId>` (collection id injected into HTML).
-- Reads:
-  - `shipmentStatus` OR `shipment.shipmentStatus`
-  - `trackingNumber` OR `shipment.trackingNumber`
-  - `order` object
-  - `requestedAt`
+- Reads: `shipmentStatus`, `consignmentNumber`, `courierPartner`, `weightKg`, `courierType`, `shippingDate`, `expectedDeliveryDate`, `updatedAt`, `order`, `requestedAt` (with legacy fallbacks during migration).
 
-## 5) Key Mapping Notes (Legacy vs New)
-
-### 5.1 Status Keys
-- **Internal**: `shipmentStatus` (legacy) / `shipment.shipmentStatus` (legacy)
-  - Examples seen in DB: `assigned`, `in_transit`, `delivered`, `rto_initiated`, `at_destination`, etc.
-- **Display**: `shipment_status` (new; required for the new tabs filtering)
-  - Examples: `In Transit`, `At Destination`, `Delivered`, `RTO Accepted`, `RTO Delivered`, etc.
-
-### 5.2 Tracking Keys
-- Legacy: `trackingNumber`, `shipment.trackingNumber`
-- New: `consignment_number` (AWB)
-- Partner: `courier_partner` (defaults to `DTDC` when AWB exists and partner missing)
-
-### 5.3 Time Keys
-- Legacy ordering: `requestedAt`
-- New sorting requirement: `shipping_date` (if missing, derived from `shipment.shippingDate` → `shipment.assignedAt` → `requestedAt` → `updatedAt`)
-- Updated timestamp: `updated_at` (if missing, derived from `shipment.updatedAt` or `updatedAt`)
+## 5) Removed Legacy Keys (Startup Migration Deletes These)
+These must not be written by current code. If found in DB, startup migration removes them:
+- `shipment_status`
+- `trackingNumber`
+- `awbNumber`
+- `trackingCompany`
+- `updated_at`
+- `shipment` (entire object)
+- `order.trackingNumbers`, `order.trackingNumbersText`, `order.trackingCompany`, `order.trackingUrl`, `order.trackingUrls`
+- `order.shipping.phoneNumbers`, `order.shipping.phoneNumbersText`
+- `consignment_number`, `courier_partner`, `courier_type`, `weight`, `shipping_date`, `expected_delivery_date`

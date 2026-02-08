@@ -371,7 +371,7 @@ function renderBulkUploadPage({ userLabel }) {
             <div class="bulkCardHeader">
               <div>
                 <div class="bulkCardTitle">Update shipment status (CSV)</div>
-                <div class="bulkCardHint">Matches rows by Tracking Number and updates shipment status.</div>
+                <div class="bulkCardHint">Matches rows by Consignment Number (AWB) and updates shipment status.</div>
               </div>
             </div>
 
@@ -401,7 +401,8 @@ function renderBulkUploadPage({ userLabel }) {
               <summary>CSV columns</summary>
               <ul class="bulkList">
                 <li><code>Tracking Numbers</code> (or <code>trackingNumber</code>)</li>
-                <li><code>Shipments Status</code> (or <code>shipmentStatus</code>)</li>
+                <li><code>consignmentNumber</code> (or <code>consignment_number</code>/<code>Tracking Numbers</code>/<code>trackingNumber</code>)</li>
+                <li><code>shipmentStatus</code> (or <code>shipment_status</code>/<code>Shipments Status</code>)</li>
               </ul>
               <div class="bulkHint">
                 Supported values: <code>In Transit</code>, <code>Undelivered</code>, <code>At Destination</code>,
@@ -423,7 +424,7 @@ function renderBulkUploadPage({ userLabel }) {
               <div class="bulkFields">
                 <label class="field">
                   <span>Order CSV file</span>
-                  <input id="csvFile" type="file" accept=".csv,text/csv" />
+                  <input id="csvFile" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
                 </label>
               </div>
               <button id="uploadBtn" class="btn btnSecondary bulkBtnFull" type="button">
@@ -450,8 +451,8 @@ function renderBulkUploadPage({ userLabel }) {
                 <li><code>totalPrice</code>, <code>financialStatus</code> (e.g. <code>paid</code> or <code>pending</code>)</li>
               </ul>
               <div class="bulkHint">
-                Optional (tracking/shipment): <code>consignment_number</code>/<code>awbNumber</code>, <code>courier_partner</code>/<code>trackingCompany</code>, <code>courier_type</code>/<code>courierType</code>, <code>weight</code>/<code>weightKg</code>, <code>shipping_date</code>, <code>expected_delivery_date</code>.
-                Optional (order): <code>customerEmail</code>, <code>address2</code>, <code>phone2</code>, <code>content_and_quantity</code> (or <code>productDescription</code>), <code>invoice_value</code>.
+                Optional (order): <code>orderId</code>, <code>orderGid</code>, <code>customerEmail</code>, <code>paymentStatus</code>, <code>address2</code>, <code>phone2</code>, <code>itemAndQuantity</code> (or <code>content_and_quantity</code>), <code>invoiceValue</code> (or <code>invoice_value</code>), <code>fulfillmentCenter</code>, <code>fulfillmentStatus</code>.
+                Optional (shipment): <code>shipmentStatus</code>, <code>courierPartner</code>, <code>consignmentNumber</code>, <code>courierType</code>, <code>weightKg</code>, <code>shippingDate</code>, <code>expectedDeliveryDate</code>, <code>updatedAt</code>.
               </div>
             </details>
           </div>
@@ -1060,9 +1061,9 @@ function renderCreateOrdersPage({ role, userLabel, storeId }) {
                 <ul class="bulkList">
                   <li><code>orderName</code> (optional; auto-generated if missing)</li>
                   <li><code>fullName</code>, <code>phone1</code>, <code>address1</code>, <code>city</code>, <code>state</code>, <code>pinCode</code></li>
-                  <li><code>totalPrice</code>, <code>financialStatus</code></li>
+                  <li><code>invoiceValue</code>, <code>paymentStatus</code></li>
                 </ul>
-                <div class="bulkHint">Optional: <code>customerEmail</code>, <code>address2</code>, <code>phone2</code>, <code>content_and_quantity</code>, <code>invoice_value</code>, <code>order_date</code>.</div>
+                <div class="bulkHint">Optional: <code>orderKey</code>, <code>orderId</code>, <code>orderGid</code>, <code>customerEmail</code>, <code>address2</code>, <code>phone2</code>, <code>productDescription</code>, <code>fulfillmentCenter</code>, <code>fulfillmentStatus</code>, <code>orderDate</code>, <code>weightKg</code>, <code>courierType</code>.</div>
               </details>
             </div>
 
@@ -1133,65 +1134,121 @@ function renderCreateOrdersPage({ role, userLabel, storeId }) {
         </button>
       </div>
       <div class="sideDrawerBody">
-        <div class="modalGrid">
-          <label class="field">
+        <div class="drawerSectionHeader">Order</div>
+        <div class="orderCreateGrid">
+          <label class="field span-4">
             <span>Order Name (optional)</span>
             <input id="singleOrderName" type="text" placeholder="Leave blank to auto-generate" />
           </label>
-          <label class="field">
-            <span>Order Date (optional)</span>
-            <input id="singleOrderDate" type="text" placeholder="YYYY-MM-DD or ISO" />
+          <label class="field span-4">
+            <span>Order Key (optional)</span>
+            <input id="singleOrderKey" type="text" placeholder="Leave blank to use Order Name" />
           </label>
-          <label class="field">
+          <label class="field span-4">
+            <span>Order ID (optional)</span>
+            <input id="singleOrderId" type="text" class="mono" inputmode="numeric" />
+          </label>
+
+          <label class="field span-8">
+            <span>Order GID (optional)</span>
+            <input id="singleOrderGid" type="text" class="mono" placeholder="Shopify GraphQL ID (optional)" />
+          </label>
+          <label class="field span-4">
+            <span>Order Date (optional)</span>
+            <input id="singleOrderDate" type="text" class="mono" placeholder="DD-MM-YYYY" />
+          </label>
+        </div>
+
+        <div class="drawerSectionHeader">Customer</div>
+        <div class="orderCreateGrid">
+          <label class="field span-6">
             <span>Customer Name</span>
             <input id="singleFullName" type="text" />
           </label>
-          <label class="field">
+          <label class="field span-6">
             <span>Customer Email (optional)</span>
-            <input id="singleCustomerEmail" type="email" />
+            <input id="singleCustomerEmail" type="email" placeholder="name@example.com" />
+            <small id="singleEmailHint" class="fieldHint"></small>
           </label>
-          <label class="field">
-            <span>Phone 1</span>
-            <input id="singlePhone1" type="text" inputmode="numeric" />
+          <label class="field span-3">
+            <span>Contact No</span>
+            <input id="singlePhone1" type="text" class="mono" inputmode="numeric" />
           </label>
-          <label class="field">
-            <span>Phone 2 (optional)</span>
-            <input id="singlePhone2" type="text" inputmode="numeric" />
+          <label class="field span-3">
+            <span>Alternate Contact (optional)</span>
+            <input id="singlePhone2" type="text" class="mono" inputmode="numeric" />
           </label>
-          <label class="field" style="grid-column: 1 / -1;">
+        </div>
+
+        <div class="drawerSectionHeader">Address</div>
+        <div class="orderCreateGrid">
+          <label class="field span-12">
             <span>Address Line 1</span>
             <input id="singleAddress1" type="text" />
           </label>
-          <label class="field" style="grid-column: 1 / -1;">
-            <span>Address Line 2 (optional)</span>
+          <label class="field span-12">
+            <span>Landmark (optional)</span>
             <input id="singleAddress2" type="text" />
           </label>
-          <label class="field">
+          <label class="field span-4">
             <span>City</span>
             <input id="singleCity" type="text" />
           </label>
-          <label class="field">
+          <label class="field span-4">
             <span>State</span>
             <input id="singleState" type="text" />
           </label>
-          <label class="field">
+          <label class="field span-4">
             <span>PIN Code</span>
-            <input id="singlePinCode" type="text" inputmode="numeric" />
+            <input id="singlePinCode" type="text" class="mono" inputmode="numeric" />
+            <small id="singlePinHint" class="fieldHint"></small>
           </label>
-          <label class="field">
-            <span>Total Price</span>
-            <input id="singleTotalPrice" type="text" inputmode="decimal" />
+        </div>
+
+        <div class="drawerSectionHeader">Payment & Fulfillment</div>
+        <div class="orderCreateGrid">
+          <label class="field span-4">
+            <span>Payment Status</span>
+            <select id="singlePaymentStatus" required>
+              <option value="" disabled selected>Select</option>
+              <option value="paid">Paid</option>
+              <option value="pending">Pending</option>
+              <option value="cod">COD</option>
+            </select>
           </label>
-          <label class="field">
-            <span>Financial Status</span>
-            <input id="singleFinancialStatus" type="text" placeholder="paid / pending" />
+
+          <label class="field span-4">
+            <span>Invoice Value</span>
+            <input id="singleInvoiceValue" type="text" class="mono" inputmode="decimal" required />
           </label>
-          <label class="field">
-            <span>Invoice Value (optional)</span>
-            <input id="singleInvoiceValue" type="text" inputmode="decimal" />
+          <label class="field span-4">
+            <span>Fulfillment Center (optional)</span>
+            <select id="singleFulfillmentCenter">
+              <option value="" disabled selected>Fulfillment Center</option>
+            </select>
           </label>
-          <label class="field" style="grid-column: 1 / -1;">
-            <span>Content & Quantity (optional)</span>
+          <label class="field span-4">
+            <span>Weight (kg) (optional)</span>
+            <input id="singleWeightKg" type="text" class="mono" inputmode="decimal" placeholder="e.g. 0.1" />
+          </label>
+          <label class="field span-4">
+            <span>Courier Type (optional)</span>
+            <select id="singleCourierType">
+              <option value="" selected>Courier Type</option>
+              <option value="Z- Express">Z- Express</option>
+              <option value="D- Surface">D- Surface</option>
+              <option value="D- Air">D- Air</option>
+              <option value="COD Surface">COD Surface</option>
+              <option value="COD Air">COD Air</option>
+            </select>
+          </label>
+          <label class="field span-4">
+            <span>Fulfillment Status (optional)</span>
+            <input id="singleFulfillmentStatus" type="text" placeholder="fulfilled / unfulfilled" />
+          </label>
+
+          <label class="field span-12">
+            <span>Item & Quantity (optional)</span>
             <input id="singleProductDescription" type="text" />
           </label>
         </div>

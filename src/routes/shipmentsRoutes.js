@@ -19,24 +19,15 @@ const internalToDisplayShipmentStatus = (value) => {
   return "";
 };
 
-const getDocShipmentStatusRaw = (data) => {
-  const direct = String(data?.shipmentStatus ?? "").trim();
-  if (direct) return direct;
-  const nested = data?.shipment && typeof data.shipment === "object" ? data.shipment : null;
-  return String(nested?.shipmentStatus ?? "").trim();
-};
+const getDocDisplayShipmentStatus = (data) =>
+  String(data?.shipmentStatus ?? data?.shipment_status ?? "").trim();
 
 const getDocShippingDateIso = (data) => {
-  const direct = String(data?.shipping_date ?? "").trim();
+  const direct = String(data?.shippingDate ?? data?.shipping_date ?? "").trim();
   if (direct) return direct;
-  const nested = data?.shipment && typeof data.shipment === "object" ? data.shipment : null;
-  const nestedShipping = String(nested?.shippingDate ?? "").trim();
-  if (nestedShipping) return nestedShipping;
-  const assignedAt = String(nested?.assignedAt ?? "").trim();
-  if (assignedAt) return assignedAt;
   const requestedAt = String(data?.requestedAt ?? "").trim();
   if (requestedAt) return requestedAt;
-  return String(data?.updatedAt ?? "").trim();
+  return String(data?.updatedAt ?? data?.updated_at ?? "").trim();
 };
 
 const normalizeShipmentStatus = (value) => {
@@ -63,6 +54,30 @@ const normalizeShipmentStatus = (value) => {
 export function createShipmentsRouter({ env, auth }) {
   const router = Router();
 
+  const sanitizeOrderForFirestore = (value) => {
+    if (!value || typeof value !== "object") return null;
+    const order = { ...value };
+    delete order.shipmentStatus;
+    delete order.trackingNumber;
+    delete order.trackingNumbers;
+    delete order.trackingNumbersText;
+    delete order.trackingCompany;
+    delete order.trackingUrl;
+    delete order.trackingUrls;
+    delete order.awbNumber;
+    delete order.courierType;
+    delete order.weightKg;
+    delete order.updatedAt;
+    delete order.updated_at;
+
+    if (order.shipping && typeof order.shipping === "object") {
+      order.shipping = { ...order.shipping };
+      delete order.shipping.phoneNumbers;
+      delete order.shipping.phoneNumbersText;
+    }
+    return order;
+  };
+
   const parseWeightKg = (value) => {
     if (value === null || value === undefined || value === "") return null;
     const n = Number.parseFloat(String(value));
@@ -72,7 +87,7 @@ export function createShipmentsRouter({ env, auth }) {
 
   const normalizeCourierType = (value) => {
     const v = String(value ?? "").trim();
-    const allowed = new Set(["Z- Express", "D- Surface", "D- Air"]);
+    const allowed = new Set(["Z- Express", "D- Surface", "D- Air", "COD Surface", "COD Air"]);
     return allowed.has(v) ? v : "";
   };
 
@@ -84,7 +99,7 @@ export function createShipmentsRouter({ env, auth }) {
         return;
       }
 
-      const order = req.body?.order && typeof req.body.order === "object" ? req.body.order : null;
+      const order = sanitizeOrderForFirestore(req.body?.order);
       const storeId = String(req.user?.storeId ?? "").trim().toLowerCase();
       if (!storeId) {
         res.status(400).json({ error: "store_id_required" });
@@ -96,14 +111,7 @@ export function createShipmentsRouter({ env, auth }) {
 
       const assignedAt = new Date().toISOString();
       const shippingDate = assignedAt;
-      const shipment = {
-        shipmentStatus: "assigned",
-        assignedAt,
-        shippingDate,
-        updatedAt: assignedAt,
-        ...(weightKg != null ? { weightKg } : {}),
-        ...(courierType ? { courierType } : {}),
-      };
+      const shipmentStatus = "Assigned";
 
       if (env?.auth?.provider !== "firebase") {
         res.status(400).json({ error: "auth_provider_not_firebase" });
@@ -122,7 +130,10 @@ export function createShipmentsRouter({ env, auth }) {
         res.json({
           ok: true,
           alreadyAssigned: true,
-          shipment: existing.data()?.shipment ?? shipment,
+          shipment: {
+            shipmentStatus: String(existing.data()?.shipmentStatus ?? existing.data()?.shipment_status ?? "Assigned"),
+            updatedAt: String(existing.data()?.updatedAt ?? existing.data()?.updated_at ?? ""),
+          },
           firestore: { collectionId, docId, storeId },
         });
         return;
@@ -135,13 +146,11 @@ export function createShipmentsRouter({ env, auth }) {
             storeId: normalizedStoreId,
             shopName: displayName,
             order,
-            shipment,
-            shipmentStatus: "assigned",
-            shipment_status: "Assigned",
-            shipping_date: shippingDate,
-            ...(weightKg != null ? { weight: weightKg } : {}),
-            ...(courierType ? { courier_type: courierType } : {}),
-            updated_at: assignedAt,
+            shipmentStatus,
+            shippingDate,
+            ...(weightKg != null ? { weightKg } : {}),
+            ...(courierType ? { courierType } : {}),
+            updatedAt: assignedAt,
             event: "ship_requested",
             requestedBy: {
               uid: String(req.user?.uid ?? ""),
@@ -149,14 +158,13 @@ export function createShipmentsRouter({ env, auth }) {
               role: String(req.user?.role ?? ""),
             },
             requestedAt: assignedAt,
-            updatedAt: assignedAt,
           },
           { merge: true }
         );
 
       res.json({
         ok: true,
-        shipment,
+        shipment: { shipmentStatus, updatedAt: assignedAt, shippingDate },
         firestore: { collectionId, docId, storeId: normalizedStoreId },
       });
     } catch (error) {
@@ -187,7 +195,7 @@ export function createShipmentsRouter({ env, auth }) {
       const trackingNumber = String(req.body?.trackingNumber ?? "").trim();
       const shipmentStatus = normalizeShipmentStatus(shipmentStatusRaw);
       const updatedAt = new Date().toISOString();
-      const shipment_status = internalToDisplayShipmentStatus(shipmentStatus) || "";
+      const shipmentStatusDisplay = internalToDisplayShipmentStatus(shipmentStatus) || "";
 
       const admin = await getFirebaseAdmin({ env });
       const { collectionId, displayName, storeId: normalizedStoreId } = getShopCollectionInfo({
@@ -200,9 +208,7 @@ export function createShipmentsRouter({ env, auth }) {
       await admin.firestore().runTransaction(async (tx) => {
         const snap = await tx.get(docRef);
         const data = snap.data() ?? {};
-        const prevInternal = normalizeShipmentStatus(getDocShipmentStatusRaw(data));
-        const prevDisplay =
-          String(data?.shipment_status ?? "").trim() || internalToDisplayShipmentStatus(prevInternal) || "";
+        const prevDisplay = getDocDisplayShipmentStatus(data) || "";
         const shippingDate = getDocShippingDateIso(data) || "";
 
         tx.set(
@@ -212,24 +218,16 @@ export function createShipmentsRouter({ env, auth }) {
             docId,
             storeId: normalizedStoreId,
             shopName: displayName,
-            shipmentStatus,
-            shipment_status,
-            ...(trackingNumber ? { trackingNumber, consignment_number: trackingNumber } : {}),
-            shipping_date: shippingDate,
-            updated_at: updatedAt,
-            shipment: {
-              shipmentStatus,
-              ...(trackingNumber ? { trackingNumber } : {}),
-              shippingDate,
-              updatedAt,
-            },
+            shipmentStatus: shipmentStatusDisplay,
+            ...(trackingNumber ? { consignmentNumber: trackingNumber } : {}),
+            shippingDate: shippingDate || updatedAt,
+            updatedAt,
             event: "admin_update",
             updatedBy: {
               uid: String(req.user?.uid ?? ""),
               email: String(req.user?.email ?? ""),
               role: String(req.user?.role ?? ""),
             },
-            updatedAt,
           },
           { merge: true }
         );
@@ -237,9 +235,9 @@ export function createShipmentsRouter({ env, auth }) {
         tx.set(historyRef, {
           changed_at: updatedAt,
           from_shipment_status: prevDisplay,
-          to_shipment_status: shipment_status,
-          from_internal_status: prevInternal,
-          to_internal_status: shipmentStatus,
+          to_shipment_status: shipmentStatusDisplay,
+          from_internal_status: "",
+          to_internal_status: "",
           updated_by: {
             uid: String(req.user?.uid ?? ""),
             email: String(req.user?.email ?? ""),
@@ -250,7 +248,7 @@ export function createShipmentsRouter({ env, auth }) {
 
       res.json({
         ok: true,
-        shipment: { shipmentStatus, trackingNumber, shipment_status, updatedAt },
+        shipment: { shipmentStatus: shipmentStatusDisplay, consignmentNumber: trackingNumber, updatedAt },
         firestore: { collectionId, docId, storeId: normalizedStoreId },
       });
     } catch (error) {

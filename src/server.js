@@ -4,6 +4,8 @@ import { createApp } from "./app.js";
 import { loadEnv } from "./config/env.js";
 import { startHttpServer } from "./http/startHttpServer.js";
 import { createLogger } from "./logging/createLogger.js";
+import { migrateAllOrdersAtStartup } from "./firestore/migrateOrders.js";
+import { ensurePincodeDirectoryAsset } from "./pincodes/buildPincodeDirectoryAsset.js";
 
 /**
  * Entry point.
@@ -14,6 +16,13 @@ import { createLogger } from "./logging/createLogger.js";
 async function main() {
   const env = loadEnv(process.env);
   const logger = createLogger({ level: env.logLevel });
+
+  // Prebuild pincode lookup asset for fast client-side searches.
+  try {
+    await ensurePincodeDirectoryAsset({ logger });
+  } catch (error) {
+    logger.error({ error }, "pincode_directory_asset_build_failed");
+  }
 
   // Ensure unexpected crashes still leave a log trail.
   process.on("unhandledRejection", (reason) => {
@@ -30,6 +39,11 @@ async function main() {
 
   const app = createApp({ env: appEnv, logger });
   const server = await startHttpServer({ app, env: appEnv, logger });
+
+  // Startup Firestore migration (non-blocking).
+  migrateAllOrdersAtStartup({ env: appEnv, logger }).catch((error) => {
+    logger.error({ error }, "startup_migration_unhandled");
+  });
 
   // Graceful shutdown for local dev and production (PM2, systemd, Docker, etc.)
   const handleShutdownSignal = (signalName) => {

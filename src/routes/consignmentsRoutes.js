@@ -34,46 +34,6 @@ const normalizeDisplayStatus = (value) => {
   return "";
 };
 
-const normalizeInternalStatus = (value) => {
-  const s = String(value ?? "").trim().toLowerCase();
-  if (!s) return "";
-  if (s === "new") return "new";
-  if (s === "assigned") return "assigned";
-  if (s === "in_transit" || s === "in transit") return "in_transit";
-  if (s === "delivered") return "delivered";
-  if (s === "rto") return "rto";
-  if (s === "rto_initiated" || s === "rto initiated") return "rto_initiated";
-  if (s === "rto_delivered" || s === "rto delivered") return "rto_delivered";
-  if (s.includes("deliver")) return "delivered";
-  if (s.includes("transit")) return "in_transit";
-  if (s.includes("assign")) return "assigned";
-  if (s.includes("rto") && s.includes("initi")) return "rto_initiated";
-  if (s.includes("rto") && s.includes("deliver")) return "rto_delivered";
-  if (s.includes("rto")) return "rto";
-  return s.replaceAll(/\s+/g, "_");
-};
-
-const internalToDisplayStatus = (internal) => {
-  const s = normalizeInternalStatus(internal);
-  if (!s) return "";
-  if (s === "undelivered") return "Undelivered";
-  if (s === "at_destination" || s === "atdestination") return "At Destination";
-  if (s === "out_for_delivery" || s === "outfordelivery") return "Out for Delivery";
-  if (s === "set_rto" || s === "setrto") return "Set RTO";
-  if (s === "rto_accepted") return "RTO Accepted";
-  if (s === "rto_in_transit" || s === "rto_intransit") return "RTO In Transit";
-  if (s === "rto_reached_at_destination" || s === "rto_reached_atdestination")
-    return "RTO Reached At Destination";
-  if (s === "delivered") return "Delivered";
-  if (s === "in_transit") return "In Transit";
-  if (s === "assigned") return "Assigned";
-  if (s === "new") return "New";
-  if (s === "rto_delivered") return "RTO Delivered";
-  if (s === "rto_initiated") return "RTO Accepted";
-  if (s === "rto") return "RTO In Transit";
-  return "";
-};
-
 const displayToInternalStatus = (display) => {
   const s = normalizeDisplayStatus(display);
   if (!s) return "";
@@ -98,43 +58,22 @@ const toSafeNumber = (value) => {
   return n;
 };
 
-const getDocShipmentInternalRaw = (data) => {
-  const direct = String(data?.shipmentStatus ?? "").trim();
-  if (direct) return direct;
-  const nested = data?.shipment && typeof data.shipment === "object" ? data.shipment : null;
-  return String(nested?.shipmentStatus ?? "").trim();
-};
-
 const getDocDisplayShipmentStatus = (data) => {
-  const direct = normalizeDisplayStatus(data?.shipment_status);
-  if (direct) return direct;
-  const raw = getDocShipmentInternalRaw(data);
-  const rawAsDisplay = normalizeDisplayStatus(raw);
-  if (rawAsDisplay) return rawAsDisplay;
-  const inferredFromInternal = internalToDisplayStatus(raw);
-  return inferredFromInternal || "";
+  return normalizeDisplayStatus(data?.shipmentStatus ?? data?.shipment_status) || "";
 };
 
 const getDocUpdatedAtIso = (data) => {
-  const direct = String(data?.updated_at ?? "").trim();
+  const direct = String(data?.updatedAt ?? data?.updated_at ?? "").trim();
   if (direct) return direct;
-  const nested = data?.shipment && typeof data.shipment === "object" ? data.shipment : null;
-  const nestedUpdated = String(nested?.updatedAt ?? "").trim();
-  if (nestedUpdated) return nestedUpdated;
-  return String(data?.updatedAt ?? "").trim();
+  return "";
 };
 
 const getDocShippingDateIso = (data) => {
-  const direct = String(data?.shipping_date ?? "").trim();
+  const direct = String(data?.shippingDate ?? data?.shipping_date ?? "").trim();
   if (direct) return direct;
-  const nested = data?.shipment && typeof data.shipment === "object" ? data.shipment : null;
-  const nestedShipping = String(nested?.shippingDate ?? "").trim();
-  if (nestedShipping) return nestedShipping;
-  const assignedAt = String(nested?.assignedAt ?? "").trim();
-  if (assignedAt) return assignedAt;
   const requestedAt = String(data?.requestedAt ?? "").trim();
   if (requestedAt) return requestedAt;
-  return String(data?.updatedAt ?? "").trim();
+  return "";
 };
 
 const getDocOrder = (data) =>
@@ -149,34 +88,10 @@ const projectConsignmentRow = ({ docId, data }) => {
   const orderId = String(order?.orderId ?? order?.order_id ?? order?.orderID ?? order?.id ?? "").trim();
   const orderDate = String(order?.order_date ?? order?.orderDate ?? order?.createdAt ?? order?.created_at ?? "").trim();
 
-  const courierPartner = String(
-    data?.courier_partner ??
-      data?.courierPartner ??
-      order?.trackingCompany ??
-      data?.trackingCompany ??
-      ""
-  ).trim();
-
-  const consignmentNumber = String(
-    data?.consignment_number ??
-      data?.consignmentNumber ??
-      data?.trackingNumber ??
-      (data?.shipment && typeof data.shipment === "object" ? data.shipment.trackingNumber : "") ??
-      order?.trackingNumbersText ??
-      ""
-  ).trim();
-
-  const shipmentInternal = normalizeInternalStatus(getDocShipmentInternalRaw(data));
-  const shipmentStatus = shipmentInternal || displayToInternalStatus(getDocDisplayShipmentStatus(data)) || "";
-
-  const weight =
-    data?.weight ??
-    (data?.shipment && typeof data.shipment === "object" ? data.shipment.weightKg : undefined);
-
-  const courierType =
-    data?.courier_type ??
-    data?.courierType ??
-    (data?.shipment && typeof data.shipment === "object" ? data.shipment.courierType : "");
+  const courierPartner = String(data?.courierPartner ?? data?.courier_partner ?? "").trim();
+  const consignmentNumber = String(data?.consignmentNumber ?? data?.consignment_number ?? "").trim();
+  const weightKgRaw = data?.weightKg ?? data?.weight;
+  const courierType = data?.courierType ?? data?.courier_type ?? "";
 
   const updatedAt = getDocUpdatedAtIso(data);
   const shippingDate = getDocShippingDateIso(data);
@@ -212,90 +127,71 @@ const projectConsignmentRow = ({ docId, data }) => {
     payment_mode: paymentModeFromFinancialStatus(paymentStatus),
 
     // Shipping Date
-    shipping_date: shippingDate,
+    shippingDate,
 
     // Tracking No
-    courier_partner: courierPartner,
-    consignment_number: consignmentNumber,
+    courierPartner,
+    consignmentNumber,
 
     // Shipment Details
-    weight: toSafeNumber(weight),
-    courier_type: String(courierType ?? "").trim(),
+    weightKg: toSafeNumber(weightKgRaw),
+    courierType: String(courierType ?? "").trim(),
 
     // Shipment Status
-    shipment_status: getDocDisplayShipmentStatus(data),
-    shipmentStatus,
+    shipmentStatus: getDocDisplayShipmentStatus(data),
 
     // Updated On
-    updated_at: updatedAt,
+    updatedAt,
 
     // EDD
-    expected_delivery_date: String(
-      data?.expected_delivery_date ??
-        data?.expectedDeliveryDate ??
-        (data?.shipment && typeof data.shipment === "object" ? data.shipment.expectedDeliveryDate : "") ??
-        ""
-    ).trim(),
+    expectedDeliveryDate: String(data?.expectedDeliveryDate ?? data?.expected_delivery_date ?? "").trim(),
   };
 };
 
 const buildMissingFieldsPatch = ({ data }) => {
   const patch = {};
 
-  if (data?.shipment_status === undefined) {
+  if (data?.shipmentStatus === undefined) {
     const inferred = getDocDisplayShipmentStatus(data);
-    if (inferred) patch.shipment_status = inferred;
+    if (inferred) patch.shipmentStatus = inferred;
   }
 
-  if (data?.updated_at === undefined) {
-    const inferred = getDocUpdatedAtIso(data);
-    if (inferred) patch.updated_at = inferred;
+  if (data?.updatedAt === undefined) {
+    const inferred = String(data?.updated_at ?? data?.requestedAt ?? "").trim();
+    if (inferred) patch.updatedAt = inferred;
   }
 
-  if (data?.shipping_date === undefined) {
-    const inferred = getDocShippingDateIso(data);
-    if (inferred) patch.shipping_date = inferred;
+  if (data?.shippingDate === undefined) {
+    const inferred = String(getDocShippingDateIso(data) || data?.requestedAt || "").trim();
+    if (inferred) patch.shippingDate = inferred;
   }
 
-  if (data?.consignment_number === undefined) {
-    const inferred = String(
-      data?.consignmentNumber ??
-        data?.trackingNumber ??
-        (data?.shipment && typeof data.shipment === "object" ? data.shipment.trackingNumber : "") ??
-        ""
-    ).trim();
-    if (inferred) patch.consignment_number = inferred;
+  if (data?.consignmentNumber === undefined) {
+    const legacy = String(data?.consignment_number ?? "").trim();
+    if (legacy) patch.consignmentNumber = legacy;
   }
 
-  if (data?.courier_partner === undefined) {
-    const order = getDocOrder(data) ?? {};
-    const inferred = String(
-      data?.courierPartner ?? order?.trackingCompany ?? data?.trackingCompany ?? ""
-    ).trim();
+  if (data?.courierPartner === undefined) {
+    const legacy = String(data?.courier_partner ?? "").trim();
+    if (legacy) patch.courierPartner = legacy;
     const consignment = String(
-      patch.consignment_number ??
-        data?.consignment_number ??
-        data?.trackingNumber ??
-        (data?.shipment && typeof data.shipment === "object" ? data.shipment.trackingNumber : "") ??
-        ""
+      patch.consignmentNumber ?? data?.consignmentNumber ?? data?.consignment_number ?? ""
     ).trim();
-    if (inferred) patch.courier_partner = inferred;
-    else if (consignment) patch.courier_partner = "DTDC";
+    if (consignment) patch.courierPartner = "DTDC";
   }
 
-  if (data?.weight === undefined) {
-    const inferred =
-      data?.shipment && typeof data.shipment === "object" ? data.shipment.weightKg : undefined;
-    const n = toSafeNumber(inferred);
-    if (n != null) patch.weight = n;
+  if (data?.weightKg === undefined) {
+    if (data?.weight !== undefined) patch.weightKg = toSafeNumber(data.weight);
   }
 
-  if (data?.courier_type === undefined) {
-    const inferred =
-      data?.courierType ??
-      (data?.shipment && typeof data.shipment === "object" ? data.shipment.courierType : "");
-    const s = String(inferred ?? "").trim();
-    if (s) patch.courier_type = s;
+  if (data?.courierType === undefined) {
+    const legacy = String(data?.courier_type ?? "").trim();
+    if (legacy) patch.courierType = legacy;
+  }
+
+  if (data?.expectedDeliveryDate === undefined) {
+    const legacy = String(data?.expected_delivery_date ?? "").trim();
+    if (legacy) patch.expectedDeliveryDate = legacy;
   }
 
   return patch;
@@ -333,11 +229,11 @@ const backfillForCollection = async ({ col, allowedDisplayStatuses, maxDocs = 30
       const displayStatus = getDocDisplayShipmentStatus(data);
       const shouldCare =
         allowedDisplayStatuses.has(displayStatus) ||
-        data?.shipping_date === undefined ||
-        data?.shipment_status === undefined ||
-        data?.updated_at === undefined ||
-        data?.consignment_number === undefined ||
-        data?.courier_partner === undefined;
+        data?.shippingDate === undefined ||
+        data?.shipmentStatus === undefined ||
+        data?.updatedAt === undefined ||
+        data?.consignmentNumber === undefined ||
+        data?.courierPartner === undefined;
 
       if (shouldCare) {
         const patch = buildMissingFieldsPatch({ data });
@@ -458,11 +354,14 @@ export function createConsignmentsRouter({ env, auth }) {
         const firestore = admin.firestore();
         const col = firestore.collection(collectionId);
 
-        // Backfill legacy docs that don't have `shipping_date` yet (otherwise orderBy(shipping_date) can return 0).
+        // Backfill legacy docs that don't have `shippingDate` yet.
         if (!cursor) {
           try {
-            const probe = await col.orderBy("shipping_date", "desc").limit(1).get();
-            if (probe.empty) {
+            const probe = await col.orderBy("shippingDate", "desc").limit(1).get();
+            const probeData = probe.docs[0]?.data?.() ?? {};
+            const hasShippingDate = Boolean(String(probeData?.shippingDate ?? "").trim());
+            const hasLegacyShippingDate = Boolean(String(probeData?.shipping_date ?? "").trim());
+            if (probe.empty || (!hasShippingDate && hasLegacyShippingDate)) {
               await backfillForCollection({ col, allowedDisplayStatuses: allowed, maxDocs: 300 });
             }
           } catch {
@@ -478,7 +377,7 @@ export function createConsignmentsRouter({ env, auth }) {
         const batchSize = Math.min(250, Math.max(25, limit * 4));
         for (let iter = 0; iter < 12 && orders.length < limit; iter += 1) {
           let q = col
-            .orderBy("shipping_date", "desc")
+            .orderBy("shippingDate", "desc")
             .orderBy(admin.firestore.FieldPath.documentId(), "desc")
             .limit(batchSize);
           if (lastShippingDate && lastDocId) q = q.startAfter(lastShippingDate, lastDocId);
@@ -495,7 +394,7 @@ export function createConsignmentsRouter({ env, auth }) {
             const displayStatus = getDocDisplayShipmentStatus(data);
             const shippingDate = getDocShippingDateIso(data);
             const patch = buildMissingFieldsPatch({ data });
-            if (!patch.shipping_date && shippingDate) patch.shipping_date = shippingDate;
+            if (!patch.shippingDate && shippingDate) patch.shippingDate = shippingDate;
             if (!allowed.has(displayStatus)) {
               lastShippingDate = String(shippingDate ?? "").trim();
               lastDocId = String(doc.id ?? "").trim();
@@ -577,7 +476,7 @@ export function createConsignmentsRouter({ env, auth }) {
           return;
         }
 
-        const nextDisplay = normalizeDisplayStatus(req.body?.shipment_status);
+        const nextDisplay = normalizeDisplayStatus(req.body?.shipmentStatus ?? req.body?.shipment_status);
         if (!nextDisplay) {
           res.status(400).json({ error: "invalid_shipment_status" });
           return;
@@ -603,7 +502,6 @@ export function createConsignmentsRouter({ env, auth }) {
           const data = snap.data() ?? {};
 
           const prevDisplay = getDocDisplayShipmentStatus(data);
-          const prevInternal = normalizeInternalStatus(getDocShipmentInternalRaw(data));
 
           const shippingDate = getDocShippingDateIso(data);
 
@@ -613,16 +511,9 @@ export function createConsignmentsRouter({ env, auth }) {
               orderKey,
               docId,
               storeId: normalizedStoreId,
-              shipment_status: nextDisplay,
-              shipmentStatus: nextInternal,
-              shipping_date: shippingDate || "",
-              updated_at: changedAt,
+              shipmentStatus: nextDisplay,
+              shippingDate: shippingDate || "",
               updatedAt: changedAt,
-              shipment: {
-                shipmentStatus: nextInternal,
-                shippingDate: shippingDate || "",
-                updatedAt: changedAt,
-              },
               event: "status_update",
               updatedBy: {
                 uid: String(req.user?.uid ?? ""),
@@ -637,8 +528,8 @@ export function createConsignmentsRouter({ env, auth }) {
             changed_at: changedAt,
             from_shipment_status: prevDisplay,
             to_shipment_status: nextDisplay,
-            from_internal_status: prevInternal,
-            to_internal_status: nextInternal,
+            from_internal_status: "",
+            to_internal_status: "",
             updated_by: {
               uid: String(req.user?.uid ?? ""),
               email: String(req.user?.email ?? ""),
@@ -652,9 +543,8 @@ export function createConsignmentsRouter({ env, auth }) {
           ok: true,
           orderKey,
           storeId: normalizedStoreId,
-          shipment_status: nextDisplay,
-          shipmentStatus: nextInternal,
-          updated_at: changedAt,
+          shipmentStatus: nextDisplay,
+          updatedAt: changedAt,
         });
       } catch (error) {
         next(error);

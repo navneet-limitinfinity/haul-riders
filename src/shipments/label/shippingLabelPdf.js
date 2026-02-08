@@ -331,16 +331,15 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
   const pin = String(shipTo?.pinCode ?? "").trim();
 
   const awb = extractAwbNumber({ firestoreDoc: data });
-  const courierType = String(data?.shipment?.courierType ?? "").trim();
+  const courierType = String(data?.courierType ?? data?.courier_type ?? "").trim();
   const orderName = String(order?.orderName ?? order?.name ?? "").trim();
 
   const shipValue = String(order?.totalPrice ?? order?.total_price ?? "").trim();
   const paymentFlag = getPaymentFlag(order?.financialStatus ?? order?.financial_status);
   const paymentNote = paymentFlag === "COD" ? "Collect money" : "Don't collect money";
 
-  const weightKgRaw = data?.shipment?.weightKg;
-  const weightKg =
-    weightKgRaw == null || Number.isNaN(Number(weightKgRaw)) ? "0.0" : String(weightKgRaw);
+  const weightRaw = data?.weightKg ?? data?.weight;
+  const weightKg = weightRaw == null || Number.isNaN(Number(weightRaw)) ? "0.0" : String(weightRaw);
 
   const fields = map?.fields ?? {};
   const fixedText = Array.isArray(map?.fixedText) ? map.fixedText : [];

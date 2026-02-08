@@ -32,10 +32,30 @@ function pickRowValue(row, keys) {
 
 function normalizeManualRow(row) {
   // Support both legacy (camelCase) and new keys.
+  const paymentStatusRaw = pickRowValue(row, ["paymentStatus", "payment_status", "payment_mode", "paymentMode"]);
+  const invoiceValueRaw = safeNumber(
+    pickRowValue(row, ["invoiceValue", "invoice_value", "Invoice Value", "invoiceValueInr"])
+  );
+  const totalPriceRaw = safeNumber(
+    pickRowValue(row, [
+      "totalPrice",
+      "total_price_including_gst",
+      "Total Price",
+      "invoice_value",
+      "invoiceValue",
+      "invoiceValueInr",
+    ])
+  );
+  const financialStatusRaw =
+    pickRowValue(row, ["financialStatus", "financial_status", "Financial Status"]) ||
+    (String(paymentStatusRaw).trim().toLowerCase() === "paid" ? "paid" : paymentStatusRaw ? "pending" : "");
+
   return {
     orderKey: getRowValue(row, "orderKey") || getRowValue(row, "order_key"),
     orderName: getRowValue(row, "orderName") || getRowValue(row, "order_name") || getRowValue(row, "Order Name"),
-    orderDate: pickRowValue(row, ["order_date", "orderDate", "createdAt", "orderCreatedAt"]),
+    orderId: pickRowValue(row, ["orderId", "order_id", "Order ID"]),
+    orderGid: pickRowValue(row, ["orderGid", "order_gid", "orderGID"]),
+    orderDate: pickRowValue(row, ["orderDate", "order_date", "createdAt", "orderCreatedAt"]),
     fullName: pickRowValue(row, ["fullName", "name", "customer_name", "customerName"]),
     customerEmail: pickRowValue(row, ["customerEmail", "email"]),
     phone1: normalizePhone10(pickRowValue(row, ["phone1", "phone_1", "phone", "phone_1"])),
@@ -45,10 +65,15 @@ function normalizeManualRow(row) {
     city: pickRowValue(row, ["city"]),
     state: pickRowValue(row, ["state"]),
     pinCode: pickRowValue(row, ["pinCode", "pincode", "pin_code"]),
-    totalPrice: safeNumber(pickRowValue(row, ["totalPrice", "total_price_including_gst", "invoice_value", "invoiceValue"])),
-    financialStatus: pickRowValue(row, ["financialStatus", "payment_status", "paymentStatus", "payment_mode", "paymentMode"]),
-    productDescription: pickRowValue(row, ["content_and_quantity", "productDescription", "product_description"]),
-    invoiceValue: safeNumber(pickRowValue(row, ["invoice_value", "invoiceValue"])),
+    totalPrice: totalPriceRaw || invoiceValueRaw,
+    financialStatus: financialStatusRaw,
+    paymentStatus: paymentStatusRaw,
+    productDescription: pickRowValue(row, ["productDescription", "content_and_quantity", "product_description", "Item & Quantity"]),
+    invoiceValue: invoiceValueRaw,
+    fulfillmentCenter: pickRowValue(row, ["fulfillmentCenter", "fulfillment_center"]),
+    fulfillmentStatus: pickRowValue(row, ["fulfillmentStatus", "fulfillment_status"]),
+    weight: safeNumber(pickRowValue(row, ["weightKg", "weight", "weight_kg"])),
+    courier_type: pickRowValue(row, ["courierType", "courier_type", "courierTypeName", "courierTypeValue"]),
   };
 }
 
@@ -74,25 +99,21 @@ function buildManualOrderDoc({ normalized, index, storeId, displayName, user }) 
   // Per requirement: Order Date should reflect upload/create time.
   const createdAt = nowIso();
 
-  const phoneNumbers = [normalized.phone1, normalized.phone2].filter(Boolean);
-
   const order = {
     index,
     orderKey: normalized.orderKey,
-    orderId: "",
+    orderId: String(normalized.orderId ?? "").trim(),
+    orderGid: String(normalized.orderGid ?? "").trim(),
     orderName: normalized.orderName,
     createdAt,
     customerEmail: normalized.customerEmail,
     financialStatus: normalized.financialStatus,
-    paymentStatus: normalized.financialStatus,
+    paymentStatus: normalized.paymentStatus || normalized.financialStatus,
     totalPrice: safeNumber(normalized.totalPrice),
     invoiceValue: safeNumber(normalized.invoiceValue || normalized.totalPrice),
     productDescription: normalized.productDescription,
-    fulfillmentStatus: "unfulfilled",
-    trackingNumbers: [],
-    trackingNumbersText: "",
-    trackingCompany: "",
-    trackingUrl: "",
+    fulfillmentCenter: normalized.fulfillmentCenter,
+    fulfillmentStatus: normalized.fulfillmentStatus || "unfulfilled",
     shipping: {
       fullName: normalized.fullName,
       address1: normalized.address1,
@@ -100,10 +121,8 @@ function buildManualOrderDoc({ normalized, index, storeId, displayName, user }) 
       city: normalized.city,
       state: normalized.state,
       pinCode: normalized.pinCode,
-      phoneNumbers,
       phone1: normalized.phone1,
       phone2: normalized.phone2,
-      phoneNumbersText: phoneNumbers.join(", "),
     },
   };
 
@@ -114,20 +133,14 @@ function buildManualOrderDoc({ normalized, index, storeId, displayName, user }) 
     storeId,
     shopName: displayName,
     order,
-    shipment: {
-      shipmentStatus: "new",
-      updatedAt: ts,
-    },
-    shipmentStatus: "new",
-    shipment_status: "New",
-    courier_partner: "",
-    consignment_number: "",
-    weight: "",
-    courier_type: "",
-    shipping_date: "",
-    expected_delivery_date: "",
-    updated_at: ts,
-    trackingNumber: "",
+    shipmentStatus: "New",
+    courierPartner: "",
+    consignmentNumber: "",
+    weightKg: normalized.weight || "",
+    courierType: normalized.courier_type || "",
+    shippingDate: "",
+    expectedDeliveryDate: "",
+    updatedAt: ts,
     event: "manual_order_create",
     requestedBy: {
       uid: String(user?.uid ?? ""),
@@ -135,7 +148,6 @@ function buildManualOrderDoc({ normalized, index, storeId, displayName, user }) 
       role: String(user?.role ?? ""),
     },
     requestedAt: ts,
-    updatedAt: ts,
   };
 }
 
@@ -265,22 +277,14 @@ export async function assignManualOrders({
     }
 
     const data = snap.data() ?? {};
-    const existingDisplayStatus = String(data?.shipment_status ?? "").trim();
+    const existingDisplayStatus = String(data?.shipmentStatus ?? data?.shipment_status ?? "").trim();
     if (existingDisplayStatus === "Assigned") continue;
 
     await docRef.set(
       {
-        shipmentStatus: "assigned",
-        shipment_status: "Assigned",
-        shipment: {
-          ...(data?.shipment && typeof data.shipment === "object" ? data.shipment : {}),
-          shipmentStatus: "assigned",
-          assignedAt: ts,
-          shippingDate: ts,
-          updatedAt: ts,
-        },
-        shipping_date: ts,
-        updated_at: ts,
+        shipmentStatus: "Assigned",
+        shippingDate: ts,
+        updatedAt: ts,
         event: "manual_assign",
         requestedBy: {
           uid: String(user?.uid ?? ""),
@@ -290,7 +294,6 @@ export async function assignManualOrders({
         requestedAt: ts,
         storeId,
         shopName: displayName,
-        updatedAt: ts,
       },
       { merge: true }
     );

@@ -1,4 +1,4 @@
-Tracking Numbers,Shipments Status,Updated On
+consignmentNumber,shipmentStatus,updatedAt
 AWB000000001,In Transit,2026-01-31T10:00:00Z
 AWB000000002,In Transit,2026-01-31T10:00:00Z
 AWB000000003,In Transit,2026-01-31T10:00:00Z

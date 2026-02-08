@@ -164,8 +164,49 @@ const normalizeShipmentStatus = (value) => {
   return "new";
 };
 
-const getEffectiveShipmentStatus = (row) =>
-  normalizeShipmentStatus(row?.shipmentStatus || row?.fulfillmentStatus);
+const internalToDisplayShipmentStatus = (value) => {
+  const s = String(value ?? "").trim().toLowerCase();
+  if (!s) return "";
+  if (s === "new") return "New";
+  if (s === "assigned") return "Assigned";
+  if (s === "in_transit" || s === "in transit") return "In Transit";
+  if (s === "delivered") return "Delivered";
+  if (s === "rto") return "RTO In Transit";
+  if (s === "rto_initiated" || s === "rto initiated") return "RTO Accepted";
+  if (s === "rto_delivered" || s === "rto delivered") return "RTO Delivered";
+  return "";
+};
+
+const displayToInternalShipmentStatus = (display) => {
+  const d = String(display ?? "").trim().toLowerCase();
+  if (!d) return "";
+  if (d === "new") return "new";
+  if (d === "assigned") return "assigned";
+  if (d === "delivered") return "delivered";
+  if (d === "in transit") return "in_transit";
+  if (d === "undelivered") return "in_transit";
+  if (d === "at destination") return "in_transit";
+  if (d === "out for delivery") return "in_transit";
+  if (d === "set rto") return "in_transit";
+  if (d === "rto accepted") return "rto_initiated";
+  if (d === "rto in transit") return "rto";
+  if (d === "rto reached at destination") return "rto";
+  if (d === "rto delivered") return "rto_delivered";
+  return "";
+};
+
+const getEffectiveShipmentStatus = (row) => {
+  const display = String(row?.shipmentStatus ?? row?.shipment_status ?? "").trim();
+  if (display) return normalizeShipmentStatus(displayToInternalShipmentStatus(display) || display);
+  return normalizeShipmentStatus(row?.shipmentStatus || row?.fulfillmentStatus);
+};
+
+const getDisplayShipmentStatus = (row) => {
+  const display = String(row?.shipmentStatus ?? row?.shipment_status ?? "").trim();
+  if (display) return display;
+  const internal = getEffectiveShipmentStatus(row);
+  return internalToDisplayShipmentStatus(internal) || "";
+};
 
 function getPrimaryTrackingCode(text) {
   const raw = String(text ?? "").trim();
@@ -554,12 +595,12 @@ function syncNewTabLayout() {
   if (isShopNew) {
     sortState = { key: "createdAt", dir: "desc" };
   } else if (["in_transit", "delivered", "rto"].includes(activeTab)) {
-    // These tabs must default to shipping_date DESC (server already returns sorted).
+    // These tabs must default to shippingDate DESC (server already returns sorted).
     // Keep a non-sorted key so applyFiltersAndSort preserves server order.
-    sortState = { key: "shipping_date", dir: "desc" };
+    sortState = { key: "shippingDate", dir: "desc" };
   } else if (sortState.key === "createdAt") {
     sortState = { key: "orderName", dir: "desc" };
-  } else if (sortState.key === "shipping_date") {
+  } else if (sortState.key === "shippingDate") {
     sortState = { key: "orderName", dir: "desc" };
   }
   renderTableHeaderForActiveTab();
@@ -918,18 +959,32 @@ async function ensureFirestoreAssignedRealtime() {
         const rows = [];
         for (const doc of snap.docs) {
           const data = doc.data() ?? {};
-          if (String(data.shipmentStatus ?? "") !== "assigned") continue;
+          if (String(data.shipmentStatus ?? data.shipment_status ?? "") !== "Assigned") continue;
           const order = data.order && typeof data.order === "object" ? data.order : null;
           const orderKey = String(data.orderKey ?? "").trim();
           if (orderKey) sessionAssignedOrderKeys.add(orderKey);
-          const trackingNumber =
-            String(data.trackingNumber ?? "").trim() ||
-            String(data?.shipment?.trackingNumber ?? "").trim();
+          const consignmentNumber = String(
+            data.consignmentNumber ?? data.consignment_number ?? ""
+          ).trim();
+          const courierPartner = String(data.courierPartner ?? data.courier_partner ?? "").trim();
+          const weightKg = data.weightKg ?? data.weight ?? "";
+          const courierType = String(data.courierType ?? data.courier_type ?? "").trim();
+          const shippingDate = String(data.shippingDate ?? data.shipping_date ?? "").trim();
+          const expectedDeliveryDate = String(
+            data.expectedDeliveryDate ?? data.expected_delivery_date ?? ""
+          ).trim();
+          const updatedAt = String(data.updatedAt ?? data.updated_at ?? "").trim();
           rows.push({
             ...(order ?? {}),
             orderKey,
-            shipmentStatus: "assigned",
-            trackingNumber,
+            shipmentStatus: "Assigned",
+            consignmentNumber,
+            courierPartner,
+            weightKg,
+            courierType,
+            shippingDate,
+            expectedDeliveryDate,
+            updatedAt,
             firestore: {
               requestedAt: String(data.requestedAt ?? ""),
             },
@@ -1123,8 +1178,8 @@ function applyFiltersAndSort() {
   }
 
   const { key, dir } = sortState;
-  if (key === "shipping_date") {
-    // These tabs must keep server order (shipping_date DESC).
+  if (key === "shippingDate") {
+    // These tabs must keep server order (shippingDate DESC).
     renderRows(view);
     updateSortIndicators();
     updateMetrics(view);
@@ -1275,16 +1330,15 @@ function renderRows(orders) {
     const fulfillmentLabel = isFulfilled ? "Fulfilled" : "Unfulfilled";
     const fulfillmentBadgeKind = isFulfilled ? "ok" : "muted";
 
-    const trackingText =
-      row.trackingNumbersText ?? formatTrackingNumbers(row.trackingNumbers);
-    const trackingUrl = String(row.trackingUrl ?? "").trim();
+    const awb = String(row?.consignmentNumber ?? row?.consignment_number ?? "").trim();
+    const trackingText = awb || (row.trackingNumbersText ?? formatTrackingNumbers(row.trackingNumbers));
+    const trackingUrl = trackingText ? buildDtdcTrackingUrl(getPrimaryTrackingCode(trackingText)) : "";
     const trackingBadge =
       trackingText && String(trackingText).trim()
         ? null
         : createBadge({ label: "Not Added", kind: "muted" });
 
     const effectiveShipmentStatus = getEffectiveShipmentStatus(row);
-    const rawShipmentStatus = String(row?.shipmentStatus ?? "").trim();
     const beautifyStatus = (value) => {
       const raw = String(value ?? "").trim();
       if (!raw) return "";
@@ -1296,10 +1350,8 @@ function renderRows(orders) {
         .trim();
     };
 
-    const inTransitLabel =
-      activeTab === "in_transit" && rawShipmentStatus
-        ? beautifyStatus(rawShipmentStatus)
-        : "";
+    const displayShipmentStatus = getDisplayShipmentStatus(row);
+    const inTransitLabel = activeTab === "in_transit" && displayShipmentStatus ? beautifyStatus(displayShipmentStatus) : "";
 
     const shipmentLabel =
       activeRole === "shop" && activeTab === "new" && !isFulfilled
@@ -1342,7 +1394,9 @@ function renderRows(orders) {
     const phone1Badge = phone1 ? null : createBadge({ label: "Missing", kind: "error" });
     const phone2Badge = null;
 
-    const courierPartner = String(row.trackingCompany ?? "").trim();
+    const courierPartner =
+      String(row.courierPartner ?? row.courier_partner ?? row.trackingCompany ?? "").trim() ||
+      (trackingUrl ? "DTDC" : "");
     const courierCell =
       courierPartner && trackingUrl
         ? createMenu({ label: courierPartner, url: trackingUrl, trackingText })
@@ -1684,14 +1738,7 @@ function renderRowsAssignedTab(orders) {
   };
 
   const getTrackingNumber = (row) => {
-    const direct = String(row?.trackingNumber ?? "").trim();
-    if (direct) return direct;
-    const fromText = getPrimaryTrackingCode(
-      row?.trackingNumbersText ?? formatTrackingNumbers(row?.trackingNumbers)
-    );
-    if (fromText) return fromText;
-    const arr = Array.isArray(row?.trackingNumbers) ? row.trackingNumbers : [];
-    return String(arr[0] ?? "").trim();
+    return String(row?.consignmentNumber ?? row?.consignment_number ?? "").trim();
   };
 
   const fragment = document.createDocumentFragment();
@@ -1784,13 +1831,12 @@ function renderRowsAssignedTab(orders) {
     const fulfillmentStatusLabel = serviceable ? "Fulfilled" : "Unfulfilled";
     const fulfillmentStatusKind = serviceable ? "ok" : "error";
 
-    const shipmentStatusRaw = String(row?.shipmentStatus ?? "").trim();
-    const shipmentStatusLabel = shipmentStatusRaw || "Assigned";
+    const shipmentStatusLabel =
+      String(row?.shipmentStatus ?? row?.shipment_status ?? "").trim() || "Assigned";
 
     const trackingNumber = serviceable ? getTrackingNumber(row) : "";
-    const courierPartner = String(row?.trackingCompany ?? "").trim();
-    const trackingUrl =
-      String(row?.trackingUrl ?? "").trim() || buildDtdcTrackingUrl(trackingNumber);
+    const courierPartner = String(row?.courierPartner ?? row?.courier_partner ?? "").trim();
+    const trackingUrl = buildDtdcTrackingUrl(trackingNumber);
 
     const trackingCell = {
       html: serviceable
@@ -1949,11 +1995,12 @@ function renderRowsInTransitTab(orders) {
     </div>`;
 
     const shippingDateHtml = `<div class="cellStack">
-      <div class="cellPrimary">${escapeHtml(formatDate(row.shipping_date))}</div>
+      <div class="cellPrimary">${escapeHtml(formatDate(row.shippingDate ?? row.shipping_date))}</div>
     </div>`;
 
-    const awb = String(row.consignment_number ?? "").trim();
-    const courierPartner = String(row.courier_partner ?? "").trim() || (awb ? "DTDC" : "");
+    const awb = String(row.consignmentNumber ?? row.consignment_number ?? "").trim();
+    const courierPartner =
+      String(row.courierPartner ?? row.courier_partner ?? "").trim() || (awb ? "DTDC" : "");
     const trackingUrl = awb ? buildDtdcTrackingUrl(awb) : "";
     const courierHtml =
       courierPartner && trackingUrl
@@ -1965,11 +2012,11 @@ function renderRowsInTransitTab(orders) {
     </div>`;
 
     const shipmentDetailsHtml = `<div class="cellStack">
-      <div class="cellPrimary mono">${escapeHtml(row.weight ?? "")}</div>
-      <div class="cellMuted">${escapeHtml(row.courier_type ?? "")}</div>
+      <div class="cellPrimary mono">${escapeHtml(row.weightKg ?? row.weight ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(row.courierType ?? row.courier_type ?? "")}</div>
     </div>`;
 
-    const statusValue = String(row.shipment_status ?? "").trim();
+    const statusValue = String(row.shipmentStatus ?? row.shipment_status ?? "").trim();
     const statusOptionsHtml = allowed
       .map((v) => {
         const selected = v === statusValue ? " selected" : "";
@@ -1983,11 +2030,11 @@ function renderRowsInTransitTab(orders) {
       : `<span class="badge badgeMuted">${escapeHtml(statusValue || "—")}</span>`;
 
     const updatedOnHtml = `<div class="cellStack">
-      <div class="cellPrimary">${escapeHtml(formatDateTime(row.updated_at))}</div>
+      <div class="cellPrimary">${escapeHtml(formatDateTime(row.updatedAt ?? row.updated_at))}</div>
     </div>`;
 
     const eddHtml = `<div class="cellStack">
-      <div class="cellPrimary">${escapeHtml(formatDate(row.expected_delivery_date))}</div>
+      <div class="cellPrimary">${escapeHtml(formatDate(row.expectedDeliveryDate ?? row.expected_delivery_date))}</div>
     </div>`;
 
     const cells = [
@@ -2082,11 +2129,12 @@ function renderRowsDeliveredTab(orders) {
     </div>`;
 
     const shippingDateHtml = `<div class="cellStack">
-      <div class="cellPrimary">${escapeHtml(formatDate(row.shipping_date))}</div>
+      <div class="cellPrimary">${escapeHtml(formatDate(row.shippingDate ?? row.shipping_date))}</div>
     </div>`;
 
-    const awb = String(row.consignment_number ?? "").trim();
-    const courierPartner = String(row.courier_partner ?? "").trim() || (awb ? "DTDC" : "");
+    const awb = String(row.consignmentNumber ?? row.consignment_number ?? "").trim();
+    const courierPartner =
+      String(row.courierPartner ?? row.courier_partner ?? "").trim() || (awb ? "DTDC" : "");
     const trackingUrl = awb ? buildDtdcTrackingUrl(awb) : "";
     const courierHtml =
       courierPartner && trackingUrl
@@ -2098,12 +2146,12 @@ function renderRowsDeliveredTab(orders) {
     </div>`;
 
     const shipmentDetailsHtml = `<div class="cellStack">
-      <div class="cellPrimary mono">${escapeHtml(row.weight ?? "")}</div>
-      <div class="cellMuted">${escapeHtml(row.courier_type ?? "")}</div>
+      <div class="cellPrimary mono">${escapeHtml(row.weightKg ?? row.weight ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(row.courierType ?? row.courier_type ?? "")}</div>
     </div>`;
 
     const updatedOnHtml = `<div class="cellStack">
-      <div class="cellPrimary">${escapeHtml(formatDateTime(row.updated_at))}</div>
+      <div class="cellPrimary">${escapeHtml(formatDateTime(row.updatedAt ?? row.updated_at))}</div>
     </div>`;
 
     const cells = [
@@ -2200,11 +2248,12 @@ function renderRowsRtoTab(orders) {
     </div>`;
 
     const shippingDateHtml = `<div class="cellStack">
-      <div class="cellPrimary">${escapeHtml(formatDate(row.shipping_date))}</div>
+      <div class="cellPrimary">${escapeHtml(formatDate(row.shippingDate ?? row.shipping_date))}</div>
     </div>`;
 
-    const awb = String(row.consignment_number ?? "").trim();
-    const courierPartner = String(row.courier_partner ?? "").trim() || (awb ? "DTDC" : "");
+    const awb = String(row.consignmentNumber ?? row.consignment_number ?? "").trim();
+    const courierPartner =
+      String(row.courierPartner ?? row.courier_partner ?? "").trim() || (awb ? "DTDC" : "");
     const trackingUrl = awb ? buildDtdcTrackingUrl(awb) : "";
     const courierHtml =
       courierPartner && trackingUrl
@@ -2216,11 +2265,11 @@ function renderRowsRtoTab(orders) {
     </div>`;
 
     const shipmentDetailsHtml = `<div class="cellStack">
-      <div class="cellPrimary mono">${escapeHtml(row.weight ?? "")}</div>
-      <div class="cellMuted">${escapeHtml(row.courier_type ?? "")}</div>
+      <div class="cellPrimary mono">${escapeHtml(row.weightKg ?? row.weight ?? "")}</div>
+      <div class="cellMuted">${escapeHtml(row.courierType ?? row.courier_type ?? "")}</div>
     </div>`;
 
-    const statusValue = String(row.shipment_status ?? "").trim();
+    const statusValue = String(row.shipmentStatus ?? row.shipment_status ?? "").trim();
     const statusOptionsHtml = allowed
       .map((v) => {
         const selected = v === statusValue ? " selected" : "";
@@ -2234,7 +2283,7 @@ function renderRowsRtoTab(orders) {
       : `<span class="badge badgeMuted">${escapeHtml(statusValue || "—")}</span>`;
 
     const updatedOnHtml = `<div class="cellStack">
-      <div class="cellPrimary">${escapeHtml(formatDateTime(row.updated_at))}</div>
+      <div class="cellPrimary">${escapeHtml(formatDateTime(row.updatedAt ?? row.updated_at))}</div>
     </div>`;
 
     const cells = [
@@ -2502,8 +2551,8 @@ function buildCsvForOrders(orders) {
     "Phone 2",
     "Total Price",
     "Fulfillment Status",
-    "Tracking Numbers",
-    "Shipments Status",
+    "Tracking No.",
+    "Shipment Status",
     "Courier Partner",
     "Tracking URL",
   ];
@@ -2513,6 +2562,13 @@ function buildCsvForOrders(orders) {
 
   for (const row of orders) {
     const shipping = row?.shipping ?? {};
+    const trackingNo =
+      String(row?.consignmentNumber ?? row?.consignment_number ?? "").trim() ||
+      getPrimaryTrackingCode(row?.trackingNumbersText ?? formatTrackingNumbers(row?.trackingNumbers));
+    const courierPartner =
+      String(row?.courierPartner ?? row?.courier_partner ?? row?.trackingCompany ?? "").trim() ||
+      (trackingNo ? "DTDC" : "");
+    const trackingUrl = trackingNo ? buildDtdcTrackingUrl(trackingNo) : "";
     const line = [
       row.index ?? "",
       row.orderName ?? "",
@@ -2527,10 +2583,10 @@ function buildCsvForOrders(orders) {
       shipping.phone2 ?? "",
       row.totalPrice ?? "",
       row.fulfillmentStatus ?? "",
-      row.trackingNumbersText ?? formatTrackingNumbers(row.trackingNumbers),
-      getEffectiveShipmentStatus(row),
-      row.trackingCompany ?? "",
-      row.trackingUrl ?? "",
+      trackingNo,
+      getDisplayShipmentStatus(row) || internalToDisplayShipmentStatus(getEffectiveShipmentStatus(row)) || "",
+      courierPartner,
+      trackingUrl,
     ];
     lines.push(line.map(csvEscape).join(","));
   }
@@ -2879,7 +2935,7 @@ window.addEventListener("DOMContentLoaded", () => {
         await postJson("/api/consignments/update-status", {
           orderKey,
           storeId,
-          shipment_status: nextValue,
+          shipmentStatus: nextValue,
         });
         target.dataset.prevValue = nextValue;
         setStatus("Status updated.", { kind: "ok" });

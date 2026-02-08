@@ -89,24 +89,12 @@ function internalToDisplayShipmentStatus(value) {
   return "";
 }
 
-function getDocShipmentStatusRaw(data) {
-  const direct = String(data?.shipmentStatus ?? "").trim();
-  if (direct) return direct;
-  const nested = data?.shipment && typeof data.shipment === "object" ? data.shipment : null;
-  return String(nested?.shipmentStatus ?? "").trim();
-}
-
 function getDocShippingDateIso(data) {
-  const direct = String(data?.shipping_date ?? "").trim();
+  const direct = String(data?.shippingDate ?? data?.shipping_date ?? "").trim();
   if (direct) return direct;
-  const nested = data?.shipment && typeof data.shipment === "object" ? data.shipment : null;
-  const nestedShipping = String(nested?.shippingDate ?? "").trim();
-  if (nestedShipping) return nestedShipping;
-  const assignedAt = String(nested?.assignedAt ?? "").trim();
-  if (assignedAt) return assignedAt;
   const requestedAt = String(data?.requestedAt ?? "").trim();
   if (requestedAt) return requestedAt;
-  return String(data?.updatedAt ?? "").trim();
+  return String(data?.updatedAt ?? data?.updated_at ?? "").trim();
 }
 
 function safeNumber(value) {
@@ -120,14 +108,6 @@ function normalizePhone10(value) {
   const digits = String(value ?? "").replaceAll(/\D/g, "");
   if (digits.length < 10) return "";
   return digits.slice(-10);
-}
-
-function buildDtdcTrackingUrl(trackingNumber) {
-  const tn = String(trackingNumber ?? "").trim();
-  if (!tn) return "";
-  return `https://txk.dtdc.com/ctbs-tracking/customerInterface.tr?submitName=showCITrackingDetails&cType=Consignment&cnNo=${encodeURIComponent(
-    tn
-  )}`;
 }
 
 function getRowValue(row, key) {
@@ -347,52 +327,50 @@ export function createBulkOrdersRouter({ env, auth }) {
 
             const phone1 = normalizePhone10(getRowValue(row, "phone1"));
             const phone2 = normalizePhone10(getRowValue(row, "phone2"));
-            const phoneNumbers = [phone1, phone2].filter(Boolean);
 
             const awbNumber = pickRowValue(row, [
-              "consignment_number",
               "consignmentNumber",
+              "consignment_number",
               "awbNumber",
               "trackingNumber",
               "tracking_number",
               "Tracking Number",
             ]);
-            const trackingCompany = pickRowValue(row, ["courier_partner", "courierPartner", "trackingCompany", "courier"])
+            const trackingCompany = pickRowValue(row, ["courierPartner", "courier_partner", "trackingCompany", "courier"])
               || (awbNumber ? "DTDC" : "");
-            const trackingUrl =
-              trackingCompany.toLowerCase().includes("dtdc") && awbNumber
-                ? buildDtdcTrackingUrl(awbNumber)
-                : "";
+            // Tracking URL is derived in UI using courier_partner + consignment_number.
 
-            const shippingDate = pickRowValue(row, ["shipping_date", "shippingDate"]) || assignedAt;
+            const shippingDate = pickRowValue(row, ["shippingDate", "shipping_date"]) || assignedAt;
             const expectedDeliveryDate = pickRowValue(row, [
-              "expected_delivery_date",
               "expectedDeliveryDate",
+              "expected_delivery_date",
               "edd",
             ]);
+            const uploadShipmentStatus = normalizeDisplayStatus(
+              pickRowValue(row, ["shipmentStatus", "shipment_status", "Shipment Status", "Shipments Status"])
+            );
 
             const order = {
               index: i + 1,
               orderKey,
-              orderId: getRowValue(row, "orderId"),
+              orderId: pickRowValue(row, ["orderId", "order_id", "Order ID"]),
+              orderGid: pickRowValue(row, ["orderGid", "order_gid", "order_gid"]),
               orderName: getRowValue(row, "orderName"),
               // Per requirement: Order Date should reflect bulk upload time.
               createdAt: assignedAt,
               customerEmail: getRowValue(row, "customerEmail"),
               financialStatus: getRowValue(row, "financialStatus"),
-              paymentStatus: getRowValue(row, "financialStatus"),
+              paymentStatus: pickRowValue(row, ["paymentStatus", "payment_status"]) || getRowValue(row, "financialStatus"),
               totalPrice: safeNumber(getRowValue(row, "totalPrice")),
               invoiceValue: safeNumber(pickRowValue(row, ["invoice_value", "invoiceValue"]) || getRowValue(row, "totalPrice")),
               productDescription: pickRowValue(row, [
+                "itemAndQuantity",
                 "content_and_quantity",
                 "productDescription",
                 "product_description",
               ]),
-              fulfillmentStatus: "unfulfilled",
-              trackingNumbers: awbNumber ? [awbNumber] : [],
-              trackingNumbersText: awbNumber ? awbNumber : "",
-              trackingCompany,
-              trackingUrl,
+              fulfillmentCenter: pickRowValue(row, ["fulfillmentCenter", "fulfillment_center"]) || "",
+              fulfillmentStatus: pickRowValue(row, ["fulfillmentStatus", "fulfillment_status"]) || "unfulfilled",
               shipping: {
                 fullName: getRowValue(row, "fullName"),
                 address1: getRowValue(row, "address1"),
@@ -400,35 +378,22 @@ export function createBulkOrdersRouter({ env, auth }) {
                 city: getRowValue(row, "city"),
                 state: getRowValue(row, "state"),
                 pinCode: getRowValue(row, "pinCode"),
-                phoneNumbers,
                 phone1,
                 phone2,
-                phoneNumbersText: phoneNumbers.join(", "),
               },
             };
 
-            const courierType = pickRowValue(row, ["courier_type", "courierType", "courierTypeName", "courierTypeValue"]);
-            const weightKgRaw = pickRowValue(row, ["weight", "weightKg", "weight_kg"]);
+            const courierType = pickRowValue(row, ["courierType", "courier_type", "courierTypeName", "courierTypeValue"]);
+            const weightKgRaw = pickRowValue(row, ["weightKg", "weight", "weight_kg"]);
             const weightKg = weightKgRaw ? Number.parseFloat(weightKgRaw) : NaN;
-
-            const shipment = {
-              shipmentStatus: "assigned",
-              assignedAt,
-              shippingDate,
-              updatedAt: assignedAt,
-              ...(courierType ? { courierType } : {}),
-              ...(Number.isFinite(weightKg) ? { weightKg: Number(weightKg.toFixed(1)) } : {}),
-              ...(awbNumber ? { awbNumber, trackingNumber: awbNumber } : {}),
-              ...(expectedDeliveryDate ? { expectedDeliveryDate } : {}),
-            };
 
             try {
               const existing = await docRef.get();
               const existingData = existing.data() ?? {};
-              const existingShippingDate = String(existingData?.shipping_date ?? "").trim();
-              const existingDisplayStatus = String(existingData?.shipment_status ?? "").trim();
-              const existingConsignment = String(existingData?.consignment_number ?? "").trim();
-              const existingCourierPartner = String(existingData?.courier_partner ?? "").trim();
+              const existingShippingDate = String(existingData?.shippingDate ?? existingData?.shipping_date ?? "").trim();
+              const existingDisplayStatus = String(existingData?.shipmentStatus ?? existingData?.shipment_status ?? "").trim();
+              const existingConsignment = String(existingData?.consignmentNumber ?? existingData?.consignment_number ?? "").trim();
+              const existingCourierPartner = String(existingData?.courierPartner ?? existingData?.courier_partner ?? "").trim();
               const resolvedShippingDate = existingShippingDate || shippingDate;
 
               await docRef.set(
@@ -438,17 +403,14 @@ export function createBulkOrdersRouter({ env, auth }) {
                   storeId: normalizedStoreId,
                   shopName: displayName,
                   order,
-                  shipment,
-                  shipmentStatus: "assigned",
-                  shipment_status: existingDisplayStatus || "Assigned",
-                  courier_partner: trackingCompany || existingCourierPartner || (awbNumber ? "DTDC" : ""),
-                  consignment_number: awbNumber || existingConsignment || "",
-                  ...(Number.isFinite(weightKg) ? { weight: Number(weightKg.toFixed(1)) } : {}),
-                  ...(courierType ? { courier_type: courierType } : {}),
-                  shipping_date: resolvedShippingDate,
-                  ...(expectedDeliveryDate ? { expected_delivery_date: expectedDeliveryDate } : {}),
-                  updated_at: assignedAt,
-                  ...(awbNumber ? { trackingNumber: awbNumber } : {}),
+                  shipmentStatus: existingDisplayStatus || uploadShipmentStatus || "Assigned",
+                  courierPartner: trackingCompany || existingCourierPartner || (awbNumber ? "DTDC" : ""),
+                  consignmentNumber: awbNumber || existingConsignment || "",
+                  ...(Number.isFinite(weightKg) ? { weightKg: Number(weightKg.toFixed(1)) } : {}),
+                  ...(courierType ? { courierType } : {}),
+                  shippingDate: resolvedShippingDate,
+                  ...(expectedDeliveryDate ? { expectedDeliveryDate } : {}),
+                  updatedAt: assignedAt,
                   event: "bulk_csv_upload",
                   requestedBy: {
                     uid: String(req.user?.uid ?? ""),
@@ -456,7 +418,6 @@ export function createBulkOrdersRouter({ env, auth }) {
                     role: String(req.user?.role ?? ""),
                   },
                   requestedAt: assignedAt,
-                  updatedAt: assignedAt,
                 },
                 { merge: true }
               );
@@ -541,6 +502,8 @@ export function createBulkOrdersRouter({ env, auth }) {
             const row = rows[i];
 
             const trackingNumber = pickFirstValue(row, [
+              "consignmentNumber",
+              "consignment_number",
               "trackingNumber",
               "Tracking Number",
               "Tracking Numbers",
@@ -548,6 +511,7 @@ export function createBulkOrdersRouter({ env, auth }) {
             ]);
             const shipmentStatusRaw = pickFirstValue(row, [
               "shipmentStatus",
+              "shipment_status",
               "Shipment status",
               "Shipments Status",
               "shipmentsStatus",
@@ -574,36 +538,21 @@ export function createBulkOrdersRouter({ env, auth }) {
               normalizeIsoDate(
                 pickFirstValue(row, ["updated_at", "updatedAt", "Updated On", "Updated At"])
               ) || nowIso();
-            const shipment_status =
+            const shipmentStatusDisplay =
               normalizeDisplayStatus(shipmentStatusRaw) ||
               internalToDisplayShipmentStatus(shipmentStatus) ||
               "";
-            const courierPartner = pickRowValue(row, ["courier_partner", "courierPartner", "trackingCompany"]) ||
+            const courierPartner = pickRowValue(row, ["courierPartner", "courier_partner", "trackingCompany"]) ||
               (trackingNumber ? "DTDC" : "");
 
             let matches = [];
             try {
-              const q1 = await firestore
-                .collection(collectionId)
-                .where("trackingNumber", "==", trackingNumber)
-                .limit(5)
-                .get();
+              const col = firestore.collection(collectionId);
+              const q1 = await col.where("consignmentNumber", "==", trackingNumber).limit(5).get();
               matches = q1.docs;
               if (matches.length === 0) {
-                const q2 = await firestore
-                  .collection(collectionId)
-                  .where("shipment.trackingNumber", "==", trackingNumber)
-                  .limit(5)
-                  .get();
+                const q2 = await col.where("consignment_number", "==", trackingNumber).limit(5).get();
                 matches = q2.docs;
-              }
-              if (matches.length === 0) {
-                const q3 = await firestore
-                  .collection(collectionId)
-                  .where("shipment.awbNumber", "==", trackingNumber)
-                  .limit(5)
-                  .get();
-                matches = q3.docs;
               }
             } catch (error) {
               current.failed += 1;
@@ -628,11 +577,7 @@ export function createBulkOrdersRouter({ env, auth }) {
                   const snap = await tx.get(docSnap.ref);
                   const data = snap.data() ?? {};
 
-                  const prevInternal = normalizeShipmentStatus(getDocShipmentStatusRaw(data));
-                  const prevDisplay =
-                    String(data?.shipment_status ?? "").trim() ||
-                    internalToDisplayShipmentStatus(prevInternal) ||
-                    "";
+                  const prevDisplay = String(data?.shipmentStatus ?? data?.shipment_status ?? "").trim();
 
                   const shippingDate = getDocShippingDateIso(data) || "";
 
@@ -641,26 +586,17 @@ export function createBulkOrdersRouter({ env, auth }) {
                     {
                       storeId: normalizedStoreId,
                       shopName: displayName,
-                      shipmentStatus,
-                      shipment_status,
-                      trackingNumber,
-                      consignment_number: trackingNumber,
-                      courier_partner: courierPartner,
-                      shipping_date: shippingDate,
-                      updated_at: updatedAt,
-                      shipment: {
-                        shipmentStatus,
-                        trackingNumber,
-                        shippingDate,
-                        updatedAt,
-                      },
+                      shipmentStatus: shipmentStatusDisplay,
+                      consignmentNumber: trackingNumber,
+                      courierPartner,
+                      shippingDate: shippingDate || updatedAt,
+                      updatedAt,
                       event: "bulk_status_csv",
                       updatedBy: {
                         uid: String(req.user?.uid ?? ""),
                         email: String(req.user?.email ?? ""),
                         role: String(req.user?.role ?? ""),
                       },
-                      updatedAt,
                     },
                     { merge: true }
                   );
@@ -668,9 +604,9 @@ export function createBulkOrdersRouter({ env, auth }) {
                   tx.set(historyRef, {
                     changed_at: updatedAt,
                     from_shipment_status: prevDisplay,
-                    to_shipment_status: shipment_status,
-                    from_internal_status: prevInternal,
-                    to_internal_status: shipmentStatus,
+                    to_shipment_status: shipmentStatusDisplay,
+                    from_internal_status: "",
+                    to_internal_status: "",
                     updated_by: {
                       uid: String(req.user?.uid ?? ""),
                       email: String(req.user?.email ?? ""),
