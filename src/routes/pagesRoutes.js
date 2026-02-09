@@ -1194,6 +1194,7 @@ function renderCreateOrdersPage({ role, userLabel, storeId }) {
           <label class="field span-6">
             <span>Customer Name</span>
             <input id="singleFullName" type="text" />
+            <small id="singleFullNameHint" class="fieldHint"></small>
           </label>
           <label class="field span-6">
             <span>Customer Email (optional)</span>
@@ -1203,10 +1204,12 @@ function renderCreateOrdersPage({ role, userLabel, storeId }) {
           <label class="field span-3">
             <span>Contact No</span>
             <input id="singlePhone1" type="text" class="mono" inputmode="numeric" placeholder="Exclude +91 or 0)" />
+            <small id="singlePhone1Hint" class="fieldHint"></small>
           </label>
           <label class="field span-3">
             <span>Alternate Contact (optional)</span>
             <input id="singlePhone2" type="text" class="mono" inputmode="numeric" />
+            <small id="singlePhone2Hint" class="fieldHint"></small>
           </label>
         </div>
 
@@ -1215,6 +1218,7 @@ function renderCreateOrdersPage({ role, userLabel, storeId }) {
           <label class="field span-12">
             <span>Complete address</span>
             <input id="singleAddress1" type="text" />
+            <small id="singleAddress1Hint" class="fieldHint"></small>
           </label>
           <label class="field span-12">
             <span>Landmark (optional)</span>
@@ -1244,11 +1248,13 @@ function renderCreateOrdersPage({ role, userLabel, storeId }) {
               <option value="paid">Paid</option>
               <option value="cod" disabled>COD</option>
             </select>
+            <small id="singlePaymentStatusHint" class="fieldHint"></small>
           </label>
 
           <label class="field span-4">
             <span>Invoice Value</span>
             <input id="singleInvoiceValue" type="text" class="mono" inputmode="decimal" required />
+            <small id="singleInvoiceValueHint" class="fieldHint"></small>
           </label>
           <label class="field span-4">
             <span>Courier Partner (optional)</span>
@@ -1261,10 +1267,12 @@ function renderCreateOrdersPage({ role, userLabel, storeId }) {
             <select id="singleFulfillmentCenter" required>
               <option value="" disabled selected>Fulfillment Center</option>
             </select>
+            <small id="singleFulfillmentCenterHint" class="fieldHint"></small>
           </label>
           <label class="field span-4">
             <span>Weight (kg)</span>
             <input id="singleWeightKg" type="text" class="mono" inputmode="decimal" placeholder="e.g. 0.1" required />
+            <small id="singleWeightKgHint" class="fieldHint"></small>
           </label>
           <label class="field span-4">
             <span>Courier Type</span>
@@ -1276,10 +1284,11 @@ function renderCreateOrdersPage({ role, userLabel, storeId }) {
               <option value="COD Surface" disabled>COD Surface</option>
               <option value="COD Air" disabled>COD Air</option>
             </select>
+            <small id="singleCourierTypeHint" class="fieldHint"></small>
           </label>
 
           <label class="field span-12">
-            <span>Item & Quantity (optional)</span>
+            <span>Product description</span>
             <input id="singleProductDescription" type="text" />
           </label>
         </div>

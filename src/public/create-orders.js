@@ -56,6 +56,13 @@ function setEmailHint({ kind, text }) {
   el.dataset.kind = String(kind ?? "");
 }
 
+function setFieldHint(id, { kind = "", text = "" } = {}) {
+  const el = $(id);
+  if (!el) return;
+  el.textContent = String(text ?? "");
+  el.dataset.kind = String(kind ?? "");
+}
+
 function parseWeightKg(value) {
   const s = String(value ?? "").trim();
   if (!s) return { ok: false, value: "" };
@@ -63,6 +70,14 @@ function parseWeightKg(value) {
   const n = Number.parseFloat(s);
   if (Number.isNaN(n) || n < 0) return { ok: false, value: "" };
   return { ok: true, value: String(Number(n.toFixed(1))) };
+}
+
+function parseInvoiceValue(value) {
+  const s = String(value ?? "").trim();
+  if (!s) return { ok: false, value: "" };
+  const n = Number(s);
+  if (!Number.isFinite(n) || n <= 0) return { ok: false, value: "" };
+  return { ok: true, value: s };
 }
 
 function normalizeWeightInput(value) {
@@ -545,6 +560,21 @@ window.addEventListener("DOMContentLoaded", async () => {
   clearAutofillOnEdit("singleCity");
   clearAutofillOnEdit("singleState");
 
+  const updatePhoneHint = (id, hintId, { required = false } = {}) => {
+    const el = $(id);
+    if (!el) return;
+    const digits = normalizePhoneDigits(el.value);
+    if (!digits) {
+      setFieldHint(hintId, required ? { kind: "error", text: "Required" } : { kind: "", text: "" });
+      return;
+    }
+    if (digits.length !== 10) {
+      setFieldHint(hintId, { kind: "error", text: "Must be exactly 10 digits" });
+      return;
+    }
+    setFieldHint(hintId, { kind: "ok", text: "✓" });
+  };
+
   const enforceDigits = (id, { required = false } = {}) => {
     const el = $(id);
     if (!el) return;
@@ -555,15 +585,125 @@ window.addEventListener("DOMContentLoaded", async () => {
       } else {
         el.setCustomValidity(el.value ? (el.value.length === 10 ? "" : "Must be 10 digits") : "");
       }
+      updatePhoneHint(id, id === "singlePhone1" ? "singlePhone1Hint" : "singlePhone2Hint", { required });
+    });
+    el.addEventListener("blur", () => {
+      updatePhoneHint(id, id === "singlePhone1" ? "singlePhone1Hint" : "singlePhone2Hint", { required });
     });
   };
   enforceDigits("singlePhone1", { required: true });
   enforceDigits("singlePhone2", { required: false });
+
+  const paymentEl = $("singlePaymentStatus");
+  if (paymentEl) {
+    const sync = () => {
+      const v = String(paymentEl.value ?? "").trim().toLowerCase();
+      if (!v) setFieldHint("singlePaymentStatusHint", { kind: "error", text: "Required" });
+      else if (v !== "paid") setFieldHint("singlePaymentStatusHint", { kind: "error", text: "Only Paid is allowed right now" });
+      else setFieldHint("singlePaymentStatusHint", { kind: "", text: "" });
+    };
+    paymentEl.addEventListener("change", sync);
+    paymentEl.addEventListener("blur", sync);
+  }
+
+  const invoiceEl = $("singleInvoiceValue");
+  if (invoiceEl) {
+    const sync = () => {
+      const v = String(invoiceEl.value ?? "").trim();
+      if (!v) {
+        setFieldHint("singleInvoiceValueHint", { kind: "error", text: "Required" });
+        return;
+      }
+      const parsed = parseInvoiceValue(v);
+      if (!parsed.ok) setFieldHint("singleInvoiceValueHint", { kind: "error", text: "Enter a valid amount" });
+      else setFieldHint("singleInvoiceValueHint", { kind: "", text: "" });
+    };
+    invoiceEl.addEventListener("input", sync);
+    invoiceEl.addEventListener("blur", sync);
+  }
+
+  const nameEl = $("singleFullName");
+  if (nameEl) {
+    const sync = () => {
+      const v = String(nameEl.value ?? "").trim();
+      if (!v) setFieldHint("singleFullNameHint", { kind: "error", text: "Required" });
+      else setFieldHint("singleFullNameHint", { kind: "", text: "" });
+    };
+    nameEl.addEventListener("input", sync);
+    nameEl.addEventListener("blur", sync);
+  }
+
+  const addrEl = $("singleAddress1");
+  if (addrEl) {
+    const sync = () => {
+      const v = String(addrEl.value ?? "").trim();
+      if (!v) setFieldHint("singleAddress1Hint", { kind: "error", text: "Required" });
+      else setFieldHint("singleAddress1Hint", { kind: "", text: "" });
+    };
+    addrEl.addEventListener("input", sync);
+    addrEl.addEventListener("blur", sync);
+  }
+
+  const centerEl = $("singleFulfillmentCenter");
+  if (centerEl) {
+    const sync = () => {
+      const v = String(centerEl.value ?? "").trim();
+      if (!v) setFieldHint("singleFulfillmentCenterHint", { kind: "error", text: "Required" });
+      else setFieldHint("singleFulfillmentCenterHint", { kind: "", text: "" });
+    };
+    centerEl.addEventListener("change", sync);
+    centerEl.addEventListener("blur", sync);
+  }
+
   $("singleWeightKg")?.addEventListener("input", (e) => {
     const input = e.target;
     if (!input) return;
     input.value = normalizeWeightInput(input.value);
+    const parsed = parseWeightKg(input.value);
+    if (!input.value) setFieldHint("singleWeightKgHint", { kind: "error", text: "Required" });
+    else if (!parsed.ok) setFieldHint("singleWeightKgHint", { kind: "error", text: "Invalid weight (e.g. 0.1)" });
+    else setFieldHint("singleWeightKgHint", { kind: "", text: "" });
   });
+  $("singleWeightKg")?.addEventListener("blur", (e) => {
+    const input = e.target;
+    if (!input) return;
+    const parsed = parseWeightKg(input.value);
+    if (!input.value) setFieldHint("singleWeightKgHint", { kind: "error", text: "Required" });
+    else if (!parsed.ok) setFieldHint("singleWeightKgHint", { kind: "error", text: "Invalid weight (e.g. 0.1)" });
+    else setFieldHint("singleWeightKgHint", { kind: "", text: "" });
+  });
+
+  const courierTypeEl = $("singleCourierType");
+  if (courierTypeEl) {
+    const allowed = new Set(["Z- Express", "D- Surface", "D- Air"]);
+    const sync = () => {
+      const v = String(courierTypeEl.value ?? "").trim();
+      if (!v) setFieldHint("singleCourierTypeHint", { kind: "error", text: "Required" });
+      else if (!allowed.has(v)) setFieldHint("singleCourierTypeHint", { kind: "error", text: "Select an active courier type" });
+      else setFieldHint("singleCourierTypeHint", { kind: "", text: "" });
+    };
+    courierTypeEl.addEventListener("change", sync);
+    courierTypeEl.addEventListener("blur", sync);
+  }
+
+  const pinEl = $("singlePinCode");
+  if (pinEl) {
+    const sync = () => {
+      const pin = normalizePincode(pinEl.value);
+      if (!pin) {
+        setPinHint({ kind: "error", text: "Required" });
+        return;
+      }
+      if (pin.length !== 6) {
+        setPinHint({ kind: "error", text: "PIN Code must be 6 digits" });
+        return;
+      }
+      // If serviceability check already ran, keep its hint. Otherwise clear.
+      if (String($("singlePinHint")?.dataset?.kind ?? "") === "ok") return;
+      setPinHint({ kind: "", text: "" });
+    };
+    pinEl.addEventListener("blur", sync);
+  }
 
   $("singleCustomerEmail")?.addEventListener("blur", (e) => {
     const input = e.target;
