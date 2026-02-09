@@ -1262,8 +1262,8 @@ function renderCreateOrdersPage({ role, userLabel, storeId }) {
             </select>
           </label>
           <label class="field span-4">
-            <span>Weight (kg) (optional)</span>
-            <input id="singleWeightKg" type="text" class="mono" inputmode="decimal" placeholder="e.g. 0.1" />
+            <span>Weight (kg)</span>
+            <input id="singleWeightKg" type="text" class="mono" inputmode="decimal" placeholder="e.g. 0.1" required />
           </label>
           <label class="field span-4">
             <span>Courier Type (optional)</span>

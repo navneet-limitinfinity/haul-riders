@@ -53,7 +53,7 @@ function setEmailHint({ kind, text }) {
 
 function parseWeightKg(value) {
   const s = String(value ?? "").trim();
-  if (!s) return { ok: true, value: "" };
+  if (!s) return { ok: false, value: "" };
   if (!/^(?:\d+|\d*\.\d)$/.test(s)) return { ok: false, value: "" };
   const n = Number.parseFloat(s);
   if (Number.isNaN(n) || n < 0) return { ok: false, value: "" };
