@@ -32,8 +32,13 @@ function normalizePincode(value) {
   return String(value ?? "").replaceAll(/\D/g, "").slice(0, 6);
 }
 
-function normalizePhone10(value) {
-  return String(value ?? "").replaceAll(/\D/g, "").slice(0, 10);
+function normalizePhoneDigits(value) {
+  return String(value ?? "").replaceAll(/\D/g, "");
+}
+
+function isPhone10(value) {
+  const digits = normalizePhoneDigits(value);
+  return digits.length === 10;
 }
 
 function isValidEmail(value) {
@@ -347,8 +352,8 @@ function readSingleOrderPayload() {
     orderDate: String($("singleOrderDate")?.value ?? "").trim(),
     fullName: String($("singleFullName")?.value ?? "").trim(),
     customerEmail: String($("singleCustomerEmail")?.value ?? "").trim(),
-    phone1: String($("singlePhone1")?.value ?? "").trim(),
-    phone2: String($("singlePhone2")?.value ?? "").trim(),
+    phone1: normalizePhoneDigits($("singlePhone1")?.value ?? ""),
+    phone2: normalizePhoneDigits($("singlePhone2")?.value ?? ""),
     address1: String($("singleAddress1")?.value ?? "").trim(),
     address2: String($("singleAddress2")?.value ?? "").trim(),
     city: String($("singleCity")?.value ?? "").trim(),
@@ -544,8 +549,12 @@ window.addEventListener("DOMContentLoaded", async () => {
     const el = $(id);
     if (!el) return;
     el.addEventListener("input", () => {
-      el.value = normalizePhone10(el.value);
-      if (required) el.setCustomValidity(el.value ? "" : "Required");
+      el.value = normalizePhoneDigits(el.value);
+      if (required) {
+        el.setCustomValidity(el.value.length === 10 ? "" : "Must be 10 digits");
+      } else {
+        el.setCustomValidity(el.value ? (el.value.length === 10 ? "" : "Must be 10 digits") : "");
+      }
     });
   };
   enforceDigits("singlePhone1", { required: true });
@@ -684,20 +693,24 @@ window.addEventListener("DOMContentLoaded", async () => {
       setStatus("Select Payment Status.", { kind: "error" });
       return;
     }
+    if (String($("singlePaymentStatus")?.value ?? "").trim().toLowerCase() !== "paid") {
+      setStatus("Payment Status must be Paid.", { kind: "error" });
+      return;
+    }
 
     if (!String($("singleInvoiceValue")?.value ?? "").trim()) {
       setStatus("Invoice Value is required.", { kind: "error" });
       return;
     }
 
-    const phone1 = normalizePhone10($("singlePhone1")?.value ?? "");
-    if (!phone1 || phone1.length < 10) {
+    const phone1 = normalizePhoneDigits($("singlePhone1")?.value ?? "");
+    if (!phone1 || phone1.length !== 10) {
       setStatus("Contact No must be 10 digits.", { kind: "error" });
       return;
     }
 
-    const phone2 = normalizePhone10($("singlePhone2")?.value ?? "");
-    if (phone2 && phone2.length < 10) {
+    const phone2 = normalizePhoneDigits($("singlePhone2")?.value ?? "");
+    if (phone2 && phone2.length !== 10) {
       setStatus("Alternate Contact must be 10 digits (or leave blank).", { kind: "error" });
       return;
     }
@@ -711,6 +724,19 @@ window.addEventListener("DOMContentLoaded", async () => {
     const weightParsed = parseWeightKg($("singleWeightKg")?.value ?? "");
     if (!weightParsed.ok) {
       setStatus("Weight must be a number with at most 1 decimal place.", { kind: "error" });
+      return;
+    }
+
+    const courierType = String($("singleCourierType")?.value ?? "").trim();
+    const allowedCourierTypes = new Set(["Z- Express", "D- Surface", "D- Air"]);
+    if (!allowedCourierTypes.has(courierType)) {
+      setStatus("Select a valid Courier Type.", { kind: "error" });
+      return;
+    }
+
+    const courierPartner = String($("singleCourierPartner")?.value ?? "").trim();
+    if (courierPartner && courierPartner !== "DTDC") {
+      setStatus("Courier Partner must be DTDC.", { kind: "error" });
       return;
     }
 

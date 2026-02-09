@@ -1242,8 +1242,7 @@ function renderCreateOrdersPage({ role, userLabel, storeId }) {
             <select id="singlePaymentStatus" required>
               <option value="" disabled selected>Select</option>
               <option value="paid">Paid</option>
-              <option value="pending">Pending</option>
-              <option value="cod">COD</option>
+              <option value="cod" disabled>COD</option>
             </select>
           </label>
 

@@ -14,10 +14,32 @@ function safeNumber(value) {
   return Number.isFinite(n) ? String(n) : s;
 }
 
-function normalizePhone10(value) {
-  const digits = String(value ?? "").replaceAll(/\D/g, "");
-  if (digits.length < 10) return "";
-  return digits.slice(-10);
+function normalizePhoneDigits(value) {
+  return String(value ?? "").replaceAll(/\D/g, "");
+}
+
+function normalizePhone10Strict(value) {
+  const digits = normalizePhoneDigits(value);
+  return digits.length === 10 ? digits : "";
+}
+
+function normalizeCourierPartner(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  if (raw.toLowerCase() === "dtdc") return "DTDC";
+  return raw;
+}
+
+function normalizeCourierTypeActive(value) {
+  const raw = String(value ?? "").trim();
+  const allowed = new Set(["Z- Express", "D- Surface", "D- Air"]);
+  if (allowed.has(raw)) return raw;
+  // Common variants
+  const key = raw.toLowerCase().replaceAll(/\s+/g, " ");
+  if (key === "z express" || key === "z- express") return "Z- Express";
+  if (key === "d surface" || key === "d- surface") return "D- Surface";
+  if (key === "d air" || key === "d- air") return "D- Air";
+  return "";
 }
 
 function formatFulfillmentCenterString(center) {
@@ -134,7 +156,9 @@ async function loadFulfillmentCentersMap({ firestore, shopsCollection, storeId }
 
 function normalizeManualRow(row) {
   // Support both legacy (camelCase) and new keys.
-  const paymentStatusRaw = pickRowValue(row, ["paymentStatus", "payment_status", "payment_mode", "paymentMode"]);
+  const paymentStatusInput = pickRowValue(row, ["paymentStatus", "payment_status", "payment_mode", "paymentMode"]);
+  const paymentStatusRaw = String(paymentStatusInput ?? "").trim().toLowerCase();
+  const paymentStatus = paymentStatusRaw === "paid" ? "paid" : "";
   const invoiceValueRaw = safeNumber(
     pickRowValue(row, ["invoiceValue", "invoice_value", "Invoice Value", "invoiceValueInr"])
   );
@@ -150,7 +174,10 @@ function normalizeManualRow(row) {
   );
   const financialStatusRaw =
     pickRowValue(row, ["financialStatus", "financial_status", "Financial Status"]) ||
-    (String(paymentStatusRaw).trim().toLowerCase() === "paid" ? "paid" : paymentStatusRaw ? "pending" : "");
+    (paymentStatus === "paid" ? "paid" : "");
+
+  const phone2Input = pickRowValue(row, ["phone2", "phone_2"]);
+  const phone2Provided = Boolean(String(phone2Input ?? "").trim());
 
   return {
     // Kept for backward compatibility (we no longer persist orderKey/orderName in Firestore).
@@ -160,8 +187,9 @@ function normalizeManualRow(row) {
     orderDate: pickRowValue(row, ["orderDate", "order_date", "createdAt", "orderCreatedAt"]),
     fullName: pickRowValue(row, ["fullName", "Full Name", "name", "Name", "customer_name", "customerName"]),
     customerEmail: pickRowValue(row, ["customerEmail", "Customer Email", "email", "Email"]),
-    phone1: normalizePhone10(pickRowValue(row, ["phone1", "phone_1", "phone", "phone_1"])),
-    phone2: normalizePhone10(pickRowValue(row, ["phone2", "phone_2"])),
+    phone1: normalizePhone10Strict(pickRowValue(row, ["phone1", "phone_1", "phone", "phone_1"])),
+    phone2: normalizePhone10Strict(phone2Input),
+    phone2Provided,
     address1: pickRowValue(row, ["address1", "Address 1", "address_line_1", "addressLine1", "address_line1"]),
     address2: pickRowValue(row, ["address2", "Address 2", "address_line_2", "addressLine2", "address_line2"]),
     city: pickRowValue(row, ["city", "City"]),
@@ -169,14 +197,18 @@ function normalizeManualRow(row) {
     pinCode: pickRowValue(row, ["pinCode", "PIN Code", "Pin Code", "pincode", "pin_code"]),
     totalPrice: totalPriceRaw || invoiceValueRaw,
     financialStatus: financialStatusRaw,
-    paymentStatus: paymentStatusRaw,
+    paymentStatus,
     productDescription: pickRowValue(row, ["productDescription", "content_and_quantity", "product_description", "Item & Quantity"]),
     invoiceValue: invoiceValueRaw,
     fulfillmentCenter: pickRowValue(row, ["fulfillmentCenter", "fulfillment_center"]),
     fulfillmentStatus: pickRowValue(row, ["fulfillmentStatus", "fulfillment_status"]),
     weight: safeNumber(pickRowValue(row, ["weightKg", "weight", "weight_kg"])),
-    courier_type: pickRowValue(row, ["courierType", "courier_type", "courierTypeName", "courierTypeValue"]),
-    courierPartner: pickRowValue(row, ["courierPartner", "courier_partner", "Courier Partner", "courier"]),
+    courier_type: normalizeCourierTypeActive(
+      pickRowValue(row, ["courierType", "courier_type", "courierTypeName", "courierTypeValue"])
+    ),
+    courierPartner: normalizeCourierPartner(
+      pickRowValue(row, ["courierPartner", "courier_partner", "Courier Partner", "courier"])
+    ),
   };
 }
 
@@ -189,12 +221,34 @@ function validateManualRow(normalized, rowIndex) {
     "state",
     "pinCode",
     "totalPrice",
-    "financialStatus",
+    "paymentStatus",
+    "fulfillmentCenter",
+    "courier_type",
   ];
   const missing = required.filter((k) => !String(normalized?.[k] ?? "").trim());
   if (missing.length) {
     return { ok: false, error: `Row ${rowIndex + 2}: missing ${missing.join(", ")}` };
   }
+
+  if (!String(normalized.phone1 ?? "").trim() || String(normalized.phone1).length !== 10) {
+    return { ok: false, error: `Row ${rowIndex + 2}: phone1 must be exactly 10 digits` };
+  }
+  if (normalized.phone2Provided && (!String(normalized.phone2 ?? "").trim() || String(normalized.phone2).length !== 10)) {
+    return { ok: false, error: `Row ${rowIndex + 2}: phone2 must be exactly 10 digits (or leave blank)` };
+  }
+
+  if (String(normalized.paymentStatus ?? "").trim().toLowerCase() !== "paid") {
+    return { ok: false, error: `Row ${rowIndex + 2}: paymentStatus must be paid` };
+  }
+
+  const courierPartner = String(normalized.courierPartner ?? "").trim();
+  if (courierPartner && courierPartner !== "DTDC") {
+    return { ok: false, error: `Row ${rowIndex + 2}: courierPartner must be DTDC` };
+  }
+  if (!String(normalized.courier_type ?? "").trim()) {
+    return { ok: false, error: `Row ${rowIndex + 2}: courierType must be one of Z- Express, D- Surface, D- Air` };
+  }
+
   return { ok: true, error: "" };
 }
 
