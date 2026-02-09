@@ -1253,7 +1253,9 @@ function renderCreateOrdersPage({ role, userLabel, storeId }) {
           </label>
           <label class="field span-4">
             <span>Courier Partner (optional)</span>
-            <input id="singleCourierPartner" type="text" value="DTDC" />
+            <select id="singleCourierPartner">
+              <option value="DTDC" selected>DTDC</option>
+            </select>
           </label>
           <label class="field span-4">
             <span>Fulfillment Center</span>
@@ -1272,8 +1274,8 @@ function renderCreateOrdersPage({ role, userLabel, storeId }) {
               <option value="Z- Express">Z- Express</option>
               <option value="D- Surface">D- Surface</option>
               <option value="D- Air">D- Air</option>
-              <option value="COD Surface">COD Surface</option>
-              <option value="COD Air">COD Air</option>
+              <option value="COD Surface" disabled>COD Surface</option>
+              <option value="COD Air" disabled>COD Air</option>
             </select>
           </label>
 
