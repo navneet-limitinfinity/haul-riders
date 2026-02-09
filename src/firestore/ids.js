@@ -6,4 +6,3 @@ export function toOrderDocId(orderKey) {
   const hash = crypto.createHash("sha256").update(raw).digest("hex");
   return `order_${hash}`;
 }
-

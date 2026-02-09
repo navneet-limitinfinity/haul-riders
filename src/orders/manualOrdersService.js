@@ -2,6 +2,8 @@ import { toOrderDocId } from "../firestore/ids.js";
 import { reserveOrderSequences, formatManualOrderName } from "../firestore/orderSequence.js";
 import { allocateAwbFromPool } from "../awb/awbPoolService.js";
 import { buildSearchTokensFromDoc } from "../firestore/searchTokens.js";
+import { reserveHrGids } from "../firestore/hrGid.js";
+import { getPincodeInfo } from "../pincodes/serviceablePins.js";
 
 function nowIso() {
   return new Date().toISOString();
@@ -12,6 +14,10 @@ function safeNumber(value) {
   if (!s) return "";
   const n = Number(s);
   return Number.isFinite(n) ? String(n) : s;
+}
+
+function normalizePin6(value) {
+  return String(value ?? "").replaceAll(/\D/g, "").slice(0, 6);
 }
 
 function normalizePhoneDigits(value) {
@@ -222,7 +228,6 @@ function validateManualRow(normalized, rowIndex) {
     "pinCode",
     "totalPrice",
     "paymentStatus",
-    "fulfillmentCenter",
     "courier_type",
   ];
   const missing = required.filter((k) => !String(normalized?.[k] ?? "").trim());
@@ -252,7 +257,7 @@ function validateManualRow(normalized, rowIndex) {
   return { ok: true, error: "" };
 }
 
-function buildManualOrderDoc({ normalized, index, storeId, displayName, user, fulfillmentCenterString }) {
+function buildManualOrderDoc({ normalized, index, storeId, displayName, user, fulfillmentCenterString, hrGid }) {
   // Per requirement: Order Date should reflect upload/create time.
   const createdAt = nowIso();
 
@@ -289,6 +294,7 @@ function buildManualOrderDoc({ normalized, index, storeId, displayName, user, fu
     courierType: normalized.courier_type || "",
   });
   return {
+    ...(hrGid ? { hrGid: String(hrGid).trim() } : {}),
     docId: toOrderDocId(normalized.orderKey),
     storeId,
     shopName: displayName,
@@ -365,6 +371,23 @@ export async function createManualOrders({
 
   for (let i = 0; i < normalizedRows.length; i += 1) {
     const norm = normalizedRows[i];
+
+    // Autofill city/state from pincode master if missing.
+    norm.pinCode = normalizePin6(norm.pinCode);
+    if (norm.pinCode && (String(norm.city ?? "").trim() === "" || String(norm.state ?? "").trim() === "")) {
+      const info = getPincodeInfo(norm.pinCode);
+      if (info) {
+        if (!String(norm.city ?? "").trim()) norm.city = String(info.district ?? "").trim();
+        if (!String(norm.state ?? "").trim()) norm.state = String(info.state ?? "").trim();
+      }
+    }
+
+    // If fulfillmentCenter is missing in CSV, use the store's default fulfillment center.
+    if (!String(norm.fulfillmentCenter ?? "").trim()) {
+      const defName = String(defaultCenter?.originName ?? "").trim();
+      if (defName) norm.fulfillmentCenter = defName;
+    }
+
     const validation = validateManualRow(norm, i);
     if (!validation.ok) {
       failed += 1;
@@ -382,17 +405,20 @@ export async function createManualOrders({
     const centerName = String(norm.fulfillmentCenter ?? "").trim();
     const fulfillmentCenterAddress = centerName ? centersByName.get(centerName) ?? null : defaultCenter;
     const fulfillmentCenterString = fulfillmentCenterAddress ? formatFulfillmentCenterString(fulfillmentCenterAddress) : "";
-    const doc = buildManualOrderDoc({
-      normalized: { ...norm, orderKey: norm.orderKey, orderId: norm.orderId },
-      index: i + 1,
-      storeId,
-      displayName,
-      user,
-      fulfillmentCenterString,
-    });
-
     try {
       const existing = await docRef.get();
+      const existingData = existing.data() ?? {};
+      const existingHrGid = String(existingData?.hrGid ?? "").trim();
+      const hrGid = existingHrGid || (await reserveHrGids({ firestore, count: 1 }))[0] || "";
+      const doc = buildManualOrderDoc({
+        normalized: { ...norm, orderKey: norm.orderKey, orderId: norm.orderId },
+        index: i + 1,
+        storeId,
+        displayName,
+        user,
+        fulfillmentCenterString,
+        hrGid,
+      });
       await docRef.set(doc, { merge: true });
       if (existing.exists) updated += 1;
       else created += 1;
@@ -479,6 +505,8 @@ export async function assignManualOrders({
         courierPartner: String(data?.courierPartner ?? data?.courier_partner ?? "").trim() || "DTDC",
         consignmentNumber: allocatedAwb,
         updatedAt: ts,
+        // Ensure hrGid exists for onboarding orders.
+        ...(String(data?.hrGid ?? "").trim() ? {} : { hrGid: (await reserveHrGids({ firestore, count: 1 }))[0] || "" }),
         event: "manual_assign",
         requestedBy: {
           uid: String(user?.uid ?? ""),

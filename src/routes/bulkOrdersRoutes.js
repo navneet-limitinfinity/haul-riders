@@ -7,6 +7,7 @@ import { toOrderDocId } from "../firestore/ids.js";
 import { reserveOrderSequences, formatManualOrderName } from "../firestore/orderSequence.js";
 import { parseCsvRows } from "../orders/import/parseCsvRows.js";
 import { buildSearchTokensFromDoc } from "../firestore/searchTokens.js";
+import { reserveHrGids } from "../firestore/hrGid.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -505,6 +506,8 @@ export function createBulkOrdersRouter({ env, auth }) {
             try {
               const existing = await docRef.get();
               const existingData = existing.data() ?? {};
+              const existingHrGid = String(existingData?.hrGid ?? "").trim();
+              const hrGid = existingHrGid || (await reserveHrGids({ firestore, count: 1 }))[0] || "";
               const existingShippingDate = String(existingData?.shippingDate ?? existingData?.shipping_date ?? "").trim();
               const existingDisplayStatus = String(existingData?.shipmentStatus ?? existingData?.shipment_status ?? "").trim();
               const existingConsignment = String(existingData?.consignmentNumber ?? existingData?.consignment_number ?? "").trim();
@@ -514,6 +517,7 @@ export function createBulkOrdersRouter({ env, auth }) {
               await docRef.set(
                 {
                   docId,
+                  ...(hrGid ? { hrGid } : {}),
                   storeId: normalizedStoreId,
                   shopName: displayName,
                   order,

@@ -7,6 +7,7 @@ import { generateShippingLabelPdfBuffer } from "../shipments/label/shippingLabel
 import { PDFDocument } from "pdf-lib";
 import { allocateAwbFromPool } from "../awb/awbPoolService.js";
 import { buildSearchTokensFromDoc } from "../firestore/searchTokens.js";
+import { reserveHrGids } from "../firestore/hrGid.js";
 
 const internalToDisplayShipmentStatus = (value) => {
   const s = String(value ?? "").trim().toLowerCase();
@@ -205,6 +206,7 @@ export function createShipmentsRouter({ env, auth }) {
       }
 
       const firestore = admin.firestore();
+      const hrGid = (await reserveHrGids({ firestore, count: 1 }))[0] || "";
       const centerName = String(order?.fulfillmentCenter ?? "").trim();
       const centerAddress = centerName
         ? await resolveFulfillmentCenterAddress({
@@ -242,6 +244,7 @@ export function createShipmentsRouter({ env, auth }) {
       await docRef.set(
           {
             docId,
+            ...(hrGid ? { hrGid } : {}),
             storeId: normalizedStoreId,
             shopName: displayName,
             order: orderToPersist,

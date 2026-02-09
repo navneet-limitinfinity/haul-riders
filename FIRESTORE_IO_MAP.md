@@ -154,6 +154,7 @@ This project enforces a **single canonical schema** for order docs. Any legacy/d
 ### 2.1 Canonical Keys (Order Doc)
 Identity / ownership:
 - `docId` (string; Firestore document id; `order_<sha256(orderKey)>`)
+- `hrGid` (string; 12-digit numeric global id for this portal)
 - `storeId` (string; normalized store key)
 - `shopName` (string; display)
 
