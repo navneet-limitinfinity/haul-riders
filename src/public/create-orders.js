@@ -508,11 +508,16 @@ window.addEventListener("DOMContentLoaded", async () => {
     if (btn) btn.disabled = true;
     if (btn) btn.innerHTML = `<span class="btnSpinner" aria-hidden="true"></span> Assigning…`;
     try {
-      await requestJson("/api/orders/assign", {
+      const result = await requestJson("/api/orders/assign", {
         method: "POST",
         body: roleNow === "admin" ? { storeId, orderKeys } : { orderKeys },
       });
-      setStatus(`Assigned ${orderKeys.length} order(s).`, { kind: "ok" });
+      const updated = Number(result?.updated ?? 0) || 0;
+      const missing = Array.isArray(result?.missing) ? result.missing.length : 0;
+      setStatus(
+        missing ? `Assigned ${updated} order(s). ${missing} not assigned (AWB unavailable).` : `Assigned ${updated} order(s).`,
+        { kind: missing ? "warn" : "ok" }
+      );
     } catch (error) {
       setStatus(error?.message ?? "Assign failed.", { kind: "error" });
     } finally {

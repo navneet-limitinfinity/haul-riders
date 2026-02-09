@@ -64,7 +64,7 @@ function renderNavDrawer({ role, userLabel, activePath }) {
 }
 
 function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
-  const assetVersion = "49";
+  const assetVersion = "51";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
   const safeFirestoreCollectionId = escapeHtml(firestoreCollectionId);
@@ -98,6 +98,19 @@ function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
           <div class="brandText">
             <div class="brandTitle">Haul Riders</div>
             <div class="brandSub">Orders dashboard</div>
+          </div>
+        </div>
+
+        <div class="topbarSearch" role="search" aria-label="Search orders">
+          <div class="topbarSearchInner">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <input
+              id="dashboardSearch"
+              type="search"
+              placeholder="Search Order ID / AWB / Phone"
+              autocomplete="off"
+              spellcheck="false"
+            />
           </div>
         </div>
 
@@ -210,6 +223,7 @@ function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
                 <i class="fa-solid fa-download" aria-hidden="true"></i>
               </button>
               <button id="exportCsv" class="btn btnSecondary" type="button">Export CSV</button>
+              <button id="loadMore" class="btn btnSecondary" type="button" hidden>Load More</button>
             </div>
           </div>
         </div>
@@ -453,6 +467,40 @@ function renderBulkUploadPage({ userLabel }) {
                 Optional (order): <code>customerEmail</code>, <code>paymentStatus</code>, <code>address2</code>, <code>phone2</code>, <code>itemAndQuantity</code> (or <code>content_and_quantity</code>), <code>invoiceValue</code> (or <code>invoice_value</code>), <code>fulfillmentCenter</code>, <code>fulfillmentStatus</code>.
                 Optional (shipment): <code>shipmentStatus</code>, <code>courierPartner</code>, <code>consignmentNumber</code>, <code>courierType</code>, <code>weightKg</code>, <code>shippingDate</code>, <code>expectedDeliveryDate</code>, <code>updatedAt</code>.
               </div>
+            </details>
+          </div>
+
+          <div class="bulkCard">
+            <div class="bulkCardHeader">
+              <div>
+                <div class="bulkCardTitle">Upload AWB pool (CSV)</div>
+                <div class="bulkCardHint">Stores docket/AWB numbers and allocates them during “Assign to ship”.</div>
+              </div>
+            </div>
+
+            <div class="bulkForm">
+              <div class="bulkFields">
+                <label class="field">
+                  <span>AWB pool CSV file</span>
+                  <input id="awbCsvFile" type="file" accept=".csv,text/csv" />
+                </label>
+              </div>
+              <button id="awbUploadBtn" class="btn btnSecondary bulkBtnFull" type="button">
+                <i class="fa-solid fa-file-arrow-up" aria-hidden="true"></i>
+                Upload AWBs
+              </button>
+            </div>
+
+            <div id="awbUploadStatus" class="status" aria-live="polite"></div>
+
+            <details class="bulkDetails">
+              <summary>CSV columns</summary>
+              <ul class="bulkList">
+                <li><code>Z - Express</code></li>
+                <li><code>D - Surface/D - Air</code></li>
+                <li><code>COD Surface/COD Air</code></li>
+              </ul>
+              <div class="bulkHint">Each cell can contain one or more AWB numbers (separated by comma/space).</div>
             </details>
           </div>
           </div>

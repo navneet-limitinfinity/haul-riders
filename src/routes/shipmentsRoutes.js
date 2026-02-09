@@ -5,6 +5,8 @@ import { getShopCollectionInfo } from "../firestore/shopCollections.js";
 import { toOrderDocId } from "../firestore/ids.js";
 import { generateShippingLabelPdfBuffer } from "../shipments/label/shippingLabelPdf.js";
 import { PDFDocument } from "pdf-lib";
+import { allocateAwbFromPool } from "../awb/awbPoolService.js";
+import { buildSearchTokensFromDoc } from "../firestore/searchTokens.js";
 
 const internalToDisplayShipmentStatus = (value) => {
   const s = String(value ?? "").trim().toLowerCase();
@@ -217,6 +219,26 @@ export function createShipmentsRouter({ env, auth }) {
           ? { ...order, ...(centerString ? { fulfillmentCenter: centerString } : {}) }
           : order;
 
+      const orderId = String(orderToPersist?.orderId ?? "").trim();
+      let allocatedAwb = "";
+      try {
+        const alloc = await allocateAwbFromPool({
+          firestore,
+          courierType,
+          docId,
+          assignedStoreId: normalizedStoreId,
+          orderId,
+        });
+        allocatedAwb = String(alloc?.awbNumber ?? "").trim();
+      } catch {
+        res.status(409).json({
+          error: "awb_unavailable",
+          message: "No available AWB numbers in pool for selected courier type.",
+          courierType,
+        });
+        return;
+      }
+
       await docRef.set(
           {
             docId,
@@ -225,6 +247,14 @@ export function createShipmentsRouter({ env, auth }) {
             order: orderToPersist,
             shipmentStatus,
             shippingDate,
+            courierPartner: "DTDC",
+            consignmentNumber: allocatedAwb,
+            searchTokens: buildSearchTokensFromDoc({
+              order: orderToPersist,
+              consignmentNumber: allocatedAwb,
+              courierPartner: "DTDC",
+              courierType,
+            }),
             ...(weightKg != null ? { weightKg } : {}),
             ...(courierType ? { courierType } : {}),
             updatedAt: assignedAt,
@@ -285,6 +315,10 @@ export function createShipmentsRouter({ env, auth }) {
         const data = snap.data() ?? {};
         const prevDisplay = getDocDisplayShipmentStatus(data) || "";
         const shippingDate = getDocShippingDateIso(data) || "";
+        const existingOrder = data?.order && typeof data.order === "object" ? data.order : {};
+        const nextConsignmentNumber = trackingNumber ? trackingNumber : String(data?.consignmentNumber ?? data?.consignment_number ?? "").trim();
+        const nextCourierPartner = String(data?.courierPartner ?? data?.courier_partner ?? "").trim() || (nextConsignmentNumber ? "DTDC" : "");
+        const nextCourierType = String(data?.courierType ?? data?.courier_type ?? "").trim();
 
         tx.set(
           docRef,
@@ -294,8 +328,15 @@ export function createShipmentsRouter({ env, auth }) {
             shopName: displayName,
             shipmentStatus: shipmentStatusDisplay,
             ...(trackingNumber ? { consignmentNumber: trackingNumber } : {}),
+            ...(trackingNumber ? { courierPartner: nextCourierPartner } : {}),
             shippingDate: shippingDate || updatedAt,
             updatedAt,
+            searchTokens: buildSearchTokensFromDoc({
+              order: existingOrder,
+              consignmentNumber: nextConsignmentNumber,
+              courierPartner: nextCourierPartner,
+              courierType: nextCourierType,
+            }),
             event: "admin_update",
             updatedBy: {
               uid: String(req.user?.uid ?? ""),

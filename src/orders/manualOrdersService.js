@@ -1,5 +1,7 @@
 import { toOrderDocId } from "../firestore/ids.js";
 import { reserveOrderSequences, formatManualOrderName } from "../firestore/orderSequence.js";
+import { allocateAwbFromPool } from "../awb/awbPoolService.js";
+import { buildSearchTokensFromDoc } from "../firestore/searchTokens.js";
 
 function nowIso() {
   return new Date().toISOString();
@@ -226,6 +228,12 @@ function buildManualOrderDoc({ normalized, index, storeId, displayName, user, fu
   };
 
   const ts = nowIso();
+  const searchTokens = buildSearchTokensFromDoc({
+    order,
+    consignmentNumber: "",
+    courierPartner: String(normalized.courierPartner ?? "").trim() || "DTDC",
+    courierType: normalized.courier_type || "",
+  });
   return {
     docId: toOrderDocId(normalized.orderKey),
     storeId,
@@ -234,6 +242,7 @@ function buildManualOrderDoc({ normalized, index, storeId, displayName, user, fu
     shipmentStatus: "New",
     courierPartner: String(normalized.courierPartner ?? "").trim() || "DTDC",
     consignmentNumber: "",
+    searchTokens,
     weightKg: normalized.weight || "",
     courierType: normalized.courier_type || "",
     shippingDate: "",
@@ -389,10 +398,32 @@ export async function assignManualOrders({
     const existingDisplayStatus = String(data?.shipmentStatus ?? data?.shipment_status ?? "").trim();
     if (existingDisplayStatus === "Assigned") continue;
 
+    const existingConsignment = String(data?.consignmentNumber ?? data?.consignment_number ?? "").trim();
+    const courierType = String(data?.courierType ?? data?.courier_type ?? "").trim();
+    const orderId = String(data?.order?.orderId ?? "").trim();
+    let allocatedAwb = existingConsignment;
+    if (!allocatedAwb) {
+      try {
+        const alloc = await allocateAwbFromPool({
+          firestore,
+          courierType,
+          docId,
+          assignedStoreId: storeId,
+          orderId,
+        });
+        allocatedAwb = String(alloc?.awbNumber ?? "").trim();
+      } catch {
+        missing.push(orderKey);
+        continue;
+      }
+    }
+
     await docRef.set(
       {
         shipmentStatus: "Assigned",
         shippingDate: ts,
+        courierPartner: String(data?.courierPartner ?? data?.courier_partner ?? "").trim() || "DTDC",
+        consignmentNumber: allocatedAwb,
         updatedAt: ts,
         event: "manual_assign",
         requestedBy: {

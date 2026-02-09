@@ -6,6 +6,7 @@ import { getShopCollectionInfo } from "../firestore/shopCollections.js";
 import { toOrderDocId } from "../firestore/ids.js";
 import { reserveOrderSequences, formatManualOrderName } from "../firestore/orderSequence.js";
 import { parseCsvRows } from "../orders/import/parseCsvRows.js";
+import { buildSearchTokensFromDoc } from "../firestore/searchTokens.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -519,6 +520,12 @@ export function createBulkOrdersRouter({ env, auth }) {
                   shipmentStatus: existingDisplayStatus || uploadShipmentStatus || "Assigned",
                   courierPartner: trackingCompany || existingCourierPartner || (awbNumber ? "DTDC" : ""),
                   consignmentNumber: awbNumber || existingConsignment || "",
+                  searchTokens: buildSearchTokensFromDoc({
+                    order,
+                    consignmentNumber: awbNumber || existingConsignment || "",
+                    courierPartner: trackingCompany || existingCourierPartner || (awbNumber ? "DTDC" : ""),
+                    courierType,
+                  }),
                   ...(Number.isFinite(weightKg) ? { weightKg: Number(weightKg.toFixed(1)) } : {}),
                   ...(courierType ? { courierType } : {}),
                   shippingDate: resolvedShippingDate,
@@ -693,6 +700,8 @@ export function createBulkOrdersRouter({ env, auth }) {
                   const prevDisplay = String(data?.shipmentStatus ?? data?.shipment_status ?? "").trim();
 
                   const shippingDate = getDocShippingDateIso(data) || "";
+                  const existingOrder = data?.order && typeof data.order === "object" ? data.order : {};
+                  const existingCourierType = String(data?.courierType ?? data?.courier_type ?? "").trim();
 
                   tx.set(
                     docSnap.ref,
@@ -702,6 +711,12 @@ export function createBulkOrdersRouter({ env, auth }) {
                       shipmentStatus: shipmentStatusDisplay,
                       consignmentNumber: trackingNumber,
                       courierPartner,
+                      searchTokens: buildSearchTokensFromDoc({
+                        order: existingOrder,
+                        consignmentNumber: trackingNumber,
+                        courierPartner,
+                        courierType: existingCourierType,
+                      }),
                       shippingDate: shippingDate || updatedAt,
                       updatedAt,
                       event: "bulk_status_csv",

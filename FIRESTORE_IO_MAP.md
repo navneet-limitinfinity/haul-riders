@@ -72,6 +72,25 @@ Keys in a center doc:
 - `default` (boolean)
 - `createdAt`, `updatedAt`
 
+### 1.4 AWB Pool (Global)
+Path:
+- `awbPool/<awbNumber>`
+
+Used to allocate AWB/Tracking/Docket numbers when an order is assigned to ship.
+
+**Document ID:** `<awbNumber>` (alphanumeric string)
+
+Keys in an AWB doc:
+- `awbNumber`
+- `category` (`z_express` | `d_prepaid` | `d_cod`)
+- `assigned` (boolean)
+- `assignedAt`, `assignedDocId`
+- `assignedStoreId` (string; store/shop that consumed this AWB)
+- `orderId` (string; the order id/name this AWB was assigned to)
+- `releasedAt`
+- `createdAt`, `updatedAt`
+- `lastUploadedAt`, `lastUploadedBy { uid, email, role }`
+
 ### 1.4 Store Details + Branding (Shop-only)
 
 **Store details**
@@ -166,6 +185,7 @@ Shipment/dashboard fields (top-level):
 - `shipmentStatus` (display string; e.g. `Assigned`, `In Transit`, `Delivered`, `RTO Accepted`, …)
 - `courierPartner` (e.g. `DTDC`)
 - `consignmentNumber` (AWB / tracking code)
+- `searchTokens` (array of strings; lowercased tokens used for server-side search + pagination)
 - `weightKg` (number or string; kg; 1 decimal preferred)
 - `courierType` (string)
 - `shippingDate` (ISO; used for sorting in In Transit/Delivered/RTO)

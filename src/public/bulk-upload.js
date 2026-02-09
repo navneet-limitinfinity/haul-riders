@@ -43,6 +43,13 @@ function setStatusUpdateStatus(message, { kind = "info" } = {}) {
   el.textContent = String(message ?? "");
 }
 
+function setAwbStatus(message, { kind = "info" } = {}) {
+  const el = $("awbUploadStatus");
+  if (!el) return;
+  el.dataset.kind = kind;
+  el.textContent = String(message ?? "");
+}
+
 async function fetchStores() {
   const response = await fetch("/api/shops", { cache: "no-store", headers: getAuthHeaders() });
   if (!response.ok) {
@@ -111,6 +118,25 @@ async function createStatusUploadJob({ file, storeId }) {
 
   const jobId = String(data?.jobId ?? "").trim();
   if (!jobId) throw new Error("Upload failed: missing jobId");
+  return data;
+}
+
+async function uploadAwbPool({ file, storeId }) {
+  const form = new FormData();
+  form.append("file", file);
+  // storeId not required (AWB pool is global); keep backward compatible if sent.
+  if (storeId) form.append("storeId", storeId);
+
+  const response = await fetch("/api/admin/awb-pool/upload", {
+    method: "POST",
+    headers: { ...getAuthHeaders() },
+    body: form,
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(String(data?.error ?? `Upload failed (HTTP ${response.status})`));
+  }
   return data;
 }
 
@@ -263,6 +289,36 @@ async function onStatusUploadClick() {
   }
 }
 
+async function onAwbUploadClick() {
+  const fileInput = $("awbCsvFile");
+  const storeSelect = $("storeId");
+  const btn = $("awbUploadBtn");
+
+  const file = fileInput?.files?.[0] ?? null;
+  if (!file) {
+    setAwbStatus("Select an AWB pool CSV file first.", { kind: "error" });
+    return;
+  }
+
+  const storeId = String(storeSelect?.value ?? "").trim();
+
+  btn.disabled = true;
+  setAwbStatus("Uploading AWB pool CSV…", { kind: "busy" });
+  try {
+    // AWB pool is global; store selection is not required here.
+    const result = await uploadAwbPool({ file, storeId });
+    const created = Number(result?.created ?? 0) || 0;
+    const updated = Number(result?.updated ?? 0) || 0;
+    const total = Number(result?.total ?? 0) || 0;
+    setAwbStatus(`Done. Total ${total}. Created ${created}, updated ${updated}.`, { kind: "ok" });
+  } catch (error) {
+    setAwbStatus(error?.message ?? "AWB pool upload failed.", { kind: "error" });
+  } finally {
+    btn.disabled = false;
+    if (fileInput) fileInput.value = "";
+  }
+}
+
 async function init() {
   const btn = $("uploadBtn");
   if (btn) btn.addEventListener("click", onUploadClick);
@@ -270,10 +326,14 @@ async function init() {
   const statusBtn = $("statusUploadBtn");
   if (statusBtn) statusBtn.addEventListener("click", onStatusUploadClick);
 
+  const awbBtn = $("awbUploadBtn");
+  if (awbBtn) awbBtn.addEventListener("click", onAwbUploadClick);
+
   setProgress(0);
   setStatusProgress(0);
   setStatus("Loading stores…", { kind: "info" });
   setStatusUpdateStatus("", { kind: "info" });
+  setAwbStatus("", { kind: "info" });
 
   try {
     const data = await fetchStores();

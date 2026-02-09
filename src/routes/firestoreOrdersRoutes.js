@@ -2,6 +2,7 @@ import { Router } from "express";
 import { getFirebaseAdmin } from "../auth/firebaseAdmin.js";
 import { getShopCollectionInfo } from "../firestore/shopCollections.js";
 import { toOrderDocId } from "../firestore/ids.js";
+import { buildSearchTokensFromDoc } from "../firestore/searchTokens.js";
 
 export function createFirestoreOrdersRouter({ env, auth }) {
   const router = Router();
@@ -75,6 +76,70 @@ export function createFirestoreOrdersRouter({ env, auth }) {
     return { docs };
   };
 
+  const normalizeSearchQuery = (q) =>
+    String(q ?? "")
+      .trim()
+      .toLowerCase()
+      .replaceAll(/[^a-z0-9]+/g, " ")
+      .trim();
+
+  const matchesSearch = ({ data, q }) => {
+    const query = normalizeSearchQuery(q);
+    if (!query) return true;
+    const terms = query.split(/\s+/g).filter(Boolean);
+    if (!terms.length) return true;
+
+    const tokensRaw = Array.isArray(data?.searchTokens) ? data.searchTokens : [];
+    const tokens = tokensRaw.map((t) => String(t ?? "").toLowerCase()).filter(Boolean);
+    if (!tokens.length) {
+      const order = data?.order && typeof data.order === "object" ? data.order : {};
+      const shipping = order?.shipping && typeof order.shipping === "object" ? order.shipping : {};
+      const hay = [
+        String(order?.orderId ?? ""),
+        String(order?.orderName ?? ""),
+        String(data?.consignmentNumber ?? data?.consignment_number ?? ""),
+        String(shipping?.fullName ?? ""),
+        String(shipping?.phone1 ?? ""),
+        String(shipping?.phone2 ?? ""),
+        String(shipping?.pinCode ?? ""),
+        String(shipping?.city ?? ""),
+        String(shipping?.state ?? ""),
+        String(data?.courierType ?? data?.courier_type ?? ""),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return terms.every((t) => hay.includes(t));
+    }
+
+    return terms.every((term) => tokens.some((tok) => tok.includes(term)));
+  };
+
+  const encodeCursor = ({ requestedAt, docId }) => {
+    const ra = String(requestedAt ?? "").trim();
+    const id = String(docId ?? "").trim();
+    if (!ra || !id) return "";
+    try {
+      return Buffer.from(JSON.stringify({ requestedAt: ra, docId: id }), "utf8").toString("base64url");
+    } catch {
+      return "";
+    }
+  };
+
+  const decodeCursor = (cursor) => {
+    const raw = String(cursor ?? "").trim();
+    if (!raw) return "";
+    try {
+      const json = Buffer.from(raw, "base64url").toString("utf8");
+      const parsed = JSON.parse(json);
+      const requestedAt = String(parsed?.requestedAt ?? "").trim();
+      const docId = String(parsed?.docId ?? "").trim();
+      if (!requestedAt || !docId) return "";
+      return { requestedAt, docId };
+    } catch {
+      return "";
+    }
+  };
+
   const toStoreIdFromShopDomain = (domain) => {
     const raw = String(domain ?? "").trim().toLowerCase();
     if (!raw) return "";
@@ -100,6 +165,8 @@ export function createFirestoreOrdersRouter({ env, auth }) {
 
       const status = String(req.query?.status ?? "assigned").trim().toLowerCase();
       const statusNorm = normalizeShipmentStatus(status) || (status === "all" ? "all" : "");
+      const q = String(req.query?.q ?? "").trim();
+      const cursor = decodeCursor(req.query?.cursor);
       const limit = Math.max(
         1,
         Math.min(250, Number.parseInt(req.query?.limit ?? "200", 10) || 200)
@@ -111,13 +178,70 @@ export function createFirestoreOrdersRouter({ env, auth }) {
       });
 
       const firestore = admin.firestore();
-      const snap = await fetchDocsForStatus({
-        firestore,
-        collectionId,
-        status: statusNorm || "assigned",
-        limit,
-      });
-      const docs = Array.isArray(snap?.docs) ? snap.docs : [];
+
+      let docs = [];
+      let nextCursor = "";
+      if (!q && !cursor) {
+        const snap = await fetchDocsForStatus({
+          firestore,
+          collectionId,
+          status: statusNorm || "assigned",
+          limit,
+        });
+        docs = Array.isArray(snap?.docs) ? snap.docs : [];
+      } else {
+        const col = firestore.collection(collectionId);
+        const allowed = new Set(getStatusVariants(statusNorm || "assigned"));
+
+        const batchSize = Math.min(250, Math.max(25, limit * 4));
+        let lastRequestedAt = String(cursor?.requestedAt ?? "").trim();
+        let lastDocId = String(cursor?.docId ?? "").trim();
+        const out = [];
+
+        for (let iter = 0; iter < 12 && out.length < limit; iter += 1) {
+          let query = col
+            .orderBy("requestedAt", "desc")
+            .orderBy(admin.firestore.FieldPath.documentId(), "desc")
+            .limit(batchSize);
+          if (lastRequestedAt && lastDocId) query = query.startAfter(lastRequestedAt, lastDocId);
+          const snap = await query.get();
+          if (snap.empty) {
+            lastRequestedAt = "";
+            lastDocId = "";
+            break;
+          }
+
+          for (const d of snap.docs) {
+            const data = d.data() ?? {};
+            const displayStatus = String(data?.shipmentStatus ?? data?.shipment_status ?? "").trim();
+            const requestedAtField = String(data?.requestedAt ?? "").trim();
+            const requestedAt = requestedAtField || String(data?.updatedAt ?? data?.updated_at ?? "").trim();
+            const id = String(d.id ?? "").trim();
+            lastRequestedAt = requestedAt;
+            lastDocId = id;
+
+            if (!requestedAtField && requestedAt) {
+              d.ref.set({ requestedAt }, { merge: true }).catch(() => {});
+            }
+
+            if (statusNorm && statusNorm !== "all") {
+              if (!allowed.has(displayStatus)) continue;
+            }
+            if (!matchesSearch({ data, q })) continue;
+            out.push(d);
+            if (out.length >= limit) break;
+          }
+
+          if (snap.docs.length < batchSize) {
+            lastRequestedAt = "";
+            lastDocId = "";
+            break;
+          }
+        }
+
+        docs = out;
+        nextCursor = lastRequestedAt && lastDocId ? encodeCursor({ requestedAt: lastRequestedAt, docId: lastDocId }) : "";
+      }
 
       const rows = docs.map((doc) => {
         const data = doc.data() ?? {};
@@ -170,6 +294,7 @@ export function createFirestoreOrdersRouter({ env, auth }) {
         storeId: normalizedStoreId,
         status: statusNorm || "assigned",
         count: orders.length,
+        nextCursor: nextCursor || "",
         orders,
       });
     } catch (error) {
@@ -227,6 +352,8 @@ export function createFirestoreOrdersRouter({ env, auth }) {
 
       const status = String(req.query?.status ?? "assigned").trim().toLowerCase();
       const statusNorm = normalizeShipmentStatus(status) || (status === "all" ? "all" : "");
+      const q = String(req.query?.q ?? "").trim();
+      const cursor = decodeCursor(req.query?.cursor);
       const limit = Math.max(
         1,
         Math.min(250, Number.parseInt(req.query?.limit ?? "100", 10) || 100)
@@ -236,13 +363,70 @@ export function createFirestoreOrdersRouter({ env, auth }) {
       const { collectionId, displayName } = getShopCollectionInfo({ storeId });
 
       const firestore = admin.firestore();
-      const snap = await fetchDocsForStatus({
-        firestore,
-        collectionId,
-        status: statusNorm || "assigned",
-        limit,
-      });
-      const docs = Array.isArray(snap?.docs) ? snap.docs : [];
+
+      let docs = [];
+      let nextCursor = "";
+      if (!q && !cursor) {
+        const snap = await fetchDocsForStatus({
+          firestore,
+          collectionId,
+          status: statusNorm || "assigned",
+          limit,
+        });
+        docs = Array.isArray(snap?.docs) ? snap.docs : [];
+      } else {
+        const col = firestore.collection(collectionId);
+        const allowed = new Set(getStatusVariants(statusNorm || "assigned"));
+
+        const batchSize = Math.min(250, Math.max(25, limit * 4));
+        let lastRequestedAt = String(cursor?.requestedAt ?? "").trim();
+        let lastDocId = String(cursor?.docId ?? "").trim();
+        const out = [];
+
+        for (let iter = 0; iter < 12 && out.length < limit; iter += 1) {
+          let query = col
+            .orderBy("requestedAt", "desc")
+            .orderBy(admin.firestore.FieldPath.documentId(), "desc")
+            .limit(batchSize);
+          if (lastRequestedAt && lastDocId) query = query.startAfter(lastRequestedAt, lastDocId);
+          const snap = await query.get();
+          if (snap.empty) {
+            lastRequestedAt = "";
+            lastDocId = "";
+            break;
+          }
+
+          for (const d of snap.docs) {
+            const data = d.data() ?? {};
+            const displayStatus = String(data?.shipmentStatus ?? data?.shipment_status ?? "").trim();
+            const requestedAtField = String(data?.requestedAt ?? "").trim();
+            const requestedAt = requestedAtField || String(data?.updatedAt ?? data?.updated_at ?? "").trim();
+            const id = String(d.id ?? "").trim();
+            lastRequestedAt = requestedAt;
+            lastDocId = id;
+
+            if (!requestedAtField && requestedAt) {
+              d.ref.set({ requestedAt }, { merge: true }).catch(() => {});
+            }
+
+            if (statusNorm && statusNorm !== "all") {
+              if (!allowed.has(displayStatus)) continue;
+            }
+            if (!matchesSearch({ data, q })) continue;
+            out.push(d);
+            if (out.length >= limit) break;
+          }
+
+          if (snap.docs.length < batchSize) {
+            lastRequestedAt = "";
+            lastDocId = "";
+            break;
+          }
+        }
+
+        docs = out;
+        nextCursor = lastRequestedAt && lastDocId ? encodeCursor({ requestedAt: lastRequestedAt, docId: lastDocId }) : "";
+      }
 
       const rows = docs.map((doc) => {
         const data = doc.data() ?? {};
@@ -295,6 +479,7 @@ export function createFirestoreOrdersRouter({ env, auth }) {
         storeId,
         status: statusNorm || "assigned",
         count: orders.length,
+        nextCursor: nextCursor || "",
         orders,
       });
     } catch (error) {
@@ -335,31 +520,43 @@ export function createFirestoreOrdersRouter({ env, auth }) {
       const docId = docIdFromBody || toOrderDocId(orderKey);
       const updatedAt = new Date().toISOString();
 
-      await admin
-        .firestore()
-        .collection(collectionId)
-        .doc(docId)
-        .set(
-          {
-            docId,
-            storeId,
-            order: {
-              shipping: {
-                fullName: normalize(shipping.fullName),
-                address1: normalize(shipping.address1),
-                address2: normalize(shipping.address2),
-                city: normalize(shipping.city),
-                state: normalize(shipping.state),
-                pinCode: normalize(shipping.pinCode),
-                phone1: normalize(shipping.phone1),
-                phone2: normalize(shipping.phone2),
-              },
-            },
-            event: "shop_edit",
-            updatedAt,
-          },
-          { merge: true }
-        );
+      const docRef = admin.firestore().collection(collectionId).doc(docId);
+      const snap = await docRef.get();
+      const existing = snap.data() ?? {};
+      const existingOrder = existing?.order && typeof existing.order === "object" ? existing.order : {};
+      const existingConsignment = String(existing?.consignmentNumber ?? existing?.consignment_number ?? "").trim();
+      const existingCourierPartner = String(existing?.courierPartner ?? existing?.courier_partner ?? "").trim();
+      const existingCourierType = String(existing?.courierType ?? existing?.courier_type ?? "").trim();
+
+      const nextShipping = {
+        fullName: normalize(shipping.fullName),
+        address1: normalize(shipping.address1),
+        address2: normalize(shipping.address2),
+        city: normalize(shipping.city),
+        state: normalize(shipping.state),
+        pinCode: normalize(shipping.pinCode),
+        phone1: normalize(shipping.phone1),
+        phone2: normalize(shipping.phone2),
+      };
+
+      const nextOrder = { ...existingOrder, shipping: nextShipping };
+
+      await docRef.set(
+        {
+          docId,
+          storeId,
+          order: { shipping: nextShipping },
+          searchTokens: buildSearchTokensFromDoc({
+            order: nextOrder,
+            consignmentNumber: existingConsignment,
+            courierPartner: existingCourierPartner,
+            courierType: existingCourierType,
+          }),
+          event: "shop_edit",
+          updatedAt,
+        },
+        { merge: true }
+      );
 
       res.setHeader("Cache-Control", "no-store");
       res.json({ ok: true, docId, orderKey, updatedAt });

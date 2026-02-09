@@ -114,6 +114,14 @@ const RTO_TAB_HEADER_HTML = `<tr>
 let allOrders = [];
 let currentOrders = [];
 const selectedOrderIds = new Set();
+let dashboardSearchQuery = "";
+let serverSearchState = {
+  active: false,
+  q: "",
+  tab: "",
+  nextCursor: "",
+  loading: false,
+};
 let fulfillmentCentersState = {
   loaded: false,
   defaultName: "",
@@ -830,6 +838,8 @@ async function fetchFirestoreOrders({ status, limit }) {
   const url = new URL("/api/firestore/orders", window.location.origin);
   if (status) url.searchParams.set("status", String(status));
   if (limit) url.searchParams.set("limit", String(limit));
+  if (serverSearchState.active && serverSearchState.q) url.searchParams.set("q", String(serverSearchState.q));
+  if (serverSearchState.active && serverSearchState.nextCursor) url.searchParams.set("cursor", String(serverSearchState.nextCursor));
   const response = await fetch(url, { cache: "no-store", headers: getAuthHeaders() });
   if (!response.ok) {
     const text = await response.text().catch(() => "");
@@ -843,6 +853,8 @@ async function fetchFirestoreAdminOrders({ storeId, status, limit }) {
   if (storeId) url.searchParams.set("shopDomain", String(storeId));
   if (status) url.searchParams.set("status", String(status));
   if (limit) url.searchParams.set("limit", String(limit));
+  if (serverSearchState.active && serverSearchState.q) url.searchParams.set("q", String(serverSearchState.q));
+  if (serverSearchState.active && serverSearchState.nextCursor) url.searchParams.set("cursor", String(serverSearchState.nextCursor));
   const response = await fetch(url, { cache: "no-store", headers: getAuthHeaders() });
   if (!response.ok) {
     const text = await response.text().catch(() => "");
@@ -883,6 +895,8 @@ async function fetchConsignments({ tab, storeId, limit }) {
   const url = new URL(`/api/consignments/${encodeURIComponent(safeTab)}`, window.location.origin);
   if (storeId) url.searchParams.set("storeId", String(storeId));
   if (limit) url.searchParams.set("limit", String(limit));
+  if (serverSearchState.active && serverSearchState.q) url.searchParams.set("q", String(serverSearchState.q));
+  if (serverSearchState.active && serverSearchState.nextCursor) url.searchParams.set("cursor", String(serverSearchState.nextCursor));
   const response = await fetch(url, { cache: "no-store", headers: getAuthHeaders() });
   if (!response.ok) {
     const text = await response.text().catch(() => "");
@@ -1162,6 +1176,33 @@ function applyFiltersAndSort() {
   if (trackingFilter !== "any") {
     const wantAssigned = trackingFilter === "added";
     view = view.filter((row) => getTrackingAssigned(row) === wantAssigned);
+  }
+
+  const q = String(dashboardSearchQuery ?? "").trim().toLowerCase();
+  if (q && !serverSearchState.active) {
+    const terms = q.split(/\s+/g).filter(Boolean);
+    view = view.filter((row) => {
+      const shipping = row?.shipping && typeof row.shipping === "object" ? row.shipping : {};
+      const haystack = [
+        String(row?.orderId ?? ""),
+        String(row?.orderName ?? ""),
+        String(row?.consignmentNumber ?? ""),
+        String(row?.courierPartner ?? ""),
+        String(row?.courierType ?? ""),
+        String(shipping?.fullName ?? ""),
+        String(shipping?.phone1 ?? ""),
+        String(shipping?.phone2 ?? ""),
+        String(shipping?.pinCode ?? ""),
+        String(shipping?.city ?? ""),
+        String(shipping?.state ?? ""),
+      ]
+        .join(" ")
+        .toLowerCase();
+      for (const t of terms) {
+        if (!haystack.includes(t)) return false;
+      }
+      return true;
+    });
   }
 
   const isShopNew = activeRole === "shop" && activeTab === "new";
@@ -2634,6 +2675,16 @@ function exportSelectedToCsv() {
 }
 
 async function refresh({ forceNetwork = false } = {}) {
+  if (serverSearchState.active && serverSearchState.q && !(activeRole === "shop" && activeTab === "new")) {
+    // Reset cursor when tab changes while searching.
+    if (serverSearchState.tab !== activeTab) {
+      serverSearchState.nextCursor = "";
+      serverSearchState.tab = activeTab;
+    }
+    await refreshServerSearch({ append: false });
+    return;
+  }
+
   const limit = SHOPIFY_MAX_LIMIT;
   const since = getSinceIsoForRange(getDateRange());
 
@@ -2736,11 +2787,108 @@ async function refresh({ forceNetwork = false } = {}) {
   }
 }
 
+function syncLoadMoreButton() {
+  const btn = $("loadMore");
+  if (!btn) return;
+  const show = Boolean(serverSearchState.active && serverSearchState.nextCursor && !serverSearchState.loading);
+  btn.hidden = !show;
+  btn.disabled = !show;
+}
+
+async function refreshServerSearch({ append = false } = {}) {
+  if (!serverSearchState.active || !serverSearchState.q) return;
+  if (activeRole === "shop" && activeTab === "new") return;
+
+  const btn = $("loadMore");
+  serverSearchState.loading = true;
+  syncLoadMoreButton();
+  if (btn) btn.disabled = true;
+
+  try {
+    if (!append) {
+      allOrders = [];
+      pruneSelectionToVisible(allOrders);
+      applyFiltersAndSort();
+    }
+
+    let data = null;
+    if (activeRole === "admin") {
+      const storeId = getActiveStoreId();
+      if (!storeId) {
+        setStatus("Select a store.", { kind: "info" });
+        serverSearchState.nextCursor = "";
+        syncLoadMoreButton();
+        return;
+      }
+      const useConsignments = ["in_transit", "delivered", "rto"].includes(activeTab);
+      data = useConsignments
+        ? await fetchConsignments({ tab: activeTab, storeId, limit: 50 })
+        : await fetchFirestoreAdminOrders({
+            storeId,
+            status: activeTab && activeTab !== "all" ? activeTab : "all",
+            limit: 50,
+          });
+    } else {
+      if (activeTab === "assigned" || activeTab === "all") {
+        data = await fetchFirestoreOrders({ status: activeTab, limit: 50 });
+      } else if (["in_transit", "delivered", "rto"].includes(activeTab)) {
+        const storeId = String(document.body?.dataset?.storeId ?? "").trim();
+        data = await fetchConsignments({ tab: activeTab, storeId, limit: 50 });
+      } else {
+        return;
+      }
+    }
+
+    const orders = Array.isArray(data?.orders) ? data.orders : [];
+    const nextCursor = String(data?.nextCursor ?? "").trim();
+
+    allOrders = append ? [...allOrders, ...orders] : orders;
+    serverSearchState.nextCursor = nextCursor;
+
+    pruneSelectionToVisible(allOrders);
+    applyFiltersAndSort();
+    setStatus(`Loaded ${allOrders.length} result(s).`, { kind: "ok" });
+  } catch (error) {
+    setStatus(error?.message ?? "Search failed.", { kind: "error" });
+  } finally {
+    serverSearchState.loading = false;
+    syncLoadMoreButton();
+  }
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   activeRole = normalizeRole(document.body?.dataset?.role);
   if (document.body) document.body.dataset.role = activeRole;
 
   setDateRange(getDateRange());
+
+  const searchEl = $("dashboardSearch");
+  if (searchEl) {
+    searchEl.addEventListener("input", (e) => {
+      dashboardSearchQuery = String(e.target?.value ?? "");
+      const q = String(dashboardSearchQuery ?? "").trim();
+      if (!q) {
+        serverSearchState = { active: false, q: "", tab: "", nextCursor: "", loading: false };
+        syncLoadMoreButton();
+        refresh({ forceNetwork: false });
+        return;
+      }
+      serverSearchState = { active: true, q, tab: activeTab, nextCursor: "", loading: false };
+      refreshServerSearch({ append: false });
+    });
+    searchEl.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        searchEl.value = "";
+        dashboardSearchQuery = "";
+        serverSearchState = { active: false, q: "", tab: "", nextCursor: "", loading: false };
+        syncLoadMoreButton();
+        applyFiltersAndSort();
+        refresh({ forceNetwork: false });
+      }
+    });
+  }
+
+  $("loadMore")?.addEventListener("click", () => refreshServerSearch({ append: true }));
 
   const url = new URL(window.location.href);
   const tabFromUrl = String(url.searchParams.get("tab") ?? "").trim().toLowerCase();

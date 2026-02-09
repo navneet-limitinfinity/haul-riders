@@ -1,5 +1,6 @@
 import { getFirebaseAdmin } from "../auth/firebaseAdmin.js";
 import { getShopCollectionInfo } from "./shopCollections.js";
+import { buildSearchTokensFromDoc } from "./searchTokens.js";
 
 function nowIso() {
   return new Date().toISOString();
@@ -123,6 +124,7 @@ function computeCanonicalPatch(data) {
     shipment.expectedDeliveryDate
   );
   const updatedAt = pickFirstString(d.updatedAt, d.updated_at, shipment.updatedAt) || nowIso();
+  const requestedAt = pickFirstString(d.requestedAt, shipment.assignedAt, updatedAt);
 
   const patch = {
     shipmentStatus: shipmentStatus || (d.shipmentStatus === undefined ? "" : d.shipmentStatus),
@@ -133,8 +135,16 @@ function computeCanonicalPatch(data) {
     ...(shippingDate ? { shippingDate } : {}),
     ...(expectedDeliveryDate ? { expectedDeliveryDate } : {}),
     updatedAt,
+    requestedAt,
     order: canonicalOrderObject(order),
   };
+
+  patch.searchTokens = buildSearchTokensFromDoc({
+    order: patch.order,
+    consignmentNumber: patch.consignmentNumber,
+    courierPartner: patch.courierPartner,
+    courierType: patch.courierType || "",
+  });
 
   // Remove legacy/duplicate keys via FieldValue.delete() in the caller.
   const deletes = [
@@ -171,6 +181,7 @@ function hasLegacyKeys(data) {
   const order = d.order && typeof d.order === "object" ? d.order : {};
   const shipment = d.shipment && typeof d.shipment === "object" ? d.shipment : {};
   return Boolean(
+    d.searchTokens === undefined ||
     d.orderKey !== undefined ||
     d.shipment_status !== undefined ||
       d.consignment_number !== undefined ||

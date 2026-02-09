@@ -253,6 +253,45 @@ const backfillForCollection = async ({ col, allowedDisplayStatuses, maxDocs = 30
   await flush();
 };
 
+const normalizeSearchQuery = (q) =>
+  String(q ?? "")
+    .trim()
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]+/g, " ")
+    .trim();
+
+const matchesSearch = ({ data, q }) => {
+  const query = normalizeSearchQuery(q);
+  if (!query) return true;
+  const terms = query.split(/\s+/g).filter(Boolean);
+  if (!terms.length) return true;
+
+  const tokensRaw = Array.isArray(data?.searchTokens) ? data.searchTokens : [];
+  const tokens = tokensRaw.map((t) => String(t ?? "").toLowerCase()).filter(Boolean);
+  if (!tokens.length) {
+    // Fallback: scan a small set of fields if tokens are missing.
+    const order = getDocOrder(data) ?? {};
+    const shipping = order?.shipping && typeof order.shipping === "object" ? order.shipping : {};
+    const hay = [
+      String(order?.orderId ?? ""),
+      String(order?.orderName ?? ""),
+      String(data?.consignmentNumber ?? data?.consignment_number ?? ""),
+      String(shipping?.fullName ?? ""),
+      String(shipping?.phone1 ?? ""),
+      String(shipping?.phone2 ?? ""),
+      String(shipping?.pinCode ?? ""),
+      String(shipping?.city ?? ""),
+      String(shipping?.state ?? ""),
+      String(data?.courierType ?? data?.courier_type ?? ""),
+    ]
+      .join(" ")
+      .toLowerCase();
+    return terms.every((t) => hay.includes(t));
+  }
+
+  return terms.every((term) => tokens.some((tok) => tok.includes(term)));
+};
+
 const encodeCursor = (requestedAt) => {
   const raw = requestedAt && typeof requestedAt === "object" ? requestedAt : null;
   const shippingDate = String(raw?.shippingDate ?? "").trim();
@@ -342,6 +381,7 @@ export function createConsignmentsRouter({ env, auth }) {
 
         const limit = parseLimit(req.query?.limit);
         const cursor = decodeCursor(req.query?.cursor);
+        const q = String(req.query?.q ?? "").trim();
         const allowed = allowedStatusesForTab(tab);
 
         const admin = await getFirebaseAdmin({ env });
@@ -394,6 +434,15 @@ export function createConsignmentsRouter({ env, auth }) {
             const patch = buildMissingFieldsPatch({ data });
             if (!patch.shippingDate && shippingDate) patch.shippingDate = shippingDate;
             if (!allowed.has(displayStatus)) {
+              lastShippingDate = String(shippingDate ?? "").trim();
+              lastDocId = String(doc.id ?? "").trim();
+              if (Object.keys(patch).length > 0) {
+                doc.ref.set(patch, { merge: true }).catch(() => {});
+              }
+              continue;
+            }
+
+            if (!matchesSearch({ data, q })) {
               lastShippingDate = String(shippingDate ?? "").trim();
               lastDocId = String(doc.id ?? "").trim();
               if (Object.keys(patch).length > 0) {
