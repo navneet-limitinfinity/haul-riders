@@ -1256,8 +1256,8 @@ function renderCreateOrdersPage({ role, userLabel, storeId }) {
             <input id="singleCourierPartner" type="text" value="DTDC" />
           </label>
           <label class="field span-4">
-            <span>Fulfillment Center (optional)</span>
-            <select id="singleFulfillmentCenter">
+            <span>Fulfillment Center</span>
+            <select id="singleFulfillmentCenter" required>
               <option value="" disabled selected>Fulfillment Center</option>
             </select>
           </label>
@@ -1266,19 +1266,15 @@ function renderCreateOrdersPage({ role, userLabel, storeId }) {
             <input id="singleWeightKg" type="text" class="mono" inputmode="decimal" placeholder="e.g. 0.1" required />
           </label>
           <label class="field span-4">
-            <span>Courier Type (optional)</span>
-            <select id="singleCourierType">
-              <option value="" selected>Courier Type</option>
+            <span>Courier Type</span>
+            <select id="singleCourierType" required>
+              <option value="" disabled selected>Courier Type</option>
               <option value="Z- Express">Z- Express</option>
               <option value="D- Surface">D- Surface</option>
               <option value="D- Air">D- Air</option>
               <option value="COD Surface">COD Surface</option>
               <option value="COD Air">COD Air</option>
             </select>
-          </label>
-          <label class="field span-4">
-            <span>Fulfillment Status (optional)</span>
-            <input id="singleFulfillmentStatus" type="text" value="fulfilled" placeholder="fulfilled / unfulfilled" />
           </label>
 
           <label class="field span-12">

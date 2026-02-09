@@ -234,11 +234,6 @@ function openDrawer() {
       });
   }
   document.body.classList.add("drawerOpen");
-
-  const fulfillmentStatus = $("singleFulfillmentStatus");
-  if (fulfillmentStatus && !String(fulfillmentStatus.value ?? "").trim()) {
-    fulfillmentStatus.value = "fulfilled";
-  }
 }
 
 function closeDrawer() {
@@ -365,7 +360,7 @@ function readSingleOrderPayload() {
     invoiceValue,
     productDescription: String($("singleProductDescription")?.value ?? "").trim(),
     fulfillmentCenter: String($("singleFulfillmentCenter")?.value ?? "").trim(),
-    fulfillmentStatus: String($("singleFulfillmentStatus")?.value ?? "").trim(),
+    fulfillmentStatus: "fulfilled",
     weightKg: weightParsed.value,
     courierType: String($("singleCourierType")?.value ?? "").trim(),
     courierPartner: String($("singleCourierPartner")?.value ?? "").trim() || "DTDC",
