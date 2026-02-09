@@ -1213,12 +1213,17 @@ function renderCreateOrdersPage({ role, userLabel, storeId }) {
         <div class="drawerSectionHeader">Address</div>
         <div class="orderCreateGrid">
           <label class="field span-12">
-            <span>Address Line 1</span>
+            <span>Complete address</span>
             <input id="singleAddress1" type="text" />
           </label>
           <label class="field span-12">
             <span>Landmark (optional)</span>
             <input id="singleAddress2" type="text" />
+          </label>
+          <label class="field span-4">
+            <span>PIN Code</span>
+            <input id="singlePinCode" type="text" class="mono" inputmode="numeric" />
+            <small id="singlePinHint" class="fieldHint"></small>
           </label>
           <label class="field span-4">
             <span>City</span>
@@ -1227,11 +1232,6 @@ function renderCreateOrdersPage({ role, userLabel, storeId }) {
           <label class="field span-4">
             <span>State</span>
             <input id="singleState" type="text" />
-          </label>
-          <label class="field span-4">
-            <span>PIN Code</span>
-            <input id="singlePinCode" type="text" class="mono" inputmode="numeric" />
-            <small id="singlePinHint" class="fieldHint"></small>
           </label>
         </div>
 
