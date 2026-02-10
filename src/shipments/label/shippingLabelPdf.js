@@ -48,6 +48,13 @@ function getCourierTypeInitial(courierType) {
   return m?.[0] ? m[0].toUpperCase() : "";
 }
 
+function getAwbInitial(awbNumber) {
+  const s = String(awbNumber ?? "").trim();
+  if (!s) return "";
+  const m = s.match(/[A-Za-z]/);
+  return m?.[0] ? m[0].toUpperCase() : "";
+}
+
 function getBestShipTo(order) {
   const projected = order?.shipping && typeof order.shipping === "object" ? order.shipping : null;
   if (projected) {
@@ -323,8 +330,10 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
       .split("|")
       .map((p) => String(p ?? "").trim())
       .filter(Boolean);
+    // Legacy format: "Name | Phone | Address..."
     if (parts.length >= 3) return { name: parts[0] ?? "", phone: parts[1] ?? "", address: parts.slice(2).join(" | ") };
-    if (parts.length === 2) return { name: "", phone: parts[0] ?? "", address: parts[1] ?? "" };
+    // Current format: "Name | Address..." (phone removed)
+    if (parts.length === 2) return { name: parts[0] ?? "", phone: "", address: parts[1] ?? "" };
     return { name: "", phone: "", address: raw };
   })();
   // originName is no longer stored on orders; only use default center lookup when needed.
@@ -339,7 +348,8 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
     parsedFulfillment?.name ||
     (await resolveDefaultFulfillmentCenterName({ env, shopDomain }));
   const brandingLogo = await resolveBrandingLogo({ env, shopDomain });
-  const storeName = await resolveStoreName({ env, shopDomain });
+  // Store name intentionally not rendered in branding section (logo only).
+  // const storeName = await resolveStoreName({ env, shopDomain });
   const shipTo = getBestShipTo(order) ?? {};
   const pin = String(shipTo?.pinCode ?? "").trim();
 
@@ -363,7 +373,11 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
   // Render fixed labels (field names) from the template map.
   for (const t of fixedText) {
     if (!t || typeof t !== "object") continue;
-    if (String(t.key ?? "") === "productDescription") continue;
+    const key = String(t.key ?? "");
+    if (key === "productDescription") continue;
+    if (key === "invNoLabel") continue;
+    if (key === "invDateLabel") continue;
+    if (key === "billSenderLabel") continue;
     const text = String(t.text ?? "").trim();
     if (!text) continue;
     const font = t.bold ? fontBold : fontRegular;
@@ -371,7 +385,17 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
     page.drawText(text, { x: Number(t.x ?? 0), y: Number(t.y ?? 0), size, font, color: black });
   }
 
-  // Branding logo + Store Name (placed in Product Description area; label removed).
+  // Order number in the top-right block (replaces removed Inv No/Date area).
+  if (orderName) {
+    const invAnchor =
+      fixedText.find((t) => t && typeof t === "object" && String(t.key ?? "") === "invNoLabel") ?? null;
+    const x = Number(invAnchor?.x ?? 324);
+    const y = Number(invAnchor?.y ?? 588.82);
+    const size = Number(invAnchor?.size ?? 12) || 12;
+    page.drawText(orderName, { x, y, size, font: fontBold, color: black });
+  }
+
+  // Branding logo (placed in Product Description area; label removed).
   if (brandingLogo) {
     try {
       const { contentType, bytes } = brandingLogo;
@@ -384,7 +408,7 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
       const anchorY = Number(productDescriptionLabel?.y ?? 286.76);
 
       const maxW = 240;
-      const maxH = 64;
+      const maxH = 110;
       const scale = Math.min(maxW / img.width, maxH / img.height, 1);
       const w = img.width * scale;
       const h = img.height * scale;
@@ -397,48 +421,8 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
         width: w,
         height: h,
       });
-
-      if (storeName) {
-        const size = 14;
-        const preferredX = imgX + w + 10;
-        const preferredMaxW = Math.max(1, 250 - (w + 10));
-        const canPlaceRight = preferredX <= 260 && preferredMaxW >= 60;
-        if (canPlaceRight) {
-          const lines = wrapText({
-            text: storeName,
-            font: fontBold,
-            size,
-            maxWidth: preferredMaxW,
-          }).slice(0, 1);
-          if (lines[0]) {
-            page.drawText(lines[0], { x: preferredX, y: imgY + h - size - 2, size, font: fontBold, color: black });
-          }
-        } else {
-          const lines = wrapText({
-            text: storeName,
-            font: fontBold,
-            size,
-            maxWidth: 260,
-          }).slice(0, 1);
-          if (lines[0]) {
-            page.drawText(lines[0], { x: imgX, y: Math.max(0, imgY - size - 6), size, font: fontBold, color: black });
-          }
-        }
-      }
     } catch {
       // ignore branding render failures
-    }
-  } else if (storeName) {
-    try {
-      const anchorX = Number(productDescriptionLabel?.x ?? 31);
-      const anchorY = Number(productDescriptionLabel?.y ?? 286.76);
-      const size = 14;
-      const lines = wrapText({ text: storeName, font: fontBold, size, maxWidth: 260 }).slice(0, 1);
-      if (lines[0]) {
-        page.drawText(lines[0], { x: anchorX, y: Math.max(0, anchorY - size), size, font: fontBold, color: black });
-      }
-    } catch {
-      // ignore
     }
   }
 
@@ -469,7 +453,7 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
     const hasInline = Boolean(String(parsedFulfillment?.address ?? "").trim());
     const fromName = hasInline ? String(parsedFulfillment?.name ?? "").trim() : fulfillmentCenterLabel || "";
     const fromAddress1 = hasInline ? String(parsedFulfillment?.address ?? "").trim() : fulfillmentCenter?.address1 || shipFrom.address1;
-    const fromAddress2 = hasInline ? String(parsedFulfillment?.phone ?? "").trim() : fulfillmentCenter?.address2 || shipFrom.address2;
+    const fromAddress2 = hasInline ? "" : fulfillmentCenter?.address2 || shipFrom.address2;
     const fromCity = hasInline ? "" : fulfillmentCenter?.city || shipFrom.city;
     const fromState = hasInline ? "" : fulfillmentCenter?.state || shipFrom.state;
     const fromPin = hasInline ? "" : fulfillmentCenter?.pinCode || shipFrom.pinCode;
@@ -557,18 +541,21 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
     bbox: map?.xobjects?.topBarcodeFormBbox,
   });
   if (awb && topBarcodeRect) {
-    const barcode = await makeCode128Png(awb, { scale: 2, height: 10 });
+    // Slightly larger barcode for better readability.
+    const barcode = await makeCode128Png(awb, { scale: 3, height: 14 });
     if (barcode) {
       const img = await pdfDoc.embedPng(barcode);
-      const pad = 2;
-      const maxW = Math.max(1, topBarcodeRect.width - pad * 2);
-      const maxH = Math.max(1, topBarcodeRect.height - pad * 2);
-      const scale = Math.min(maxW / img.width, maxH / img.height);
-      const w = img.width * scale;
-      const h = img.height * scale;
+      const padX = 6;
+      const padY = 1;
+      const maxW = Math.max(1, topBarcodeRect.width - padX * 2);
+      const maxH = Math.max(1, topBarcodeRect.height - padY * 2);
+      // Fill the whole barcode box width (even if it slightly squishes height),
+      // so the barcode spans at least the full box width.
+      const w = maxW;
+      const h = maxH;
       page.drawImage(img, {
-        x: topBarcodeRect.x + (topBarcodeRect.width - w) / 2,
-        y: topBarcodeRect.y + (topBarcodeRect.height - h) / 2,
+        x: topBarcodeRect.x + padX,
+        y: topBarcodeRect.y + padY,
         width: w,
         height: h,
       });
@@ -596,8 +583,8 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
     });
   }
 
-  // Courier-type initial box (below AWB barcode) + label.
-  const courierInitial = getCourierTypeInitial(courierType);
+  // Square initial (below AWB barcode): first letter from AWB number (real-time).
+  const courierInitial = getAwbInitial(awb) || getCourierTypeInitial(courierType);
   if (courierInitial && fields.courierTypeInitial) {
     page.drawText(courierInitial, {
       x: fields.courierTypeInitial.x,
@@ -629,32 +616,7 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
     });
   }
 
-  // Bottom barcode uses awb+pin as a stable id.
-  const bottomBarcodeRect = rectFromMatrix({
-    rect: fields.bottomBarcodeRect,
-    bbox: map?.xobjects?.bottomBarcodeFormBbox,
-  });
-  const bottomCode = [awb || orderName || String(data?.orderKey ?? "").trim(), pin]
-    .filter(Boolean)
-    .join("");
-  if (bottomCode && bottomBarcodeRect) {
-    const barcode = await makeCode128Png(bottomCode, { scale: 2, height: 14 });
-    if (barcode) {
-      const img = await pdfDoc.embedPng(barcode);
-      const pad = 2;
-      const maxW = Math.max(1, bottomBarcodeRect.width - pad * 2);
-      const maxH = Math.max(1, bottomBarcodeRect.height - pad * 2);
-      const scale = Math.min(maxW / img.width, maxH / img.height);
-      const w = img.width * scale;
-      const h = img.height * scale;
-      page.drawImage(img, {
-        x: bottomBarcodeRect.x + (bottomBarcodeRect.width - w) / 2,
-        y: bottomBarcodeRect.y + (bottomBarcodeRect.height - h) / 2,
-        width: w,
-        height: h,
-      });
-    }
-  }
+  // Bottom barcode removed per requirement.
 
   // Ref. No value.
   if (orderName && fields.refNoValue) {
@@ -670,7 +632,7 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
   // Weight + bottom date/time.
   if (fields.weight) {
     // Label "Weight:" is part of fixedText; here we render only the value.
-    page.drawText(`1/${weightKg}`, {
+    page.drawText(`${weightKg} Kg`, {
       x: fields.weight.x,
       y: fields.weight.y,
       size: fields.weight.size,

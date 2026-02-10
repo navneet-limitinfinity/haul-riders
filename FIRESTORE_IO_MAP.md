@@ -170,7 +170,7 @@ Order object (sanitized; no tracking/status duplicates inside):
   - `totalPrice`
   - `invoiceValue`
   - `productDescription`
-  - `fulfillmentCenter` (string; stored as `"Contact Person Name | Phone | Full Address"` for manual/bulk/assigned flows; origin name is not included)
+  - `fulfillmentCenter` (string; stored as `"Contact Person Name | Full Address"` for manual/bulk/assigned flows; origin name is not included and phone is not stored)
   - `fulfillmentStatus`
   - `shipping`:
     - `fullName`

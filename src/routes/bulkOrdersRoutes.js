@@ -245,7 +245,6 @@ function normalizeCenterForOrder(data) {
 function formatFulfillmentCenterString(center) {
   const c = center && typeof center === "object" ? center : null;
   if (!c) return "";
-  const phone = String(c.phone ?? "").trim();
   const contactPersonName = String(c.contactPersonName ?? "").trim();
   const parts = [
     String(c.address1 ?? "").trim(),
@@ -257,7 +256,8 @@ function formatFulfillmentCenterString(center) {
   ].filter(Boolean);
   const addr = parts.join(", ");
   // Per requirement: do NOT include originName in orders (originName is shop reference only).
-  return [contactPersonName, phone, addr].filter(Boolean).join(" | ");
+  // Per requirement: do NOT store fulfillment center phone inside orders.
+  return [contactPersonName, addr].filter(Boolean).join(" | ");
 }
 
 async function loadFulfillmentCentersMap({ firestore, shopsCollection, storeId }) {

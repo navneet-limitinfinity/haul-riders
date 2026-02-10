@@ -31,7 +31,36 @@ const normalizeDisplayStatus = (value) => {
   for (const s of all) {
     if (s.toLowerCase() === key) return s;
   }
-  return "";
+
+  // Accept internal / legacy variants (snake_case, kebab-case, camelCase).
+  const canonical = raw
+    .replaceAll(/([a-z])([A-Z])/g, "$1_$2")
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]+/g, "_")
+    .replaceAll(/^_+|_+$/g, "");
+
+  const map = {
+    in_transit: "In Transit",
+    intransit: "In Transit",
+    undelivered: "Undelivered",
+    at_destination: "At Destination",
+    atdestination: "At Destination",
+    out_for_delivery: "Out for Delivery",
+    outfordelivery: "Out for Delivery",
+    set_rto: "Set RTO",
+    setrto: "Set RTO",
+
+    // RTO internal variants
+    rto_initiated: "RTO Accepted",
+    rto_accepted: "RTO Accepted",
+    rto_in_transit: "RTO In Transit",
+    rto_intransit: "RTO In Transit",
+    rto_reached_at_destination: "RTO Reached At Destination",
+    rto_reached_atdestination: "RTO Reached At Destination",
+    rto_delivered: "RTO Delivered",
+  };
+
+  return map[canonical] ?? "";
 };
 
 const displayToInternalStatus = (display) => {
