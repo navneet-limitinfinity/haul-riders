@@ -404,15 +404,18 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
           ? await pdfDoc.embedPng(haulRidersLogo.bytes)
           : await pdfDoc.embedJpg(haulRidersLogo.bytes);
 
-      // Position: top-left, same header row where DTDC appears on the right.
+      // Position: top-left, aligned to the same header row where DTDC appears on the right.
+      // Use a fixed header "band" and center vertically within it.
       const headerLeftX = 31;
-      const headerTopY = 692;
+      const headerBandTopY = 688;
+      const headerBandBottomY = 652;
       const maxW = 150;
-      const maxH = 34;
+      const maxH = Math.max(1, headerBandTopY - headerBandBottomY);
       const scale = Math.min(maxW / img.width, maxH / img.height, 1);
       const w = img.width * scale;
       const h = img.height * scale;
-      page.drawImage(img, { x: headerLeftX, y: headerTopY - h, width: w, height: h });
+      const y = headerBandBottomY + (maxH - h) / 2;
+      page.drawImage(img, { x: headerLeftX, y, width: w, height: h });
     } catch {
       // ignore
     }
