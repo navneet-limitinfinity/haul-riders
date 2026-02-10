@@ -261,6 +261,12 @@ export function createFirestoreOrdersRouter({ env, auth }) {
         const orderName = String(order?.orderName ?? orderId).trim();
         const orderKey = String(data.orderKey ?? orderId).trim();
         const requestedAt = String(data.requestedAt ?? data.updatedAt ?? data.updated_at ?? "").trim();
+
+        // Best-effort migration: ensure canonical camelCase field exists (tabs read `shipmentStatus`).
+        if (shipmentStatus && data?.shipmentStatus === undefined) {
+          doc.ref.set({ shipmentStatus }, { merge: true }).catch(() => {});
+        }
+
         return {
           ...(order ?? {}),
           docId,
@@ -446,6 +452,12 @@ export function createFirestoreOrdersRouter({ env, auth }) {
         const orderName = String(order?.orderName ?? orderId).trim();
         const orderKey = String(data.orderKey ?? orderId).trim();
         const requestedAt = String(data.requestedAt ?? data.updatedAt ?? data.updated_at ?? "").trim();
+
+        // Best-effort migration: ensure canonical camelCase field exists (tabs read `shipmentStatus`).
+        if (shipmentStatus && data?.shipmentStatus === undefined) {
+          doc.ref.set({ shipmentStatus }, { merge: true }).catch(() => {});
+        }
+
         return {
           ...(order ?? {}),
           docId,
