@@ -137,6 +137,16 @@ async function loadTemplateAssets() {
   return { map, blankBytes };
 }
 
+async function loadHaulRidersLogo() {
+  try {
+    const logoPath = path.resolve(process.cwd(), "src/public/haul_riders_logo.jpeg");
+    const bytes = await fs.readFile(logoPath);
+    return { contentType: "image/jpeg", bytes };
+  } catch {
+    return null;
+  }
+}
+
 function rectFromMatrix({ rect, bbox }) {
   // matrix e/f = translate, a/d = scale, bbox is in unscaled units
   if (!rect || !bbox) return null;
@@ -383,6 +393,29 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
     const font = t.bold ? fontBold : fontRegular;
     const size = Number(t.size ?? 10) || 10;
     page.drawText(text, { x: Number(t.x ?? 0), y: Number(t.y ?? 0), size, font, color: black });
+  }
+
+  // Haul Riders logo in the header (top-left). DTDC is already present in the base template (top-right).
+  const haulRidersLogo = await loadHaulRidersLogo();
+  if (haulRidersLogo) {
+    try {
+      const img =
+        haulRidersLogo.contentType === "image/png"
+          ? await pdfDoc.embedPng(haulRidersLogo.bytes)
+          : await pdfDoc.embedJpg(haulRidersLogo.bytes);
+
+      // Position: top-left, same header row where DTDC appears on the right.
+      const headerLeftX = 31;
+      const headerTopY = 692;
+      const maxW = 150;
+      const maxH = 34;
+      const scale = Math.min(maxW / img.width, maxH / img.height, 1);
+      const w = img.width * scale;
+      const h = img.height * scale;
+      page.drawImage(img, { x: headerLeftX, y: headerTopY - h, width: w, height: h });
+    } catch {
+      // ignore
+    }
   }
 
   // Order number in the top-right block (replaces removed Inv No/Date area).
