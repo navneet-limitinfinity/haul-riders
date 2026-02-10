@@ -18,6 +18,63 @@ export function createFirestoreOrdersRouter({ env, auth }) {
     return s.replaceAll(/\s+/g, "_");
   };
 
+  const normalizeDisplayShipmentStatus = (value) => {
+    const raw = String(value ?? "").trim();
+    if (!raw) return "";
+    const key = raw.toLowerCase();
+
+    const all = [
+      "New",
+      "Assigned",
+      "In Transit",
+      "Undelivered",
+      "At Destination",
+      "Out for Delivery",
+      "Set RTO",
+      "Delivered",
+      "RTO Accepted",
+      "RTO In Transit",
+      "RTO Reached At Destination",
+      "RTO Delivered",
+    ];
+    for (const s of all) {
+      if (s.toLowerCase() === key) return s;
+    }
+
+    const canonical = raw
+      .replaceAll(/([a-z])([A-Z])/g, "$1_$2")
+      .toLowerCase()
+      .replaceAll(/[^a-z0-9]+/g, "_")
+      .replaceAll(/^_+|_+$/g, "");
+
+    const map = {
+      new: "New",
+      assigned: "Assigned",
+      delivered: "Delivered",
+
+      in_transit: "In Transit",
+      intransit: "In Transit",
+      undelivered: "Undelivered",
+      at_destination: "At Destination",
+      atdestination: "At Destination",
+      out_for_delivery: "Out for Delivery",
+      outfordelivery: "Out for Delivery",
+      set_rto: "Set RTO",
+      setrto: "Set RTO",
+
+      rto_initiated: "RTO Accepted",
+      rto_accepted: "RTO Accepted",
+      rto_in_transit: "RTO In Transit",
+      rto_intransit: "RTO In Transit",
+      rto_reached_at_destination: "RTO Reached At Destination",
+      rto_reached_atdestination: "RTO Reached At Destination",
+      rto_delivered: "RTO Delivered",
+      rto: "RTO In Transit",
+    };
+
+    return map[canonical] ?? "";
+  };
+
   const getStatusVariants = (status) => {
     if (status === "new") return ["New"];
     if (status === "assigned") return ["Assigned"];
@@ -70,6 +127,28 @@ export function createFirestoreOrdersRouter({ env, auth }) {
         }
       } catch {
         // ignore legacy query failures
+      }
+    }
+
+    // Fallback scan: catch legacy variations like "in transit" / "in_transit" / casing differences.
+    if (docs.length < limit) {
+      try {
+        const allowed = new Set(getStatusVariants(statusNorm).map((v) => String(v ?? "").trim()));
+        const seen = new Set(docs.map((d) => d.id));
+        const scanLimit = Math.min(250, Math.max(limit * 6, 50));
+        const scanSnap = await col.orderBy("requestedAt", "desc").limit(scanLimit).get();
+        for (const d of scanSnap.docs) {
+          if (docs.length >= limit) break;
+          if (seen.has(d.id)) continue;
+          const data = d.data() ?? {};
+          const display = normalizeDisplayShipmentStatus(data?.shipmentStatus ?? data?.shipment_status);
+          if (!display) continue;
+          if (!allowed.has(display)) continue;
+          docs.push(d);
+          seen.add(d.id);
+        }
+      } catch {
+        // ignore scan failures
       }
     }
 
@@ -213,7 +292,9 @@ export function createFirestoreOrdersRouter({ env, auth }) {
 
           for (const d of snap.docs) {
             const data = d.data() ?? {};
-            const displayStatus = String(data?.shipmentStatus ?? data?.shipment_status ?? "").trim();
+            const displayStatus = normalizeDisplayShipmentStatus(
+              data?.shipmentStatus ?? data?.shipment_status
+            );
             const requestedAtField = String(data?.requestedAt ?? "").trim();
             const requestedAt = requestedAtField || String(data?.updatedAt ?? data?.updated_at ?? "").trim();
             const id = String(d.id ?? "").trim();
@@ -225,7 +306,7 @@ export function createFirestoreOrdersRouter({ env, auth }) {
             }
 
             if (statusNorm && statusNorm !== "all") {
-              if (!allowed.has(displayStatus)) continue;
+              if (!displayStatus || !allowed.has(displayStatus)) continue;
             }
             if (!matchesSearch({ data, q })) continue;
             out.push(d);
@@ -247,7 +328,8 @@ export function createFirestoreOrdersRouter({ env, auth }) {
         const data = doc.data() ?? {};
         const order = data.order && typeof data.order === "object" ? data.order : null;
         const docId = String(doc.id ?? "").trim();
-        const shipmentStatus = String(data?.shipmentStatus ?? data?.shipment_status ?? "").trim();
+        const shipmentStatusRaw = data?.shipmentStatus ?? data?.shipment_status ?? "";
+        const shipmentStatus = normalizeDisplayShipmentStatus(shipmentStatusRaw) || String(shipmentStatusRaw ?? "").trim();
         const consignmentNumber = String(data?.consignmentNumber ?? data?.consignment_number ?? "").trim();
         const courierPartner = String(data?.courierPartner ?? data?.courier_partner ?? "").trim();
         const weightKg = data?.weightKg ?? data?.weight ?? "";
@@ -263,8 +345,9 @@ export function createFirestoreOrdersRouter({ env, auth }) {
         const requestedAt = String(data.requestedAt ?? data.updatedAt ?? data.updated_at ?? "").trim();
 
         // Best-effort migration: ensure canonical camelCase field exists (tabs read `shipmentStatus`).
-        if (shipmentStatus && data?.shipmentStatus === undefined) {
-          doc.ref.set({ shipmentStatus }, { merge: true }).catch(() => {});
+        if (shipmentStatus) {
+          const shouldSet = data?.shipmentStatus === undefined || String(data?.shipmentStatus ?? "").trim() !== shipmentStatus;
+          if (shouldSet) doc.ref.set({ shipmentStatus }, { merge: true }).catch(() => {});
         }
 
         return {
@@ -438,7 +521,8 @@ export function createFirestoreOrdersRouter({ env, auth }) {
         const data = doc.data() ?? {};
         const order = data.order && typeof data.order === "object" ? data.order : null;
         const docId = String(doc.id ?? "").trim();
-        const shipmentStatus = String(data?.shipmentStatus ?? data?.shipment_status ?? "").trim();
+        const shipmentStatusRaw = data?.shipmentStatus ?? data?.shipment_status ?? "";
+        const shipmentStatus = normalizeDisplayShipmentStatus(shipmentStatusRaw) || String(shipmentStatusRaw ?? "").trim();
         const consignmentNumber = String(data?.consignmentNumber ?? data?.consignment_number ?? "").trim();
         const courierPartner = String(data?.courierPartner ?? data?.courier_partner ?? "").trim();
         const weightKg = data?.weightKg ?? data?.weight ?? "";
@@ -454,8 +538,9 @@ export function createFirestoreOrdersRouter({ env, auth }) {
         const requestedAt = String(data.requestedAt ?? data.updatedAt ?? data.updated_at ?? "").trim();
 
         // Best-effort migration: ensure canonical camelCase field exists (tabs read `shipmentStatus`).
-        if (shipmentStatus && data?.shipmentStatus === undefined) {
-          doc.ref.set({ shipmentStatus }, { merge: true }).catch(() => {});
+        if (shipmentStatus) {
+          const shouldSet = data?.shipmentStatus === undefined || String(data?.shipmentStatus ?? "").trim() !== shipmentStatus;
+          if (shouldSet) doc.ref.set({ shipmentStatus }, { merge: true }).catch(() => {});
         }
 
         return {
