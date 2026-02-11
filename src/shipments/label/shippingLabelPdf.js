@@ -376,6 +376,14 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
       order?.contentAndQuantity ??
       ""
   ).trim();
+  const ewayBillValue = String(
+    order?.ewayBill ??
+      order?.eWayBill ??
+      order?.ewayBillNumber ??
+      order?.eWayBillNumber ??
+      data?.ewayBill ??
+      ""
+  ).trim();
 
   const resolveModeValue = (ct) => {
     const s = String(ct ?? "").toLowerCase();
@@ -389,6 +397,9 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
   for (const t of fixedText) {
     if (!t || typeof t !== "object") continue;
     const key = String(t.key ?? "");
+    if (key === "from") continue;
+    if (key === "to") continue;
+    if (key === "ewayBill") continue;
     if (key === "productDescription") continue;
     if (key === "invNoLabel") continue;
     if (key === "invDateLabel") continue;
@@ -398,6 +409,21 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
     const font = t.bold ? fontBold : fontRegular;
     const size = Number(t.size ?? 10) || 10;
     page.drawText(text, { x: Number(t.x ?? 0), y: Number(t.y ?? 0), size, font, color: black });
+  }
+
+  // E-Way Bill: print ONLY value (no label) when present.
+  if (ewayBillValue) {
+    const ewayAnchor =
+      fixedText.find((t) => t && typeof t === "object" && String(t.key ?? "") === "ewayBill") ?? null;
+    if (ewayAnchor) {
+      page.drawText(ewayBillValue, {
+        x: Number(ewayAnchor.x ?? 0),
+        y: Number(ewayAnchor.y ?? 0),
+        size: Number(ewayAnchor.size ?? 12) || 12,
+        font: ewayAnchor.bold ? fontBold : fontRegular,
+        color: black,
+      });
+    }
   }
 
   // Order number in the top-right block (replaces removed Inv No/Date area).
@@ -412,17 +438,28 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
 
   // Product description strip (full width).
   if (productDescription && fields.productDescriptionBlock) {
+    // Label in bold (required).
+    page.drawText("Product Description:", {
+      x: fields.productDescriptionBlock.x,
+      y: fields.productDescriptionBlock.yTop,
+      size: fields.productDescriptionBlock.size,
+      font: fontBold,
+      color: black,
+    });
+
     const lines = wrapText({
       text: productDescription,
       font: fontRegular,
       size: fields.productDescriptionBlock.size,
       maxWidth: fields.productDescriptionBlock.maxWidth,
-    }).slice(0, fields.productDescriptionBlock.maxLines);
+    }).slice(0, Math.max(0, (fields.productDescriptionBlock.maxLines ?? 0) - 1));
 
     for (let i = 0; i < lines.length; i++) {
       page.drawText(lines[i], {
         x: fields.productDescriptionBlock.x,
-        y: fields.productDescriptionBlock.yTop - i * fields.productDescriptionBlock.lineHeight,
+        y:
+          fields.productDescriptionBlock.yTop -
+          (i + 1) * fields.productDescriptionBlock.lineHeight,
         size: fields.productDescriptionBlock.size,
         font: fontRegular,
         color: black,
@@ -554,16 +591,6 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
   }
 
   // AWB text + top barcode.
-  if (awb && fields.awbText) {
-    page.drawText(awb, {
-      x: fields.awbText.x,
-      y: fields.awbText.y,
-      size: fields.awbText.size,
-      font: fields.awbText.bold ? fontBold : fontRegular,
-      color: black,
-    });
-  }
-
   const topBarcodeRect = rectFromMatrix({
     rect: fields.topBarcodeRect,
     bbox: map?.xobjects?.topBarcodeFormBbox,
@@ -588,6 +615,17 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
         height: h,
       });
     }
+  }
+
+  // AWB number text: keep strictly within the AWB block width.
+  if (awb && fields.awbText) {
+    const padX = 6;
+    const maxW = topBarcodeRect ? Math.max(1, topBarcodeRect.width - padX * 2) : 160;
+    let size = Number(fields.awbText.size ?? 16) || 16;
+    const font = fields.awbText.bold ? fontBold : fontRegular;
+    while (size > 8 && font.widthOfTextAtSize(awb, size) > maxW) size -= 1;
+    const x = topBarcodeRect ? topBarcodeRect.x + padX : fields.awbText.x;
+    page.drawText(awb, { x, y: fields.awbText.y, size, font, color: black });
   }
 
   // Big PIN + service.
