@@ -407,9 +407,10 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
       // Position: top-left, aligned to the same header row where DTDC appears on the right.
       // Use a fixed header "band" and center vertically within it.
       const headerLeftX = 31;
-      const headerBandTopY = 688;
-      const headerBandBottomY = 652;
-      const maxW = 150;
+      // Tuned to fit between the first row's divider lines in the template.
+      const headerBandTopY = 680;
+      const headerBandBottomY = 650;
+      const maxW = 140;
       const maxH = Math.max(1, headerBandTopY - headerBandBottomY);
       const scale = Math.min(maxW / img.width, maxH / img.height, 1);
       const w = img.width * scale;
