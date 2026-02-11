@@ -139,9 +139,9 @@ async function loadTemplateAssets() {
 
 async function loadHaulRidersLogo() {
   try {
-    const logoPath = path.resolve(process.cwd(), "src/public/haul_riders_logo.jpeg");
+    const logoPath = path.resolve(process.cwd(), "src/public/haul_riders_logo.png");
     const bytes = await fs.readFile(logoPath);
-    return { contentType: "image/jpeg", bytes };
+    return { contentType: "image/png", bytes };
   } catch {
     return null;
   }
