@@ -137,16 +137,6 @@ async function loadTemplateAssets() {
   return { map, blankBytes };
 }
 
-async function loadHaulRidersLogo() {
-  try {
-    const logoPath = path.resolve(process.cwd(), "src/public/haul_riders_logo.png");
-    const bytes = await fs.readFile(logoPath);
-    return { contentType: "image/png", bytes };
-  } catch {
-    return null;
-  }
-}
-
 function rectFromMatrix({ rect, bbox }) {
   // matrix e/f = translate, a/d = scale, bbox is in unscaled units
   if (!rect || !bbox) return null;
@@ -366,8 +356,11 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
   const awb = extractAwbNumber({ firestoreDoc: data });
   const courierType = String(data?.courierType ?? data?.courier_type ?? "").trim();
   const orderName = String(order?.orderId ?? order?.orderName ?? order?.name ?? "").trim();
+  const refNo = String(data?.hrGid ?? order?.hrGid ?? "").trim();
 
-  const shipValue = String(order?.totalPrice ?? order?.total_price ?? "").trim();
+  const shipValue = String(
+    order?.invoiceValue ?? order?.invoice_value ?? order?.totalPrice ?? order?.total_price ?? ""
+  ).trim();
   const paymentFlag = getPaymentFlag(order?.financialStatus ?? order?.financial_status);
   const paymentNote = paymentFlag === "COD" ? "Collect money" : "Don't collect money";
 
@@ -376,9 +369,21 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
 
   const fields = map?.fields ?? {};
   const fixedText = Array.isArray(map?.fixedText) ? map.fixedText : [];
-  const productDescriptionLabel =
-    fixedText.find((t) => t && typeof t === "object" && String(t.key ?? "") === "productDescription") ??
-    null;
+  const productDescription = String(
+    order?.productDescription ??
+      order?.product_description ??
+      order?.itemAndQuantity ??
+      order?.contentAndQuantity ??
+      ""
+  ).trim();
+
+  const resolveModeValue = (ct) => {
+    const s = String(ct ?? "").toLowerCase();
+    if (!s) return "";
+    if (s.includes("surface")) return "Surface";
+    return "Air";
+  };
+  const modeValue = resolveModeValue(courierType);
 
   // Render fixed labels (field names) from the template map.
   for (const t of fixedText) {
@@ -395,33 +400,6 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
     page.drawText(text, { x: Number(t.x ?? 0), y: Number(t.y ?? 0), size, font, color: black });
   }
 
-  // Haul Riders logo in the header (top-left). DTDC is already present in the base template (top-right).
-  const haulRidersLogo = await loadHaulRidersLogo();
-  if (haulRidersLogo) {
-    try {
-      const img =
-        haulRidersLogo.contentType === "image/png"
-          ? await pdfDoc.embedPng(haulRidersLogo.bytes)
-          : await pdfDoc.embedJpg(haulRidersLogo.bytes);
-
-      // Position: top-left, aligned to the same header row where DTDC appears on the right.
-      // Use a fixed header "band" and center vertically within it.
-      const headerLeftX = 31;
-      // Tuned to fit between the first row's divider lines in the template.
-      const headerBandTopY = 680;
-      const headerBandBottomY = 650;
-      const maxW = 140;
-      const maxH = Math.max(1, headerBandTopY - headerBandBottomY);
-      const scale = Math.min(maxW / img.width, maxH / img.height, 1);
-      const w = img.width * scale;
-      const h = img.height * scale;
-      const y = headerBandBottomY + (maxH - h) / 2;
-      page.drawImage(img, { x: headerLeftX, y, width: w, height: h });
-    } catch {
-      // ignore
-    }
-  }
-
   // Order number in the top-right block (replaces removed Inv No/Date area).
   if (orderName) {
     const invAnchor =
@@ -432,8 +410,28 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
     page.drawText(orderName, { x, y, size, font: fontBold, color: black });
   }
 
-  // Branding logo (placed in Product Description area; label removed).
-  if (brandingLogo) {
+  // Product description strip (full width).
+  if (productDescription && fields.productDescriptionBlock) {
+    const lines = wrapText({
+      text: productDescription,
+      font: fontRegular,
+      size: fields.productDescriptionBlock.size,
+      maxWidth: fields.productDescriptionBlock.maxWidth,
+    }).slice(0, fields.productDescriptionBlock.maxLines);
+
+    for (let i = 0; i < lines.length; i++) {
+      page.drawText(lines[i], {
+        x: fields.productDescriptionBlock.x,
+        y: fields.productDescriptionBlock.yTop - i * fields.productDescriptionBlock.lineHeight,
+        size: fields.productDescriptionBlock.size,
+        font: fontRegular,
+        color: black,
+      });
+    }
+  }
+
+  // Branding strip: brand logo at right side, vertically fit.
+  if (brandingLogo && fields.brandingLogoRect) {
     try {
       const { contentType, bytes } = brandingLogo;
       const img =
@@ -441,23 +439,17 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
           ? await pdfDoc.embedPng(bytes)
           : await pdfDoc.embedJpg(bytes);
 
-      const anchorX = Number(productDescriptionLabel?.x ?? 31);
-      const anchorY = Number(productDescriptionLabel?.y ?? 286.76);
-
-      const maxW = 240;
-      const maxH = 110;
+      const rect = fields.brandingLogoRect;
+      const maxW = Number(rect.width ?? 0) || 1;
+      const maxH = Number(rect.height ?? 0) || 1;
       const scale = Math.min(maxW / img.width, maxH / img.height, 1);
       const w = img.width * scale;
       const h = img.height * scale;
 
-      const imgX = anchorX;
-      const imgY = Math.max(0, anchorY - h + 10);
-      page.drawImage(img, {
-        x: imgX,
-        y: imgY,
-        width: w,
-        height: h,
-      });
+      const padX = 6;
+      const x = Number(rect.x ?? 0) + Math.max(0, maxW - w - padX);
+      const y = Number(rect.y ?? 0) + (maxH - h) / 2;
+      page.drawImage(img, { x, y, width: w, height: h });
     } catch {
       // ignore branding render failures
     }
@@ -532,8 +524,7 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
       shipTo.address2,
       [shipTo.city, shipTo.state].filter(Boolean).join(" "),
       shipTo.phoneText,
-      pin ? `${String(shipTo.city ?? "").toUpperCase()}, PIN:${pin}` : "",
-      [shipTo.state, shipTo.country].filter(Boolean).join(", "),
+      [shipTo.country].filter(Boolean).join(", "),
     ]
       .filter(Boolean)
       .join("\n");
@@ -620,14 +611,13 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
     });
   }
 
-  // Square initial (below AWB barcode): first letter from AWB number (real-time).
-  const courierInitial = getAwbInitial(awb) || getCourierTypeInitial(courierType);
-  if (courierInitial && fields.courierTypeInitial) {
-    page.drawText(courierInitial, {
-      x: fields.courierTypeInitial.x,
-      y: fields.courierTypeInitial.y,
-      size: fields.courierTypeInitial.size,
-      font: fields.courierTypeInitial.bold ? fontBold : fontRegular,
+  // Mode value.
+  if (modeValue && fields.modeValue) {
+    page.drawText(modeValue, {
+      x: fields.modeValue.x,
+      y: fields.modeValue.y,
+      size: fields.modeValue.size,
+      font: fields.modeValue.bold ? fontBold : fontRegular,
       color: black,
     });
   }
@@ -655,9 +645,9 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
 
   // Bottom barcode removed per requirement.
 
-  // Ref. No value.
-  if (orderName && fields.refNoValue) {
-    page.drawText(orderName, {
+  // Ref. No value (hrGid).
+  if (refNo && fields.refNoValue) {
+    page.drawText(refNo, {
       x: fields.refNoValue.x,
       y: fields.refNoValue.y,
       size: fields.refNoValue.size,

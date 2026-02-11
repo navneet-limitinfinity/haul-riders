@@ -60,6 +60,12 @@
       "size": 16,
       "bold": true
     },
+    "modeValue": {
+      "x": 90,
+      "y": 309.57,
+      "size": 16,
+      "bold": true
+    },
     "paymentFlag": {
       "x": 363.1,
       "y": 201.65,
