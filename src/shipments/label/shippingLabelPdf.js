@@ -596,21 +596,23 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
     bbox: map?.xobjects?.topBarcodeFormBbox,
   });
   if (awb && topBarcodeRect) {
-    // Slightly larger barcode for better readability.
-    const barcode = await makeCode128Png(awb, { scale: 3, height: 14 });
+    // Barcode should fit fully inside the AWB block with horizontal padding.
+    // Generate a "wide" barcode (shorter height) so it can fill width without overflowing height.
+    const barcode = await makeCode128Png(awb, { scale: 3, height: 8 });
     if (barcode) {
       const img = await pdfDoc.embedPng(barcode);
       const padX = 6;
       const padY = 1;
       const maxW = Math.max(1, topBarcodeRect.width - padX * 2);
       const maxH = Math.max(1, topBarcodeRect.height - padY * 2);
-      // Fill the whole barcode box width (even if it slightly squishes height),
-      // so the barcode spans at least the full box width.
-      const w = maxW;
-      const h = maxH;
+      const scale = Math.min(maxW / img.width, maxH / img.height);
+      const w = img.width * scale;
+      const h = img.height * scale;
+      const x = topBarcodeRect.x + padX + (maxW - w) / 2;
+      const y = topBarcodeRect.y + padY + (maxH - h) / 2;
       page.drawImage(img, {
-        x: topBarcodeRect.x + padX,
-        y: topBarcodeRect.y + padY,
+        x,
+        y,
         width: w,
         height: h,
       });
@@ -624,7 +626,10 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
     let size = Number(fields.awbText.size ?? 16) || 16;
     const font = fields.awbText.bold ? fontBold : fontRegular;
     while (size > 8 && font.widthOfTextAtSize(awb, size) > maxW) size -= 1;
-    const x = topBarcodeRect ? topBarcodeRect.x + padX : fields.awbText.x;
+    const textW = font.widthOfTextAtSize(awb, size);
+    const x = topBarcodeRect
+      ? topBarcodeRect.x + padX + Math.max(0, (maxW - textW) / 2)
+      : fields.awbText.x;
     page.drawText(awb, { x, y: fields.awbText.y, size, font, color: black });
   }
 
