@@ -1,7 +1,7 @@
 {
   "template": {
-    "samplePdf": "src/public/Sample Docket.pdf",
-    "blankPdf": "src/public/Blank Docket.pdf",
+    "samplePdf": "src/public/label_sample.pdf",
+    "blankPdf": "src/public/label_format.pdf",
     "mediaBox": [
       0,
       0,
@@ -84,12 +84,6 @@
       "size": 14,
       "bold": true
     },
-    "courierTypeInitial": {
-      "x": 363.61,
-      "y": 404.32,
-      "size": 70,
-      "bold": true
-    },
     "bottomDate": {
       "x": 417.86,
       "y": 49.63,
@@ -108,11 +102,19 @@
       "sx": 1.56,
       "sy": 1.56
     },
-    "bottomBarcodeRect": {
-      "x": 79,
-      "y": 118.24,
-      "sx": 1.27,
-      "sy": 1.27
+    "productDescriptionBlock": {
+      "x": 32,
+      "yTop": 155,
+      "size": 11,
+      "lineHeight": 13,
+      "maxWidth": 330,
+      "maxLines": 3
+    },
+    "brandingLogoRect": {
+      "x": 360,
+      "y": 110,
+      "width": 110,
+      "height": 90
     }
   },
   "fixedText": [
@@ -142,7 +144,7 @@
     },
     {
       "key": "shipValueLabel",
-      "text": "Ship value :",
+      "text": "Value :",
       "x": 324,
       "y": 601.82,
       "size": 10,
@@ -198,17 +200,9 @@
     },
     {
       "key": "refNo",
-      "text": "Ref. No:",
+      "text": "",
       "x": 32,
       "y": 76.05,
-      "size": 12,
-      "bold": true
-    },
-    {
-      "key": "lv",
-      "text": "LV : 0",
-      "x": 436,
-      "y": 75.55,
       "size": 12,
       "bold": true
     },
@@ -230,19 +224,11 @@
     }
   ],
   "xobjects": {
-    "topBarcodeFormName": "Xf2",
     "topBarcodeFormBbox": [
       0,
       0,
       121,
       18
-    ],
-    "bottomBarcodeFormName": "Xf1",
-    "bottomBarcodeFormBbox": [
-      0,
-      0,
-      264,
-      40
     ]
   }
 }
