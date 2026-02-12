@@ -428,22 +428,34 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
 
   // Order number in the top-right block (replaces removed Inv No/Date area).
   if (orderName) {
-    const invAnchor =
-      fixedText.find((t) => t && typeof t === "object" && String(t.key ?? "") === "invNoLabel") ?? null;
-    const x = Number(invAnchor?.x ?? 324);
-    const y = Number(invAnchor?.y ?? 588.82);
-    const size = Number(invAnchor?.size ?? 12) || 12;
-    page.drawText(orderName, { x, y, size, font: fontBold, color: black });
+    if (fields.orderId) {
+      page.drawText(orderName, {
+        x: Number(fields.orderId.x ?? 0),
+        y: Number(fields.orderId.y ?? 0),
+        size: Number(fields.orderId.size ?? 16) || 16,
+        font: fields.orderId.bold ? fontBold : fontRegular,
+        color: black,
+      });
+    } else {
+      const invAnchor =
+        fixedText.find((t) => t && typeof t === "object" && String(t.key ?? "") === "invNoLabel") ??
+        null;
+      const x = Number(invAnchor?.x ?? 324);
+      const y = Number(invAnchor?.y ?? 630.82);
+      const size = Number(invAnchor?.size ?? 16) || 16;
+      page.drawText(orderName, { x, y, size, font: fontBold, color: black });
+    }
   }
 
   // Product description strip (full width).
   if (productDescription && fields.productDescriptionBlock) {
     // Label in bold (required).
-    page.drawText("Product Description:", {
+    page.drawText("Product Description:\n\n", {
       x: fields.productDescriptionBlock.x,
       y: fields.productDescriptionBlock.yTop,
       size: fields.productDescriptionBlock.size,
       font: fontBold,
+      size: 16,
       color: black,
     });
 
@@ -459,7 +471,7 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
         x: fields.productDescriptionBlock.x,
         y:
           fields.productDescriptionBlock.yTop -
-          (i + 1) * fields.productDescriptionBlock.lineHeight,
+          (i + 2) * fields.productDescriptionBlock.lineHeight,
         size: fields.productDescriptionBlock.size,
         font: fontRegular,
         color: black,
