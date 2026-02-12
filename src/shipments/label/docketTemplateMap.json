@@ -28,7 +28,7 @@
     },
     "orderId": {
       "x": 324,
-      "y": 630.82,
+      "y": 620.82,
       "size": 16,
       "bold": true
     },
@@ -148,7 +148,7 @@
     },
     {
       "key": "shipDateLabel",
-      "text": "Ship Date :",
+      "text": "",
       "x": 324,
       "y": 601.82,
       "size": 10,
@@ -156,7 +156,7 @@
     },
     {
       "key": "shipValueLabel",
-      "text": "Value :",
+      "text": "",
       "x": 324,
       "y": 588.82,
       "size": 10,
@@ -196,7 +196,7 @@
     },
     {
       "key": "productDescription",
-      "text": "Product Description:",
+      "text": "",
       "x": 31,
       "y": 360,
       "size": 16,
