@@ -400,6 +400,9 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
     if (key === "from") continue;
     if (key === "to") continue;
     if (key === "ewayBill") continue;
+    // These labels are already present in the new template background.
+    if (key === "shipDateLabel") continue;
+    if (key === "shipValueLabel") continue;
     if (key === "productDescription") continue;
     if (key === "invNoLabel") continue;
     if (key === "invDateLabel") continue;
