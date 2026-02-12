@@ -88,17 +88,39 @@ const toSafeNumber = (value) => {
 };
 
 const getDocDisplayShipmentStatus = (data) => {
-  return normalizeDisplayStatus(data?.shipmentStatus ?? data?.shipment_status) || "";
+  const shipment = data?.shipment && typeof data.shipment === "object" ? data.shipment : null;
+  return (
+    normalizeDisplayStatus(
+      data?.shipmentStatus ??
+        data?.shipment_status ??
+        shipment?.shipmentStatus ??
+        shipment?.shipment_status
+    ) || ""
+  );
 };
 
 const getDocUpdatedAtIso = (data) => {
-  const direct = String(data?.updatedAt ?? data?.updated_at ?? "").trim();
+  const shipment = data?.shipment && typeof data.shipment === "object" ? data.shipment : null;
+  const direct = String(
+    data?.updatedAt ??
+      data?.updated_at ??
+      shipment?.updatedAt ??
+      shipment?.updated_at ??
+      ""
+  ).trim();
   if (direct) return direct;
   return "";
 };
 
 const getDocShippingDateIso = (data) => {
-  const direct = String(data?.shippingDate ?? data?.shipping_date ?? "").trim();
+  const shipment = data?.shipment && typeof data.shipment === "object" ? data.shipment : null;
+  const direct = String(
+    data?.shippingDate ??
+      data?.shipping_date ??
+      shipment?.shippingDate ??
+      shipment?.shipping_date ??
+      ""
+  ).trim();
   if (direct) return direct;
   const requestedAt = String(data?.requestedAt ?? "").trim();
   if (requestedAt) return requestedAt;
@@ -112,13 +134,22 @@ const projectConsignmentRow = ({ docId, data }) => {
   const order = getDocOrder(data) ?? {};
   const shipping = order?.shipping && typeof order.shipping === "object" ? order.shipping : {};
 
+  const shipment = data?.shipment && typeof data.shipment === "object" ? data.shipment : {};
   const orderId = String(order?.orderId ?? order?.orderName ?? order?.order_id ?? order?.orderID ?? "").trim();
   const orderDate = String(order?.order_date ?? order?.orderDate ?? order?.createdAt ?? order?.created_at ?? "").trim();
 
-  const courierPartner = String(data?.courierPartner ?? data?.courier_partner ?? "").trim();
-  const consignmentNumber = String(data?.consignmentNumber ?? data?.consignment_number ?? "").trim();
-  const weightKgRaw = data?.weightKg ?? data?.weight;
-  const courierType = data?.courierType ?? data?.courier_type ?? "";
+  const courierPartner = String(
+    data?.courierPartner ?? data?.courier_partner ?? shipment?.courierPartner ?? shipment?.courier_partner ?? ""
+  ).trim();
+  const consignmentNumber = String(
+    data?.consignmentNumber ??
+      data?.consignment_number ??
+      shipment?.consignmentNumber ??
+      shipment?.consignment_number ??
+      ""
+  ).trim();
+  const weightKgRaw = data?.weightKg ?? data?.weight ?? shipment?.weightKg ?? shipment?.weight;
+  const courierType = data?.courierType ?? data?.courier_type ?? shipment?.courierType ?? shipment?.courier_type ?? "";
 
   const updatedAt = getDocUpdatedAtIso(data);
   const shippingDate = getDocShippingDateIso(data);
@@ -171,7 +202,13 @@ const projectConsignmentRow = ({ docId, data }) => {
     updatedAt,
 
     // EDD
-    expectedDeliveryDate: String(data?.expectedDeliveryDate ?? data?.expected_delivery_date ?? "").trim(),
+    expectedDeliveryDate: String(
+      data?.expectedDeliveryDate ??
+        data?.expected_delivery_date ??
+        shipment?.expectedDeliveryDate ??
+        shipment?.expected_delivery_date ??
+        ""
+    ).trim(),
   };
 };
 
@@ -184,7 +221,14 @@ const buildMissingFieldsPatch = ({ data }) => {
   }
 
   if (data?.updatedAt === undefined) {
-    const inferred = String(data?.updated_at ?? data?.requestedAt ?? "").trim();
+    const shipment = data?.shipment && typeof data.shipment === "object" ? data.shipment : null;
+    const inferred = String(
+      data?.updated_at ??
+        shipment?.updatedAt ??
+        shipment?.updated_at ??
+        data?.requestedAt ??
+        ""
+    ).trim();
     if (inferred) patch.updatedAt = inferred;
   }
 
@@ -194,15 +238,22 @@ const buildMissingFieldsPatch = ({ data }) => {
   }
 
   if (data?.consignmentNumber === undefined) {
-    const legacy = String(data?.consignment_number ?? "").trim();
+    const shipment = data?.shipment && typeof data.shipment === "object" ? data.shipment : null;
+    const legacy = String(data?.consignment_number ?? shipment?.consignmentNumber ?? shipment?.consignment_number ?? "").trim();
     if (legacy) patch.consignmentNumber = legacy;
   }
 
   if (data?.courierPartner === undefined) {
-    const legacy = String(data?.courier_partner ?? "").trim();
+    const shipment = data?.shipment && typeof data.shipment === "object" ? data.shipment : null;
+    const legacy = String(data?.courier_partner ?? shipment?.courierPartner ?? shipment?.courier_partner ?? "").trim();
     if (legacy) patch.courierPartner = legacy;
     const consignment = String(
-      patch.consignmentNumber ?? data?.consignmentNumber ?? data?.consignment_number ?? ""
+      patch.consignmentNumber ??
+        data?.consignmentNumber ??
+        data?.consignment_number ??
+        shipment?.consignmentNumber ??
+        shipment?.consignment_number ??
+        ""
     ).trim();
     if (consignment) patch.courierPartner = "DTDC";
   }
@@ -212,12 +263,14 @@ const buildMissingFieldsPatch = ({ data }) => {
   }
 
   if (data?.courierType === undefined) {
-    const legacy = String(data?.courier_type ?? "").trim();
+    const shipment = data?.shipment && typeof data.shipment === "object" ? data.shipment : null;
+    const legacy = String(data?.courier_type ?? shipment?.courierType ?? shipment?.courier_type ?? "").trim();
     if (legacy) patch.courierType = legacy;
   }
 
   if (data?.expectedDeliveryDate === undefined) {
-    const legacy = String(data?.expected_delivery_date ?? "").trim();
+    const shipment = data?.shipment && typeof data.shipment === "object" ? data.shipment : null;
+    const legacy = String(data?.expected_delivery_date ?? shipment?.expectedDeliveryDate ?? shipment?.expected_delivery_date ?? "").trim();
     if (legacy) patch.expectedDeliveryDate = legacy;
   }
 
