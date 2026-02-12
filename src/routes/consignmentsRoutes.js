@@ -89,12 +89,15 @@ const toSafeNumber = (value) => {
 
 const getDocDisplayShipmentStatus = (data) => {
   const shipment = data?.shipment && typeof data.shipment === "object" ? data.shipment : null;
+  const order = getDocOrder(data);
   return (
     normalizeDisplayStatus(
       data?.shipmentStatus ??
         data?.shipment_status ??
         shipment?.shipmentStatus ??
-        shipment?.shipment_status
+        shipment?.shipment_status ??
+        order?.shipmentStatus ??
+        order?.shipment_status
     ) || ""
   );
 };
