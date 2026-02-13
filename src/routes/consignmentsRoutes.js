@@ -469,196 +469,24 @@ export function createConsignmentsRouter({ env, auth }) {
 
         const role = String(req.user?.role ?? "");
         const limit = parseLimit(req.query?.limit);
-        const cursor = decodeCursor(req.query?.cursor);
         const q = String(req.query?.q ?? "").trim();
         const allowed = allowedStatusesForTab(tab);
+        // NOTE: Firestore order-reading logic intentionally removed.
+        // You will implement a new architecture for fetching/reading orders in all tabs.
+        const storeIdForCollection =
+          role === ROLE_SHOP ? String(req.user?.storeId ?? "").trim().toLowerCase() : storeId;
+        const primaryInfo = getShopCollectionInfo({ storeId: storeIdForCollection || storeId });
+        const collectionId = primaryInfo.collectionId;
+        const displayName = primaryInfo.displayName;
+        const normalizedStoreId = primaryInfo.storeId;
+
         const wantsDebug =
           String(req.query?.debug ?? "").trim() === "1" ||
           String(env?.logLevel ?? "").trim().toLowerCase() === "debug" ||
           String(process.env.NODE_ENV ?? "").trim().toLowerCase() !== "production";
 
-        const admin = await getFirebaseAdmin({ env });
-        const storeIdForCollection =
-          role === ROLE_SHOP ? String(req.user?.storeId ?? "").trim().toLowerCase() : storeId;
-        const primaryInfo = getShopCollectionInfo({ storeId: storeIdForCollection || storeId });
-        let { collectionId, displayName, storeId: normalizedStoreId } = primaryInfo;
-
-        const firestore = admin.firestore();
-        if (role === ROLE_SHOP) {
-          const requestedCollectionId = String(req.query?.collectionId ?? "").trim();
-          // Align shop API reads with the same collection id used by the Assigned realtime tab,
-          // but do not allow a shop user to read another shop's collection.
-          if (requestedCollectionId && requestedCollectionId === primaryInfo.collectionId) {
-            collectionId = requestedCollectionId;
-          }
-        }
-        // Some legacy deployments used the full shop domain string for the collection id
-        // (e.g. `smylo-devstore_myshopify_com`) instead of the domain key (`smylo-devstore`).
-        // If the primary collection is empty, fall back to the legacy naming.
-        const legacyCollectionId = toFirestoreCollectionId(storeIdForCollection || storeId);
-        const debug = String(env?.logLevel ?? "").trim().toLowerCase() === "debug";
-        let usedLegacyCollectionId = false;
-        if (legacyCollectionId && legacyCollectionId !== collectionId) {
-          try {
-            const probePrimary = await firestore.collection(collectionId).limit(1).get();
-            if (probePrimary.empty) {
-              const probeLegacy = await firestore.collection(legacyCollectionId).limit(1).get();
-              if (!probeLegacy.empty) {
-                collectionId = legacyCollectionId;
-                // displayName / normalizedStoreId should still be the shop key for UI.
-                ({ displayName, storeId: normalizedStoreId } = primaryInfo);
-                usedLegacyCollectionId = true;
-              }
-            }
-          } catch {
-            // ignore probe failures
-          }
-        }
-
-        if (debug) {
-          console.log("[consignments] resolved collection", {
-            tab,
-            role: String(req.user?.role ?? ""),
-            userStoreId: String(req.user?.storeId ?? ""),
-            userStoreKey: String(req.user?.storeKey ?? ""),
-            resolvedStoreId: storeId,
-            collectionId,
-            usedLegacyCollectionId,
-          });
-        }
-
-        const col = firestore.collection(collectionId);
-
-        // Backfill legacy docs that don't have `shippingDate` yet.
-        if (!cursor) {
-          try {
-            const probe = await col.orderBy("shippingDate", "desc").limit(1).get();
-            const probeData = probe.docs[0]?.data?.() ?? {};
-            const hasShippingDate = Boolean(String(probeData?.shippingDate ?? "").trim());
-            const hasLegacyShippingDate = Boolean(String(probeData?.shipping_date ?? "").trim());
-            if (probe.empty || (!hasShippingDate && hasLegacyShippingDate)) {
-              await backfillForCollection({ col, allowedDisplayStatuses: allowed, maxDocs: 300 });
-            }
-          } catch {
-            // ignore probe/backfill failures
-          }
-        }
-
         const orders = [];
-        let lastShippingDate = String(cursor?.shippingDate ?? "").trim();
-        let lastDocId = String(cursor?.docId ?? "").trim();
-
-        // In-memory filter to avoid requiring Firestore composite indexes.
-        const batchSize = Math.min(250, Math.max(25, limit * 4));
-        const debugStatusCounts = debug ? new Map() : null;
-        const debugSamples = debug ? [] : null;
-        let scannedDocs = 0;
-        let scannedBatches = 0;
-        for (let iter = 0; iter < 12 && orders.length < limit; iter += 1) {
-          let q = col
-            .orderBy("shippingDate", "desc")
-            .orderBy(admin.firestore.FieldPath.documentId(), "desc")
-            .limit(batchSize);
-          if (lastShippingDate && lastDocId) q = q.startAfter(lastShippingDate, lastDocId);
-
-          const snap = await q.get();
-          scannedBatches += 1;
-          scannedDocs += snap.docs.length;
-          if (snap.empty) {
-            lastShippingDate = "";
-            lastDocId = "";
-            break;
-          }
-
-          for (const doc of snap.docs) {
-            const data = doc.data() ?? {};
-            const displayStatus = getDocDisplayShipmentStatus(data);
-            if (debugStatusCounts) {
-              debugStatusCounts.set(displayStatus || "(missing)", (debugStatusCounts.get(displayStatus || "(missing)") ?? 0) + 1);
-              if (debugSamples && debugSamples.length < 5) {
-                debugSamples.push({
-                  docId: doc.id,
-                  shipmentStatus: String(data?.shipmentStatus ?? data?.shipment_status ?? ""),
-                  shipmentNested: String(
-                    data?.shipment && typeof data.shipment === "object"
-                      ? data.shipment?.shipmentStatus ?? data.shipment?.shipment_status ?? ""
-                      : ""
-                  ),
-                  orderNested: String(
-                    data?.order && typeof data.order === "object"
-                      ? data.order?.shipmentStatus ?? data.order?.shipment_status ?? ""
-                      : ""
-                  ),
-                  normalizedDisplay: displayStatus,
-                });
-              }
-            }
-            const shippingDate = getDocShippingDateIso(data);
-            const patch = buildMissingFieldsPatch({ data });
-            if (!patch.shippingDate && shippingDate) patch.shippingDate = shippingDate;
-            if (!allowed.has(displayStatus)) {
-              lastShippingDate = String(shippingDate ?? "").trim();
-              lastDocId = String(doc.id ?? "").trim();
-              if (Object.keys(patch).length > 0) {
-                doc.ref.set(patch, { merge: true }).catch(() => {});
-              }
-              continue;
-            }
-
-            if (!matchesSearch({ data, q })) {
-              lastShippingDate = String(shippingDate ?? "").trim();
-              lastDocId = String(doc.id ?? "").trim();
-              if (Object.keys(patch).length > 0) {
-                doc.ref.set(patch, { merge: true }).catch(() => {});
-              }
-              continue;
-            }
-
-            const row = projectConsignmentRow({ docId: doc.id, data });
-            orders.push(row);
-
-            if (Object.keys(patch).length > 0) {
-              // Best-effort migration; do not block response.
-              doc.ref.set(patch, { merge: true }).catch(() => {});
-            }
-
-            if (orders.length >= limit) break;
-            lastShippingDate = String(shippingDate ?? "").trim();
-            lastDocId = String(doc.id ?? "").trim();
-          }
-
-          const lastDoc = snap.docs[snap.docs.length - 1];
-          const lastDocData = lastDoc?.data?.() ?? {};
-          const lastDocShipping = getDocShippingDateIso(lastDocData);
-          const lastId = String(lastDoc?.id ?? "").trim();
-          if (lastDocShipping && lastId) {
-            lastShippingDate = String(lastDocShipping ?? "").trim();
-            lastDocId = lastId;
-          }
-
-          if (snap.docs.length < batchSize) {
-            // No more to scan.
-            lastShippingDate = "";
-            lastDocId = "";
-            break;
-          }
-        }
-
-        const nextCursor =
-          lastShippingDate && lastDocId
-            ? encodeCursor({ shippingDate: lastShippingDate, docId: lastDocId })
-            : "";
-
-        if (orders.length === 0 && String(req.user?.role ?? "") === ROLE_SHOP) {
-          console.log("[consignments] empty_result_debug", {
-            tab,
-            resolvedStoreId: storeId,
-            collectionId,
-            allowed: Array.from(allowed.values()),
-            counts: debugStatusCounts ? Object.fromEntries(debugStatusCounts.entries()) : {},
-            samples: debugSamples ?? [],
-          });
-        }
+        const nextCursor = "";
 
         res.setHeader("Cache-Control", "no-store");
         res.json({
@@ -672,11 +500,13 @@ export function createConsignmentsRouter({ env, auth }) {
             ? {
                 debug: {
                   collectionId,
-                  scannedDocs,
-                  scannedBatches,
-                  returnedDocs: orders.length,
-                  allowedStatuses: Array.from(allowed.values()),
                   query: q,
+                  allowedStatuses: Array.from(allowed.values()),
+                  limit,
+                  scannedDocs: 0,
+                  scannedBatches: 0,
+                  returnedDocs: 0,
+                  note: "firestore_read_logic_removed",
                 },
               }
             : {}),

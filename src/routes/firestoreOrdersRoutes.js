@@ -6,10 +6,6 @@ import { buildSearchTokensFromDoc } from "../firestore/searchTokens.js";
 
 export function createFirestoreOrdersRouter({ env, auth }) {
   const router = Router();
-  const wantsDebug = (req) =>
-    String(req.query?.debug ?? "").trim() === "1" ||
-    String(env?.logLevel ?? "").trim().toLowerCase() === "debug" ||
-    String(process.env.NODE_ENV ?? "").trim().toLowerCase() !== "production";
 
   const normalizeShipmentStatus = (value) => {
     const s = String(value ?? "").trim().toLowerCase();
@@ -249,143 +245,18 @@ export function createFirestoreOrdersRouter({ env, auth }) {
       const status = String(req.query?.status ?? "assigned").trim().toLowerCase();
       const statusNorm = normalizeShipmentStatus(status) || (status === "all" ? "all" : "");
       const q = String(req.query?.q ?? "").trim();
-      const cursor = decodeCursor(req.query?.cursor);
       const limit = Math.max(
         1,
         Math.min(250, Number.parseInt(req.query?.limit ?? "200", 10) || 200)
       );
 
-      const admin = await getFirebaseAdmin({ env });
       const { collectionId, displayName, storeId: normalizedStoreId } = getShopCollectionInfo({
         storeId: storeId || shopDomain,
       });
-
-      const firestore = admin.firestore();
-
-      let docs = [];
-      let nextCursor = "";
-      let scannedDocs = 0;
-      let scannedBatches = 0;
-      if (!q && !cursor) {
-        const snap = await fetchDocsForStatus({
-          firestore,
-          collectionId,
-          status: statusNorm || "assigned",
-          limit,
-        });
-        docs = Array.isArray(snap?.docs) ? snap.docs : [];
-        scannedDocs = docs.length;
-        scannedBatches = 1;
-      } else {
-        const col = firestore.collection(collectionId);
-        const allowed = new Set(getStatusVariants(statusNorm || "assigned"));
-
-        const batchSize = Math.min(250, Math.max(25, limit * 4));
-        let lastRequestedAt = String(cursor?.requestedAt ?? "").trim();
-        let lastDocId = String(cursor?.docId ?? "").trim();
-        const out = [];
-
-        for (let iter = 0; iter < 12 && out.length < limit; iter += 1) {
-          let query = col
-            .orderBy("requestedAt", "desc")
-            .orderBy(admin.firestore.FieldPath.documentId(), "desc")
-            .limit(batchSize);
-          if (lastRequestedAt && lastDocId) query = query.startAfter(lastRequestedAt, lastDocId);
-          const snap = await query.get();
-          scannedBatches += 1;
-          scannedDocs += snap.docs.length;
-          if (snap.empty) {
-            lastRequestedAt = "";
-            lastDocId = "";
-            break;
-          }
-
-          for (const d of snap.docs) {
-            const data = d.data() ?? {};
-            const displayStatus = normalizeDisplayShipmentStatus(
-              data?.shipmentStatus ?? data?.shipment_status
-            );
-            const requestedAtField = String(data?.requestedAt ?? "").trim();
-            const requestedAt = requestedAtField || String(data?.updatedAt ?? data?.updated_at ?? "").trim();
-            const id = String(d.id ?? "").trim();
-            lastRequestedAt = requestedAt;
-            lastDocId = id;
-
-            if (!requestedAtField && requestedAt) {
-              d.ref.set({ requestedAt }, { merge: true }).catch(() => {});
-            }
-
-            if (statusNorm && statusNorm !== "all") {
-              if (!displayStatus || !allowed.has(displayStatus)) continue;
-            }
-            if (!matchesSearch({ data, q })) continue;
-            out.push(d);
-            if (out.length >= limit) break;
-          }
-
-          if (snap.docs.length < batchSize) {
-            lastRequestedAt = "";
-            lastDocId = "";
-            break;
-          }
-        }
-
-        docs = out;
-        nextCursor = lastRequestedAt && lastDocId ? encodeCursor({ requestedAt: lastRequestedAt, docId: lastDocId }) : "";
-      }
-
-      const rows = docs.map((doc) => {
-        const data = doc.data() ?? {};
-        const order = data.order && typeof data.order === "object" ? data.order : null;
-        const docId = String(doc.id ?? "").trim();
-        const shipmentStatusRaw = data?.shipmentStatus ?? data?.shipment_status ?? "";
-        const shipmentStatus = normalizeDisplayShipmentStatus(shipmentStatusRaw) || String(shipmentStatusRaw ?? "").trim();
-        const consignmentNumber = String(data?.consignmentNumber ?? data?.consignment_number ?? "").trim();
-        const courierPartner = String(data?.courierPartner ?? data?.courier_partner ?? "").trim();
-        const weightKg = data?.weightKg ?? data?.weight ?? "";
-        const courierType = String(data?.courierType ?? data?.courier_type ?? "").trim();
-        const shippingDate = String(data?.shippingDate ?? data?.shipping_date ?? "").trim();
-        const expectedDeliveryDate = String(
-          data?.expectedDeliveryDate ?? data?.expected_delivery_date ?? ""
-        ).trim();
-        const updatedAt = String(data?.updatedAt ?? data?.updated_at ?? "").trim();
-        const orderId = String(order?.orderId ?? order?.orderName ?? order?.order_id ?? "").trim();
-        const orderName = String(order?.orderName ?? orderId).trim();
-        const orderKey = String(data.orderKey ?? orderId).trim();
-        const requestedAt = String(data.requestedAt ?? data.updatedAt ?? data.updated_at ?? "").trim();
-
-        // Best-effort migration: ensure canonical camelCase field exists (tabs read `shipmentStatus`).
-        if (shipmentStatus) {
-          const shouldSet = data?.shipmentStatus === undefined || String(data?.shipmentStatus ?? "").trim() !== shipmentStatus;
-          if (shouldSet) doc.ref.set({ shipmentStatus }, { merge: true }).catch(() => {});
-        }
-
-        return {
-          ...(order ?? {}),
-          docId,
-          orderKey,
-          orderId,
-          orderName,
-          shipmentStatus,
-          consignmentNumber,
-          courierPartner,
-          weightKg,
-          courierType,
-          shippingDate,
-          expectedDeliveryDate,
-          updatedAt,
-          firestore: {
-            shopName: String(data.shopName ?? displayName),
-            requestedAt,
-          },
-        };
-      });
-
-      const orders = rows.sort((a, b) =>
-        String(b?.firestore?.requestedAt ?? "").localeCompare(
-          String(a?.firestore?.requestedAt ?? "")
-        )
-      );
+      // NOTE: Firestore order-reading logic intentionally removed for `/shop/orders` and `/admin/orders`.
+      // You will implement your new architecture to fetch/read orders in all tabs.
+      const orders = [];
+      const nextCursor = "";
 
       res.setHeader("Cache-Control", "no-store");
       res.json({
@@ -399,11 +270,13 @@ export function createFirestoreOrdersRouter({ env, auth }) {
           ? {
               debug: {
                 collectionId,
-                scannedDocs,
-                scannedBatches,
-                returnedDocs: orders.length,
                 status: statusNorm || "assigned",
                 query: q,
+                limit,
+                scannedDocs: 0,
+                scannedBatches: 0,
+                returnedDocs: 0,
+                note: "firestore_read_logic_removed",
               },
             }
           : {}),
@@ -464,139 +337,16 @@ export function createFirestoreOrdersRouter({ env, auth }) {
       const status = String(req.query?.status ?? "assigned").trim().toLowerCase();
       const statusNorm = normalizeShipmentStatus(status) || (status === "all" ? "all" : "");
       const q = String(req.query?.q ?? "").trim();
-      const cursor = decodeCursor(req.query?.cursor);
       const limit = Math.max(
         1,
         Math.min(250, Number.parseInt(req.query?.limit ?? "100", 10) || 100)
       );
 
-      const admin = await getFirebaseAdmin({ env });
       const { collectionId, displayName } = getShopCollectionInfo({ storeId });
-
-      const firestore = admin.firestore();
-
-      let docs = [];
-      let nextCursor = "";
-      let scannedDocs = 0;
-      let scannedBatches = 0;
-      if (!q && !cursor) {
-        const snap = await fetchDocsForStatus({
-          firestore,
-          collectionId,
-          status: statusNorm || "assigned",
-          limit,
-        });
-        docs = Array.isArray(snap?.docs) ? snap.docs : [];
-        scannedDocs = docs.length;
-        scannedBatches = 1;
-      } else {
-        const col = firestore.collection(collectionId);
-        const allowed = new Set(getStatusVariants(statusNorm || "assigned"));
-
-        const batchSize = Math.min(250, Math.max(25, limit * 4));
-        let lastRequestedAt = String(cursor?.requestedAt ?? "").trim();
-        let lastDocId = String(cursor?.docId ?? "").trim();
-        const out = [];
-
-        for (let iter = 0; iter < 12 && out.length < limit; iter += 1) {
-          let query = col
-            .orderBy("requestedAt", "desc")
-            .orderBy(admin.firestore.FieldPath.documentId(), "desc")
-            .limit(batchSize);
-          if (lastRequestedAt && lastDocId) query = query.startAfter(lastRequestedAt, lastDocId);
-          const snap = await query.get();
-          scannedBatches += 1;
-          scannedDocs += snap.docs.length;
-          if (snap.empty) {
-            lastRequestedAt = "";
-            lastDocId = "";
-            break;
-          }
-
-          for (const d of snap.docs) {
-            const data = d.data() ?? {};
-            const displayStatus = String(data?.shipmentStatus ?? data?.shipment_status ?? "").trim();
-            const requestedAtField = String(data?.requestedAt ?? "").trim();
-            const requestedAt = requestedAtField || String(data?.updatedAt ?? data?.updated_at ?? "").trim();
-            const id = String(d.id ?? "").trim();
-            lastRequestedAt = requestedAt;
-            lastDocId = id;
-
-            if (!requestedAtField && requestedAt) {
-              d.ref.set({ requestedAt }, { merge: true }).catch(() => {});
-            }
-
-            if (statusNorm && statusNorm !== "all") {
-              if (!allowed.has(displayStatus)) continue;
-            }
-            if (!matchesSearch({ data, q })) continue;
-            out.push(d);
-            if (out.length >= limit) break;
-          }
-
-          if (snap.docs.length < batchSize) {
-            lastRequestedAt = "";
-            lastDocId = "";
-            break;
-          }
-        }
-
-        docs = out;
-        nextCursor = lastRequestedAt && lastDocId ? encodeCursor({ requestedAt: lastRequestedAt, docId: lastDocId }) : "";
-      }
-
-      const rows = docs.map((doc) => {
-        const data = doc.data() ?? {};
-        const order = data.order && typeof data.order === "object" ? data.order : null;
-        const docId = String(doc.id ?? "").trim();
-        const shipmentStatusRaw = data?.shipmentStatus ?? data?.shipment_status ?? "";
-        const shipmentStatus = normalizeDisplayShipmentStatus(shipmentStatusRaw) || String(shipmentStatusRaw ?? "").trim();
-        const consignmentNumber = String(data?.consignmentNumber ?? data?.consignment_number ?? "").trim();
-        const courierPartner = String(data?.courierPartner ?? data?.courier_partner ?? "").trim();
-        const weightKg = data?.weightKg ?? data?.weight ?? "";
-        const courierType = String(data?.courierType ?? data?.courier_type ?? "").trim();
-        const shippingDate = String(data?.shippingDate ?? data?.shipping_date ?? "").trim();
-        const expectedDeliveryDate = String(
-          data?.expectedDeliveryDate ?? data?.expected_delivery_date ?? ""
-        ).trim();
-        const updatedAt = String(data?.updatedAt ?? data?.updated_at ?? "").trim();
-        const orderId = String(order?.orderId ?? order?.orderName ?? order?.order_id ?? "").trim();
-        const orderName = String(order?.orderName ?? orderId).trim();
-        const orderKey = String(data.orderKey ?? orderId).trim();
-        const requestedAt = String(data.requestedAt ?? data.updatedAt ?? data.updated_at ?? "").trim();
-
-        // Best-effort migration: ensure canonical camelCase field exists (tabs read `shipmentStatus`).
-        if (shipmentStatus) {
-          const shouldSet = data?.shipmentStatus === undefined || String(data?.shipmentStatus ?? "").trim() !== shipmentStatus;
-          if (shouldSet) doc.ref.set({ shipmentStatus }, { merge: true }).catch(() => {});
-        }
-
-        return {
-          ...(order ?? {}),
-          docId,
-          orderKey,
-          orderId,
-          orderName,
-          shipmentStatus,
-          consignmentNumber,
-          courierPartner,
-          weightKg,
-          courierType,
-          shippingDate,
-          expectedDeliveryDate,
-          updatedAt,
-          firestore: {
-            shopName: String(data.shopName ?? displayName),
-            requestedAt,
-          },
-        };
-      });
-
-      const orders = rows.sort((a, b) =>
-        String(b?.firestore?.requestedAt ?? "").localeCompare(
-          String(a?.firestore?.requestedAt ?? "")
-        )
-      );
+      // NOTE: Firestore order-reading logic intentionally removed for `/shop/orders` and `/admin/orders`.
+      // You will implement your new architecture to fetch/read orders in all tabs.
+      const orders = [];
+      const nextCursor = "";
 
       res.setHeader("Cache-Control", "no-store");
       res.json({
@@ -610,11 +360,13 @@ export function createFirestoreOrdersRouter({ env, auth }) {
           ? {
               debug: {
                 collectionId,
-                scannedDocs,
-                scannedBatches,
-                returnedDocs: orders.length,
                 status: statusNorm || "assigned",
                 query: q,
+                limit,
+                scannedDocs: 0,
+                scannedBatches: 0,
+                returnedDocs: 0,
+                note: "firestore_read_logic_removed",
               },
             }
           : {}),
