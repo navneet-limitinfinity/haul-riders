@@ -435,8 +435,9 @@ const resolveStoreId = ({ req }) => {
     if (storeKey) return storeKey;
     const fromProfile = String(req.user?.storeId ?? "").trim().toLowerCase();
     if (fromProfile) return fromProfile;
-    const q = req.query ?? {};
-    return String(q.storeId ?? q.store ?? q.shopDomain ?? "").trim().toLowerCase();
+    // For shop users, never trust query params for store id.
+    // The store is derived from the authenticated user's Firestore profile.
+    return "";
   }
   return "";
 };
@@ -629,7 +630,7 @@ export function createConsignmentsRouter({ env, auth }) {
             ? encodeCursor({ shippingDate: lastShippingDate, docId: lastDocId })
             : "";
 
-        if (debug && orders.length === 0) {
+        if (orders.length === 0 && String(req.user?.role ?? "") === ROLE_SHOP) {
           console.log("[consignments] empty_result_debug", {
             tab,
             resolvedStoreId: storeId,
