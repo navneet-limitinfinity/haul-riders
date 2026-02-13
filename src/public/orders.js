@@ -14,29 +14,29 @@ const DEFAULT_HEADER_HTML = `<tr>
   <th class="colCheck">
     <input id="selectAll" type="checkbox" aria-label="Select all" />
   </th>
-  <th>#</th>
-  <th class="colSortable" data-sort-key="orderName">
-    Order Name <span class="sortIndicator" aria-hidden="true"></span>
-  </th>
   <th>Order ID</th>
-  <th>Full Name</th>
+  <th>Order Date</th>
+  <th>Customer Name</th>
   <th>Address 1</th>
   <th>Address 2</th>
+  <th>Pincode</th>
   <th>City</th>
   <th>State</th>
-  <th>PIN Code</th>
   <th>Phone 1</th>
   <th>Phone 2</th>
-  <th>Total Price</th>
-  <th class="colSortable" data-sort-key="fulfillmentStatus">
-    Fulfillment Status <span class="sortIndicator" aria-hidden="true"></span>
-  </th>
-  <th>Tracking Numbers</th>
-  <th>Shipments Status</th>
-  <th>Courier Partner</th>
+  <th>Product Discription</th>
+  <th>Invoice Value</th>
+  <th>Payment Status</th>
+  <th>Fulfillment Status</th>
+  <th>Fulfillment Center</th>
   <th>Weight</th>
   <th>Courier Type</th>
-  <th>Action</th>
+  <th>Shipping Date</th>
+  <th>Courier Partner</th>
+  <th>Consignment No.</th>
+  <th>Shipment Status</th>
+  <th>Updated On</th>
+  <th>EDD</th>
 </tr>`;
 
 const NEW_TAB_HEADER_HTML = `<tr>
