@@ -480,6 +480,8 @@ export function createConsignmentsRouter({ env, auth }) {
         // (e.g. `smylo-devstore_myshopify_com`) instead of the domain key (`smylo-devstore`).
         // If the primary collection is empty, fall back to the legacy naming.
         const legacyCollectionId = toFirestoreCollectionId(storeId);
+        const debug = String(env?.logLevel ?? "").trim().toLowerCase() === "debug";
+        let usedLegacyCollectionId = false;
         if (legacyCollectionId && legacyCollectionId !== collectionId) {
           try {
             const probePrimary = await firestore.collection(collectionId).limit(1).get();
@@ -489,11 +491,24 @@ export function createConsignmentsRouter({ env, auth }) {
                 collectionId = legacyCollectionId;
                 // displayName / normalizedStoreId should still be the shop key for UI.
                 ({ displayName, storeId: normalizedStoreId } = primaryInfo);
+                usedLegacyCollectionId = true;
               }
             }
           } catch {
             // ignore probe failures
           }
+        }
+
+        if (debug) {
+          console.log("[consignments] resolved collection", {
+            tab,
+            role: String(req.user?.role ?? ""),
+            userStoreId: String(req.user?.storeId ?? ""),
+            userStoreKey: String(req.user?.storeKey ?? ""),
+            resolvedStoreId: storeId,
+            collectionId,
+            usedLegacyCollectionId,
+          });
         }
 
         const col = firestore.collection(collectionId);
