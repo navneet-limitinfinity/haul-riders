@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { getShopCollectionInfo } from "../firestore/shopCollections.js";
+import { parseCookies } from "../auth/cookies.js";
 
 const html = String.raw;
 
@@ -69,6 +70,36 @@ function debugFooterEnabled(env) {
   return level === "debug" || nodeEnv !== "production";
 }
 
+const DEBUG_FOOTER_COOKIE = "haul_debug_footer";
+
+function resolveDebugFooterFlag({ req, env }) {
+  const q = String(req.query?.debugFooter ?? "").trim();
+  if (q === "1") return true;
+  if (q === "0") return false;
+
+  const cookies = parseCookies(req.headers?.cookie);
+  const cookieVal = String(cookies?.[DEBUG_FOOTER_COOKIE] ?? "").trim();
+  if (cookieVal === "1") return true;
+  if (cookieVal === "0") return false;
+
+  return debugFooterEnabled(env);
+}
+
+function maybePersistDebugFooterFlag({ req, res }) {
+  const q = String(req.query?.debugFooter ?? "").trim();
+  if (q !== "1" && q !== "0") return false;
+
+  // Persist for this browser session across the portal.
+  res.cookie(DEBUG_FOOTER_COOKIE, q, {
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    httpOnly: false,
+    secure: Boolean(req.secure),
+    sameSite: "lax",
+    path: "/",
+  });
+  return true;
+}
+
 function renderDebugFooterAssets({ assetVersion, enabled }) {
   if (!enabled) return "";
   return html`
@@ -78,7 +109,7 @@ function renderDebugFooterAssets({ assetVersion, enabled }) {
 }
 
 function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId, debugFooter }) {
-  const assetVersion = "53";
+  const assetVersion = "54";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
   const safeFirestoreCollectionId = escapeHtml(firestoreCollectionId);
@@ -1323,13 +1354,18 @@ function renderCreateOrdersPage({ role, userLabel, storeId, debugFooter }) {
 
 export function createPagesRouter({ env, auth } = {}) {
   const router = Router();
-  const debugFooter = debugFooterEnabled(env);
 
   router.get("/orders", (_req, res) => {
     res.redirect(302, "/shop/orders");
   });
 
   router.get("/shop/orders", auth.requireRole("shop"), (req, res) => {
+    if (maybePersistDebugFooterFlag({ req, res })) {
+      const url = new URL(`${req.protocol}://${req.get("host")}${req.originalUrl}`);
+      url.searchParams.delete("debugFooter");
+      res.redirect(302, url.pathname + (url.search ? url.search : ""));
+      return;
+    }
     // Shop dashboard must not carry admin store selection query params.
     if (req.query?.store != null) {
       res.redirect(302, "/shop/orders");
@@ -1338,45 +1374,88 @@ export function createPagesRouter({ env, auth } = {}) {
     const userLabel = String(req.user?.email ?? "Shop").trim() || "Shop";
     const storeId = String(req.user?.storeId ?? "").trim();
     const firestoreCollectionId = getShopCollectionInfo({ storeId }).collectionId;
+    const debugFooter = resolveDebugFooterFlag({ req, env });
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(renderOrdersPage({ role: "shop", userLabel, storeId, firestoreCollectionId, debugFooter }));
   });
 
   router.get("/shop/store", auth.requireRole("shop"), (req, res) => {
+    if (maybePersistDebugFooterFlag({ req, res })) {
+      const url = new URL(`${req.protocol}://${req.get("host")}${req.originalUrl}`);
+      url.searchParams.delete("debugFooter");
+      res.redirect(302, url.pathname + (url.search ? url.search : ""));
+      return;
+    }
     const userLabel = String(req.user?.email ?? "Shop").trim() || "Shop";
     const storeId = String(req.user?.storeId ?? "").trim();
+    const debugFooter = resolveDebugFooterFlag({ req, env });
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(renderStoreDetailsPage({ userLabel, storeId, debugFooter }));
   });
 
   router.get("/admin/orders", auth.requireRole("admin"), (req, res) => {
+    if (maybePersistDebugFooterFlag({ req, res })) {
+      const url = new URL(`${req.protocol}://${req.get("host")}${req.originalUrl}`);
+      url.searchParams.delete("debugFooter");
+      res.redirect(302, url.pathname + (url.search ? url.search : ""));
+      return;
+    }
     const userLabel = String(req.user?.email ?? env?.adminName ?? "Admin").trim() || "Admin";
+    const debugFooter = resolveDebugFooterFlag({ req, env });
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(renderOrdersPage({ role: "admin", userLabel, storeId: "", firestoreCollectionId: "", debugFooter }));
   });
 
   router.get("/admin/bulk-upload", auth.requireRole("admin"), (req, res) => {
+    if (maybePersistDebugFooterFlag({ req, res })) {
+      const url = new URL(`${req.protocol}://${req.get("host")}${req.originalUrl}`);
+      url.searchParams.delete("debugFooter");
+      res.redirect(302, url.pathname + (url.search ? url.search : ""));
+      return;
+    }
     const userLabel = String(req.user?.email ?? env?.adminName ?? "Admin").trim() || "Admin";
+    const debugFooter = resolveDebugFooterFlag({ req, env });
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(renderBulkUploadPage({ userLabel, debugFooter }));
   });
 
   router.get("/admin/create-orders", auth.requireRole("admin"), (req, res) => {
+    if (maybePersistDebugFooterFlag({ req, res })) {
+      const url = new URL(`${req.protocol}://${req.get("host")}${req.originalUrl}`);
+      url.searchParams.delete("debugFooter");
+      res.redirect(302, url.pathname + (url.search ? url.search : ""));
+      return;
+    }
     const userLabel = String(req.user?.email ?? env?.adminName ?? "Admin").trim() || "Admin";
+    const debugFooter = resolveDebugFooterFlag({ req, env });
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(renderCreateOrdersPage({ role: "admin", userLabel, storeId: "", debugFooter }));
   });
 
   router.get("/shop/create-orders", auth.requireRole("shop"), (req, res) => {
+    if (maybePersistDebugFooterFlag({ req, res })) {
+      const url = new URL(`${req.protocol}://${req.get("host")}${req.originalUrl}`);
+      url.searchParams.delete("debugFooter");
+      res.redirect(302, url.pathname + (url.search ? url.search : ""));
+      return;
+    }
     const userLabel = String(req.user?.email ?? "Shop").trim() || "Shop";
     const storeId = String(req.user?.storeId ?? "").trim();
+    const debugFooter = resolveDebugFooterFlag({ req, env });
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(renderCreateOrdersPage({ role: "shop", userLabel, storeId, debugFooter }));
   });
 
   router.get("/shop/fulfillment-centers", auth.requireRole("shop"), (req, res) => {
+    if (maybePersistDebugFooterFlag({ req, res })) {
+      const url = new URL(`${req.protocol}://${req.get("host")}${req.originalUrl}`);
+      url.searchParams.delete("debugFooter");
+      res.redirect(302, url.pathname + (url.search ? url.search : ""));
+      return;
+    }
     const userLabel = String(req.user?.email ?? "Shop").trim() || "Shop";
     const storeId = String(req.user?.storeId ?? "").trim();
+    const debugFooter = resolveDebugFooterFlag({ req, env });
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(renderFulfillmentCentersPage({ userLabel, storeId, debugFooter }));
   });

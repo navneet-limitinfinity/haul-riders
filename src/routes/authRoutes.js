@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { parseCookies } from "../auth/cookies.js";
 
 const html = String.raw;
 
@@ -6,7 +7,8 @@ export function createAuthRouter({ env }) {
   const router = Router();
   const logLevel = String(env?.logLevel ?? "").trim().toLowerCase();
   const nodeEnv = String(process.env.NODE_ENV ?? "").trim().toLowerCase();
-  const debugFooter = logLevel === "debug" || nodeEnv !== "production";
+  const DEBUG_FOOTER_COOKIE = "haul_debug_footer";
+  const wantsFooterFromEnv = logLevel === "debug" || nodeEnv !== "production";
 
   router.get("/auth/firebase-config.js", (_req, res) => {
     const firebaseConfigJson = String(env?.auth?.firebase?.webConfigJson ?? "").trim();
@@ -56,6 +58,23 @@ export function createAuthRouter({ env }) {
   router.get("/login", (req, res) => {
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Cache-Control", "no-store");
+    const q = String(req.query?.debugFooter ?? "").trim();
+    if (q === "1" || q === "0") {
+      res.cookie(DEBUG_FOOTER_COOKIE, q, {
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        httpOnly: false,
+        secure: Boolean(req.secure),
+        sameSite: "lax",
+        path: "/",
+      });
+      const url = new URL(`${req.protocol}://${req.get("host")}${req.originalUrl}`);
+      url.searchParams.delete("debugFooter");
+      res.redirect(302, url.pathname + (url.search ? url.search : ""));
+      return;
+    }
+    const cookies = parseCookies(req.headers?.cookie);
+    const cookieVal = String(cookies?.[DEBUG_FOOTER_COOKIE] ?? "").trim();
+    const debugFooter = cookieVal === "1" ? true : cookieVal === "0" ? false : wantsFooterFromEnv;
     res.send(html`<!doctype html>
 <html lang="en">
   <head>
