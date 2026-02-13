@@ -2797,22 +2797,18 @@ async function refresh({ forceNetwork = false } = {}) {
       if (activeTab === "assigned") {
         debugLog("tab_fetch", {
           tab: activeTab,
-          source: "firestore(realtime)",
+          source: "firestore(orders)",
           role: "shop",
           firestoreCollection: String(document.body?.dataset?.firestoreCollection ?? ""),
         });
-        await ensureFirestoreAssignedRealtime();
-        const orders = Array.isArray(firestoreAssignedState.orders)
-          ? firestoreAssignedState.orders
-          : [];
+        const data = await fetchFirestoreOrders({ status: "assigned", limit: 250 });
+        const orders = Array.isArray(data?.orders) ? data.orders : [];
         allOrders = orders;
         pruneSelectionToVisible(orders);
         applyFiltersAndSort();
         hydrateAssignedProductDescriptions(orders).catch(() => {});
         hydrateAssignedServiceablePins(orders).catch(() => {});
-        if (firestoreAssignedState.ready) {
-          setStatus(`Loaded ${allOrders.length} assigned order(s).`, { kind: "ok" });
-        }
+        setStatus(`Loaded ${allOrders.length} assigned order(s).`, { kind: "ok" });
         debugLog("tab_result", { tab: activeTab, count: allOrders.length });
         return;
       }
