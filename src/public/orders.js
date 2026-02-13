@@ -33,7 +33,7 @@ const DEFAULT_HEADER_HTML = `<tr>
   <th>Courier Type</th>
   <th>Shipping Date</th>
   <th>Courier Partner</th>
-  <th>Consignment No.</th>
+  <th>Tracking No.</th>
   <th>Shipment Status</th>
   <th>Updated On</th>
   <th>EDD</th>
@@ -62,7 +62,7 @@ const ASSIGNED_TAB_HEADER_HTML = `<tr>
   </th>
   <th>Order ID</th>
   <th>Order Date</th>
-  <th>Full Name</th>
+  <th>Customer Name</th>
   <th>Address</th>
   <th>Pincode</th>
   <th>Phone No.</th>
@@ -84,7 +84,7 @@ const IN_TRANSIT_TAB_HEADER_HTML = `<tr>
   <th>Phone No</th>
   <th>Invoice Details</th>
   <th>Shipping Date</th>
-  <th>Tracking No</th>
+  <th>Tracking No.</th>
   <th>Shipment Details</th>
   <th>Shipment Status</th>
   <th>Updated On</th>
@@ -100,7 +100,7 @@ const DELIVERED_TAB_HEADER_HTML = `<tr>
   <th>Phone No</th>
   <th>Invoice Details</th>
   <th>Shipping Date</th>
-  <th>Tracking No</th>
+  <th>Tracking No.</th>
   <th>Shipment Details</th>
   <th>Shipment Status</th>
   <th>Updated On</th>
@@ -115,7 +115,7 @@ const RTO_TAB_HEADER_HTML = `<tr>
   <th>Phone No</th>
   <th>Invoice Details</th>
   <th>Shipping Date</th>
-  <th>Tracking No</th>
+  <th>Tracking No.</th>
   <th>Shipment Details</th>
   <th>Shipment Status</th>
   <th>Updated On</th>
