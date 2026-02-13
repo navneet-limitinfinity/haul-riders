@@ -431,6 +431,8 @@ const resolveStoreId = ({ req }) => {
     return storeId;
   }
   if (role === ROLE_SHOP) {
+    const storeKey = String(req.user?.storeKey ?? "").trim().toLowerCase();
+    if (storeKey) return storeKey;
     const fromProfile = String(req.user?.storeId ?? "").trim().toLowerCase();
     if (fromProfile) return fromProfile;
     const q = req.query ?? {};

@@ -5,6 +5,14 @@ import { getFirebaseAdmin } from "./firebaseAdmin.js";
 const BEARER_PREFIX = "bearer ";
 const SESSION_COOKIE = "haul_session";
 
+function toShopDomainKey(value) {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (!raw) return "";
+  const withoutScheme = raw.replace(/^https?:\/\//, "");
+  const host = withoutScheme.split("/")[0] ?? "";
+  return host.endsWith(".myshopify.com") ? host.slice(0, -".myshopify.com".length) : host;
+}
+
 function getBearerToken(req) {
   const header = String(req.get?.("authorization") ?? "");
   const lower = header.toLowerCase();
@@ -87,6 +95,7 @@ async function resolveUserFromFirebase({ env, logger, req }) {
   )
     .trim()
     .toLowerCase();
+  const storeKey = toShopDomainKey(storeId);
 
   return {
     provider: "firebase",
@@ -94,17 +103,20 @@ async function resolveUserFromFirebase({ env, logger, req }) {
     email,
     role: role || "",
     storeId,
+    storeKey,
     claims: decoded ?? {},
   };
 }
 
 function resolveUserFromDev({ env }) {
+  const storeId = String(env.auth.dev.storeId ?? "").trim();
   return {
     provider: "dev",
     uid: "dev",
     email: "",
     role: env.auth.dev.role === ROLE_ADMIN ? ROLE_ADMIN : ROLE_SHOP,
-    storeId: String(env.auth.dev.storeId ?? "").trim(),
+    storeId,
+    storeKey: toShopDomainKey(storeId),
     claims: {},
   };
 }
