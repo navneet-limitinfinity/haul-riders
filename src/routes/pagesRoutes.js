@@ -1310,6 +1310,11 @@ export function createPagesRouter({ env, auth } = {}) {
   });
 
   router.get("/shop/orders", auth.requireRole("shop"), (req, res) => {
+    // Shop dashboard must not carry admin store selection query params.
+    if (req.query?.store != null) {
+      res.redirect(302, "/shop/orders");
+      return;
+    }
     const userLabel = String(req.user?.email ?? "Shop").trim() || "Shop";
     const storeId = String(req.user?.storeId ?? "").trim();
     const firestoreCollectionId = getShopCollectionInfo({ storeId }).collectionId;
