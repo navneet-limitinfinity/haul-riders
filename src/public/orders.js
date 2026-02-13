@@ -137,6 +137,58 @@ let fulfillmentCentersState = {
   defaultName: "",
   centers: [],
 };
+let firestoreClientState = null;
+
+async function ensureFirestoreClient() {
+  if (firestoreClientState) return firestoreClientState;
+
+  let firebaseConfig = window.__FIREBASE_WEB_CONFIG__ ?? null;
+  if (!firebaseConfig) {
+    const response = await fetch("/auth/firebase-config.json", { cache: "no-store" });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(String(data?.error ?? "firebase_config_missing"));
+    firebaseConfig = data?.config ?? null;
+    if (!firebaseConfig) throw new Error("firebase_config_missing");
+  }
+
+  const [{ initializeApp, getApps }, { getFirestore }, firestoreModules] = await Promise.all([
+    import("https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"),
+    import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"),
+  ]);
+
+  let app = null;
+  if (typeof getApps === "function") {
+    const existing = Array.isArray(getApps()) ? getApps() : [];
+    app = existing.find(Boolean) ?? null;
+  }
+  if (!app) {
+    app = initializeApp(firebaseConfig);
+  }
+
+  const firestore = getFirestore(app);
+  firestoreClientState = { firestore, modules: firestoreModules };
+  return firestoreClientState;
+}
+
+async function fetchFirestoreAllOrders({ sinceIso, limit = 50 }) {
+  const collectionId = String(document.body?.dataset?.firestoreCollection ?? "").trim();
+  if (!collectionId) throw new Error("missing_store_collection");
+  const { firestore, modules } = await ensureFirestoreClient();
+  const col = modules.collection(firestore, collectionId);
+  const clauses = [
+    modules.orderBy("shippingDate", "desc"),
+    modules.limit(limit),
+  ];
+  if (sinceIso) {
+    clauses.unshift(modules.where("shippingDate", ">=", sinceIso));
+  }
+  const q = modules.query(col, ...clauses);
+  const snap = await modules.getDocs(q);
+  return snap.docs.map((doc) => {
+    const data = doc.data() ?? {};
+    return { docId: String(doc.id ?? ""), ...data };
+  });
+}
 function pruneSelectionToVisible(orders) {
   const allowed = new Set();
   for (const row of orders ?? []) {
@@ -2793,8 +2845,8 @@ async function refresh({ forceNetwork = false } = {}) {
       return;
     }
 
-    if (activeRole === "shop") {
-      if (activeTab === "assigned") {
+      if (activeRole === "shop") {
+        if (activeTab === "assigned") {
         debugLog("tab_fetch", {
           tab: activeTab,
           source: "firestore(orders)",
@@ -2813,24 +2865,28 @@ async function refresh({ forceNetwork = false } = {}) {
         return;
       }
 
-      if (["in_transit", "delivered", "rto", "all"].includes(activeTab)) {
-        if (activeTab === "all") {
-          debugLog("tab_fetch", {
-            tab: activeTab,
-            source: "firestore(orders)",
-            role: "shop",
-            firestoreCollection: String(document.body?.dataset?.firestoreCollection ?? ""),
-            q: serverSearchState.active ? String(serverSearchState.q ?? "") : "",
-          });
-          const data = await fetchFirestoreOrders({ status: "all", limit: 250 });
-          const orders = Array.isArray(data?.orders) ? data.orders : [];
-          allOrders = orders;
-          pruneSelectionToVisible(orders);
-          applyFiltersAndSort();
-          setStatus(`Loaded ${orders.length} order(s).`, { kind: "ok" });
-          debugLog("tab_result", { tab: activeTab, count: orders.length, debug: data?.debug ?? null });
-          return;
-        }
+        if (["in_transit", "delivered", "rto", "all"].includes(activeTab)) {
+          if (activeTab === "all") {
+            debugLog("tab_fetch", {
+              tab: activeTab,
+              source: "firestore(client)",
+              role: "shop",
+              firestoreCollection: String(document.body?.dataset?.firestoreCollection ?? ""),
+            });
+            try {
+              const sinceIso = getSinceIsoForRange(getDateRange());
+              const orders = await fetchFirestoreAllOrders({ sinceIso, limit: 50 });
+              allOrders = orders;
+              pruneSelectionToVisible(orders);
+              applyFiltersAndSort();
+              setStatus(`Loaded ${orders.length} order(s).`, { kind: "ok" });
+              debugLog("tab_result", { tab: activeTab, count: orders.length });
+            } catch (error) {
+              setStatus(error?.message ?? "Failed to load orders.", { kind: "error" });
+              debugLog("tab_error", { tab: activeTab, message: String(error?.message ?? error) });
+            }
+            return;
+          }
 
         const storeId = String(document.body?.dataset?.storeId ?? "").trim();
         debugLog("tab_fetch", {
