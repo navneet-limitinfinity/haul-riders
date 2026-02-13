@@ -1,5 +1,15 @@
 const $ = (id) => document.getElementById(id);
 
+const isDebugFooterEnabled = () => String(document.body?.dataset?.debugFooter ?? "") === "1";
+
+const debugLog = (message, meta) => {
+  if (!isDebugFooterEnabled()) return;
+  const m = String(message ?? "").trim();
+  if (!m) return;
+  if (meta !== undefined) console.log(m, meta);
+  else console.log(m);
+};
+
 const DEFAULT_HEADER_HTML = `<tr>
   <th class="colCheck">
     <input id="selectAll" type="checkbox" aria-label="Select all" />
@@ -838,6 +848,7 @@ async function fetchFirestoreOrders({ status, limit }) {
   const url = new URL("/api/firestore/orders", window.location.origin);
   if (status) url.searchParams.set("status", String(status));
   if (limit) url.searchParams.set("limit", String(limit));
+  if (isDebugFooterEnabled()) url.searchParams.set("debug", "1");
   if (serverSearchState.active && serverSearchState.q) url.searchParams.set("q", String(serverSearchState.q));
   if (serverSearchState.active && serverSearchState.nextCursor) url.searchParams.set("cursor", String(serverSearchState.nextCursor));
   const response = await fetch(url, { cache: "no-store", headers: getAuthHeaders() });
@@ -853,6 +864,7 @@ async function fetchFirestoreAdminOrders({ storeId, status, limit }) {
   if (storeId) url.searchParams.set("shopDomain", String(storeId));
   if (status) url.searchParams.set("status", String(status));
   if (limit) url.searchParams.set("limit", String(limit));
+  if (isDebugFooterEnabled()) url.searchParams.set("debug", "1");
   if (serverSearchState.active && serverSearchState.q) url.searchParams.set("q", String(serverSearchState.q));
   if (serverSearchState.active && serverSearchState.nextCursor) url.searchParams.set("cursor", String(serverSearchState.nextCursor));
   const response = await fetch(url, { cache: "no-store", headers: getAuthHeaders() });
@@ -901,6 +913,7 @@ async function fetchConsignments({ tab, storeId, limit }) {
     if (collectionId) url.searchParams.set("collectionId", collectionId);
   }
   if (limit) url.searchParams.set("limit", String(limit));
+  if (isDebugFooterEnabled()) url.searchParams.set("debug", "1");
   if (serverSearchState.active && serverSearchState.q) url.searchParams.set("q", String(serverSearchState.q));
   if (serverSearchState.active && serverSearchState.nextCursor) url.searchParams.set("cursor", String(serverSearchState.nextCursor));
   const response = await fetch(url, { cache: "no-store", headers: getAuthHeaders() });
@@ -980,6 +993,11 @@ async function ensureFirestoreAssignedRealtime() {
     firestoreAssignedState.unsubscribe = onSnapshot(
       q,
       (snap) => {
+        debugLog("assigned_realtime_snapshot", {
+          collectionId,
+          scannedDocs: snap?.docs?.length ?? 0,
+          filteredDocs: "shipmentStatus == Assigned (client-side)",
+        });
         const rows = [];
         for (const doc of snap.docs) {
           const data = doc.data() ?? {};
@@ -1034,6 +1052,11 @@ async function ensureFirestoreAssignedRealtime() {
         try {
           const data = await fetchFirestoreOrders({ status: "assigned", limit: 200 });
           const orders = Array.isArray(data?.orders) ? data.orders : [];
+          debugLog("assigned_realtime_fallback", {
+            collectionId,
+            count: orders.length,
+            debug: data?.debug ?? null,
+          });
           for (const row of orders) {
             const key = String(row?.orderKey ?? "").trim();
             if (key) sessionAssignedOrderKeys.add(key);
@@ -2742,6 +2765,13 @@ async function refresh({ forceNetwork = false } = {}) {
       }
 
       const useConsignments = ["in_transit", "delivered", "rto"].includes(activeTab);
+      debugLog("tab_fetch", {
+        tab: activeTab,
+        source: useConsignments ? "firestore(consignments)" : "firestore(orders)",
+        role: "admin",
+        storeId,
+        q: serverSearchState.active ? String(serverSearchState.q ?? "") : "",
+      });
       const data = useConsignments
         ? await fetchConsignments({ tab: activeTab, storeId, limit: 250 })
         : await fetchFirestoreAdminOrders({
@@ -2751,6 +2781,11 @@ async function refresh({ forceNetwork = false } = {}) {
           });
       const orders = Array.isArray(data?.orders) ? data.orders : [];
       allOrders = orders;
+      debugLog("tab_result", {
+        tab: activeTab,
+        count: orders.length,
+        debug: data?.debug ?? null,
+      });
 
       pruneSelectionToVisible(orders);
 
@@ -2760,6 +2795,12 @@ async function refresh({ forceNetwork = false } = {}) {
 
     if (activeRole === "shop") {
       if (activeTab === "assigned") {
+        debugLog("tab_fetch", {
+          tab: activeTab,
+          source: "firestore(realtime)",
+          role: "shop",
+          firestoreCollection: String(document.body?.dataset?.firestoreCollection ?? ""),
+        });
         await ensureFirestoreAssignedRealtime();
         const orders = Array.isArray(firestoreAssignedState.orders)
           ? firestoreAssignedState.orders
@@ -2772,31 +2813,55 @@ async function refresh({ forceNetwork = false } = {}) {
         if (firestoreAssignedState.ready) {
           setStatus(`Loaded ${allOrders.length} assigned order(s).`, { kind: "ok" });
         }
+        debugLog("tab_result", { tab: activeTab, count: allOrders.length });
         return;
       }
 
       if (["in_transit", "delivered", "rto", "all"].includes(activeTab)) {
         if (activeTab === "all") {
+          debugLog("tab_fetch", {
+            tab: activeTab,
+            source: "firestore(orders)",
+            role: "shop",
+            firestoreCollection: String(document.body?.dataset?.firestoreCollection ?? ""),
+            q: serverSearchState.active ? String(serverSearchState.q ?? "") : "",
+          });
           const data = await fetchFirestoreOrders({ status: "all", limit: 250 });
           const orders = Array.isArray(data?.orders) ? data.orders : [];
           allOrders = orders;
           pruneSelectionToVisible(orders);
           applyFiltersAndSort();
           setStatus(`Loaded ${orders.length} order(s).`, { kind: "ok" });
+          debugLog("tab_result", { tab: activeTab, count: orders.length, debug: data?.debug ?? null });
           return;
         }
 
         const storeId = String(document.body?.dataset?.storeId ?? "").trim();
+        debugLog("tab_fetch", {
+          tab: activeTab,
+          source: "firestore(consignments)",
+          role: "shop",
+          storeId,
+          firestoreCollection: String(document.body?.dataset?.firestoreCollection ?? ""),
+          q: serverSearchState.active ? String(serverSearchState.q ?? "") : "",
+        });
         const data = await fetchConsignments({ tab: activeTab, storeId, limit: 250 });
         const orders = Array.isArray(data?.orders) ? data.orders : [];
         allOrders = orders;
         pruneSelectionToVisible(orders);
         applyFiltersAndSort();
         setStatus(`Loaded ${orders.length} order(s).`, { kind: "ok" });
+        debugLog("tab_result", { tab: activeTab, count: orders.length, debug: data?.debug ?? null });
         return;
       }
     }
 
+    debugLog("tab_fetch", {
+      tab: activeTab,
+      source: "shopify",
+      role: activeRole,
+      q: serverSearchState.active ? String(serverSearchState.q ?? "") : "",
+    });
     const data = await fetchLatestOrders({ limit, since });
     let orders = Array.isArray(data?.orders) ? data.orders : [];
 
@@ -2812,11 +2877,13 @@ async function refresh({ forceNetwork = false } = {}) {
     pruneSelectionToVisible(orders);
 
     applyFiltersAndSort();
+    debugLog("tab_result", { tab: activeTab, count: orders.length });
   } catch (error) {
     allOrders = [];
     pruneSelectionToVisible(allOrders);
     applyFiltersAndSort();
     setStatus(error?.message ?? "Failed to load orders.", { kind: "error" });
+    debugLog("tab_error", { tab: activeTab, message: String(error?.message ?? error) });
   } finally {
     setLoading(false);
   }
@@ -2894,6 +2961,11 @@ async function refreshServerSearch({ append = false } = {}) {
 window.addEventListener("DOMContentLoaded", () => {
   (async () => {
     await bootstrapSessionContext();
+    debugLog("session_context", {
+      role: String(document.body?.dataset?.role ?? ""),
+      storeId: String(document.body?.dataset?.storeId ?? ""),
+      firestoreCollection: String(document.body?.dataset?.firestoreCollection ?? ""),
+    });
 
     setDateRange(getDateRange());
 
@@ -2940,6 +3012,13 @@ window.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll(".tabBtn[data-tab]").forEach((btn) => {
       btn.addEventListener("click", async () => {
         const tab = String(btn.dataset.tab ?? "");
+        debugLog("tab_click", {
+          tab,
+          role: String(document.body?.dataset?.role ?? ""),
+          storeId: String(document.body?.dataset?.storeId ?? ""),
+          firestoreCollection: String(document.body?.dataset?.firestoreCollection ?? ""),
+          q: serverSearchState.active ? String(serverSearchState.q ?? "") : "",
+        });
         setActiveTab(tab);
         refresh({ forceNetwork: false });
       });

@@ -78,7 +78,7 @@ function renderDebugFooterAssets({ assetVersion, enabled }) {
 }
 
 function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId, debugFooter }) {
-  const assetVersion = "52";
+  const assetVersion = "53";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
   const safeFirestoreCollectionId = escapeHtml(firestoreCollectionId);

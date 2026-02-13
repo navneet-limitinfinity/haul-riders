@@ -6,6 +6,10 @@ import { buildSearchTokensFromDoc } from "../firestore/searchTokens.js";
 
 export function createFirestoreOrdersRouter({ env, auth }) {
   const router = Router();
+  const wantsDebug = (req) =>
+    String(req.query?.debug ?? "").trim() === "1" ||
+    String(env?.logLevel ?? "").trim().toLowerCase() === "debug" ||
+    String(process.env.NODE_ENV ?? "").trim().toLowerCase() !== "production";
 
   const normalizeShipmentStatus = (value) => {
     const s = String(value ?? "").trim().toLowerCase();
@@ -260,6 +264,8 @@ export function createFirestoreOrdersRouter({ env, auth }) {
 
       let docs = [];
       let nextCursor = "";
+      let scannedDocs = 0;
+      let scannedBatches = 0;
       if (!q && !cursor) {
         const snap = await fetchDocsForStatus({
           firestore,
@@ -268,6 +274,8 @@ export function createFirestoreOrdersRouter({ env, auth }) {
           limit,
         });
         docs = Array.isArray(snap?.docs) ? snap.docs : [];
+        scannedDocs = docs.length;
+        scannedBatches = 1;
       } else {
         const col = firestore.collection(collectionId);
         const allowed = new Set(getStatusVariants(statusNorm || "assigned"));
@@ -284,6 +292,8 @@ export function createFirestoreOrdersRouter({ env, auth }) {
             .limit(batchSize);
           if (lastRequestedAt && lastDocId) query = query.startAfter(lastRequestedAt, lastDocId);
           const snap = await query.get();
+          scannedBatches += 1;
+          scannedDocs += snap.docs.length;
           if (snap.empty) {
             lastRequestedAt = "";
             lastDocId = "";
@@ -385,6 +395,18 @@ export function createFirestoreOrdersRouter({ env, auth }) {
         count: orders.length,
         nextCursor: nextCursor || "",
         orders,
+        ...(wantsDebug(req)
+          ? {
+              debug: {
+                collectionId,
+                scannedDocs,
+                scannedBatches,
+                returnedDocs: orders.length,
+                status: statusNorm || "assigned",
+                query: q,
+              },
+            }
+          : {}),
       });
     } catch (error) {
       next(error);
@@ -455,6 +477,8 @@ export function createFirestoreOrdersRouter({ env, auth }) {
 
       let docs = [];
       let nextCursor = "";
+      let scannedDocs = 0;
+      let scannedBatches = 0;
       if (!q && !cursor) {
         const snap = await fetchDocsForStatus({
           firestore,
@@ -463,6 +487,8 @@ export function createFirestoreOrdersRouter({ env, auth }) {
           limit,
         });
         docs = Array.isArray(snap?.docs) ? snap.docs : [];
+        scannedDocs = docs.length;
+        scannedBatches = 1;
       } else {
         const col = firestore.collection(collectionId);
         const allowed = new Set(getStatusVariants(statusNorm || "assigned"));
@@ -479,6 +505,8 @@ export function createFirestoreOrdersRouter({ env, auth }) {
             .limit(batchSize);
           if (lastRequestedAt && lastDocId) query = query.startAfter(lastRequestedAt, lastDocId);
           const snap = await query.get();
+          scannedBatches += 1;
+          scannedDocs += snap.docs.length;
           if (snap.empty) {
             lastRequestedAt = "";
             lastDocId = "";
@@ -578,6 +606,18 @@ export function createFirestoreOrdersRouter({ env, auth }) {
         count: orders.length,
         nextCursor: nextCursor || "",
         orders,
+        ...(wantsDebug(req)
+          ? {
+              debug: {
+                collectionId,
+                scannedDocs,
+                scannedBatches,
+                returnedDocs: orders.length,
+                status: statusNorm || "assigned",
+                query: q,
+              },
+            }
+          : {}),
       });
     } catch (error) {
       next(error);

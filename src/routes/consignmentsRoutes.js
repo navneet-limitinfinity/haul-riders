@@ -472,6 +472,10 @@ export function createConsignmentsRouter({ env, auth }) {
         const cursor = decodeCursor(req.query?.cursor);
         const q = String(req.query?.q ?? "").trim();
         const allowed = allowedStatusesForTab(tab);
+        const wantsDebug =
+          String(req.query?.debug ?? "").trim() === "1" ||
+          String(env?.logLevel ?? "").trim().toLowerCase() === "debug" ||
+          String(process.env.NODE_ENV ?? "").trim().toLowerCase() !== "production";
 
         const admin = await getFirebaseAdmin({ env });
         const storeIdForCollection =
@@ -548,6 +552,8 @@ export function createConsignmentsRouter({ env, auth }) {
         const batchSize = Math.min(250, Math.max(25, limit * 4));
         const debugStatusCounts = debug ? new Map() : null;
         const debugSamples = debug ? [] : null;
+        let scannedDocs = 0;
+        let scannedBatches = 0;
         for (let iter = 0; iter < 12 && orders.length < limit; iter += 1) {
           let q = col
             .orderBy("shippingDate", "desc")
@@ -556,6 +562,8 @@ export function createConsignmentsRouter({ env, auth }) {
           if (lastShippingDate && lastDocId) q = q.startAfter(lastShippingDate, lastDocId);
 
           const snap = await q.get();
+          scannedBatches += 1;
+          scannedDocs += snap.docs.length;
           if (snap.empty) {
             lastShippingDate = "";
             lastDocId = "";
@@ -660,6 +668,18 @@ export function createConsignmentsRouter({ env, auth }) {
           count: orders.length,
           nextCursor,
           orders,
+          ...(wantsDebug
+            ? {
+                debug: {
+                  collectionId,
+                  scannedDocs,
+                  scannedBatches,
+                  returnedDocs: orders.length,
+                  allowedStatuses: Array.from(allowed.values()),
+                  query: q,
+                },
+              }
+            : {}),
         });
       } catch (error) {
         next(error);
