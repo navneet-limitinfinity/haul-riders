@@ -1729,6 +1729,23 @@ body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="
   display: none;
 }
 
+body[data-page="orders"][data-tab="all"] .table th:nth-child(2),
+body[data-page="orders"][data-tab="all"] .table td:nth-child(2),
+body[data-page="orders"][data-tab="all"] .table th:nth-child(4),
+body[data-page="orders"][data-tab="all"] .table td:nth-child(4),
+body[data-page="orders"][data-tab="all"] .table th:nth-child(6),
+body[data-page="orders"][data-tab="all"] .table td:nth-child(6),
+body[data-page="orders"][data-tab="all"] .table th:nth-child(7),
+body[data-page="orders"][data-tab="all"] .table td:nth-child(7),
+body[data-page="orders"][data-tab="all"] .table th:nth-child(12),
+body[data-page="orders"][data-tab="all"] .table td:nth-child(12),
+body[data-page="orders"][data-tab="all"] .table th:nth-child(14),
+body[data-page="orders"][data-tab="all"] .table td:nth-child(14),
+body[data-page="orders"][data-tab="all"] .table th:nth-child(17),
+body[data-page="orders"][data-tab="all"] .table td:nth-child(17) {
+  display: table-cell;
+}
+
 .table th,
 .table td {
   padding: 10px 12px;
