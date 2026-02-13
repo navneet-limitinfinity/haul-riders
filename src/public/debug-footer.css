@@ -1,0 +1,54 @@
+:root {
+  --debugFooterHeight: 96px;
+}
+
+.debugFooter {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  background: rgba(8, 12, 20, 0.92);
+  color: #e9eefc;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  font: 12px/1.35 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  padding: 8px 10px;
+  height: var(--debugFooterHeight);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.debugFooter .debugFooterHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  opacity: 0.9;
+}
+
+.debugFooter .debugFooterTitle {
+  font-weight: 600;
+}
+
+.debugFooter .debugFooterBtn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: inherit;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.debugFooter .debugFooterLines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  white-space: nowrap;
+}
+
+.debugFooter .debugFooterLines li {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+

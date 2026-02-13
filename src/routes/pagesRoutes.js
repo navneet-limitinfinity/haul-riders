@@ -63,7 +63,21 @@ function renderNavDrawer({ role, userLabel, activePath }) {
   `;
 }
 
-function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
+function debugFooterEnabled(env) {
+  const level = String(env?.logLevel ?? "").trim().toLowerCase();
+  const nodeEnv = String(process.env.NODE_ENV ?? "").trim().toLowerCase();
+  return level === "debug" || nodeEnv !== "production";
+}
+
+function renderDebugFooterAssets({ assetVersion, enabled }) {
+  if (!enabled) return "";
+  return html`
+    <link rel="stylesheet" href="/static/debug-footer.css?v=${assetVersion}" />
+    <script src="/static/debug-footer.js?v=${assetVersion}" defer></script>
+  `;
+}
+
+function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId, debugFooter }) {
   const assetVersion = "52";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
@@ -80,8 +94,9 @@ function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/solid.min.css?v=${assetVersion}" />
     <link rel="icon" type="image/png" href="/static/icon.png?v=${assetVersion}" />
     <script src="/static/orders.js?v=${assetVersion}" defer></script>
+    ${renderDebugFooterAssets({ assetVersion, enabled: debugFooter })}
   </head>
-  <body data-role="${role}" data-page="orders" data-store-id="${safeStoreId}" data-firestore-collection="${safeFirestoreCollectionId}">
+  <body data-role="${role}" data-page="orders" data-store-id="${safeStoreId}" data-firestore-collection="${safeFirestoreCollectionId}" data-debug-footer="${debugFooter ? "1" : "0"}">
     ${renderNavDrawer({ role, userLabel, activePath: role === "admin" ? "/admin/orders" : "/shop/orders" })}
     <header class="topbar">
       <div class="topbarInner">
@@ -294,7 +309,7 @@ function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId }) {
 </html>`;
 }
 
-function renderBulkUploadPage({ userLabel }) {
+function renderBulkUploadPage({ userLabel, debugFooter }) {
   const assetVersion = "3";
   const safeUserLabel = escapeHtml(userLabel);
 
@@ -310,8 +325,9 @@ function renderBulkUploadPage({ userLabel }) {
     <link rel="stylesheet" href="/static/bulk-upload.css?v=${assetVersion}" />
     <link rel="icon" type="image/png" href="/static/icon.png?v=29" />
     <script src="/static/bulk-upload.js?v=${assetVersion}" defer></script>
+    ${renderDebugFooterAssets({ assetVersion: "29", enabled: debugFooter })}
   </head>
-  <body data-role="admin" data-page="bulk-upload">
+  <body data-role="admin" data-page="bulk-upload" data-debug-footer="${debugFooter ? "1" : "0"}">
     ${renderNavDrawer({ role: "admin", userLabel, activePath: "/admin/bulk-upload" })}
 	    <header class="topbar">
 	      <div class="topbarInner">
@@ -511,7 +527,7 @@ function renderBulkUploadPage({ userLabel }) {
 </html>`;
 }
 
-function renderFulfillmentCentersPage({ userLabel, storeId }) {
+function renderFulfillmentCentersPage({ userLabel, storeId, debugFooter }) {
   const assetVersion = "54";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
@@ -527,8 +543,9 @@ function renderFulfillmentCentersPage({ userLabel, storeId }) {
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/solid.min.css?v=${assetVersion}" />
     <link rel="icon" type="image/png" href="/static/icon.png?v=${assetVersion}" />
     <script src="/static/fulfillment-centers.js?v=${assetVersion}" defer></script>
+    ${renderDebugFooterAssets({ assetVersion, enabled: debugFooter })}
   </head>
-  <body data-role="shop" data-page="fulfillment-centers" data-store-id="${safeStoreId}">
+  <body data-role="shop" data-page="fulfillment-centers" data-store-id="${safeStoreId}" data-debug-footer="${debugFooter ? "1" : "0"}">
     ${renderNavDrawer({ role: "shop", userLabel, activePath: "/shop/fulfillment-centers" })}
 	    <header class="topbar">
 	      <div class="topbarInner">
@@ -672,7 +689,7 @@ function renderFulfillmentCentersPage({ userLabel, storeId }) {
 </html>`;
 }
 
-function renderStoreDetailsPage({ userLabel, storeId }) {
+function renderStoreDetailsPage({ userLabel, storeId, debugFooter }) {
   const assetVersion = "54";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
@@ -688,8 +705,9 @@ function renderStoreDetailsPage({ userLabel, storeId }) {
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/solid.min.css?v=${assetVersion}" />
     <link rel="icon" type="image/png" href="/static/icon.png?v=${assetVersion}" />
     <script src="/static/store-details.js?v=${assetVersion}" defer></script>
+    ${renderDebugFooterAssets({ assetVersion, enabled: debugFooter })}
   </head>
-  <body data-role="shop" data-page="store" data-store-id="${safeStoreId}">
+  <body data-role="shop" data-page="store" data-store-id="${safeStoreId}" data-debug-footer="${debugFooter ? "1" : "0"}">
     ${renderNavDrawer({ role: "shop", userLabel, activePath: "/shop/store" })}
     <header class="topbar">
       <div class="topbarInner">
@@ -975,7 +993,7 @@ function renderStoreDetailsPage({ userLabel, storeId }) {
 </html>`;
 }
 
-function renderCreateOrdersPage({ role, userLabel, storeId }) {
+function renderCreateOrdersPage({ role, userLabel, storeId, debugFooter }) {
   const assetVersion = "1";
   const safeUserLabel = escapeHtml(userLabel);
   const safeStoreId = escapeHtml(storeId);
@@ -992,8 +1010,9 @@ function renderCreateOrdersPage({ role, userLabel, storeId }) {
     <link rel="stylesheet" href="/static/bulk-upload.css?v=3" />
     <link rel="icon" type="image/png" href="/static/icon.png?v=54" />
     <script src="/static/create-orders.js?v=${assetVersion}" defer></script>
+    ${renderDebugFooterAssets({ assetVersion: "54", enabled: debugFooter })}
   </head>
-  <body data-role="${role}" data-page="create-orders" data-store-id="${safeStoreId}">
+  <body data-role="${role}" data-page="create-orders" data-store-id="${safeStoreId}" data-debug-footer="${debugFooter ? "1" : "0"}">
     ${renderNavDrawer({
       role,
       userLabel,
@@ -1304,6 +1323,7 @@ function renderCreateOrdersPage({ role, userLabel, storeId }) {
 
 export function createPagesRouter({ env, auth } = {}) {
   const router = Router();
+  const debugFooter = debugFooterEnabled(env);
 
   router.get("/orders", (_req, res) => {
     res.redirect(302, "/shop/orders");
@@ -1319,46 +1339,46 @@ export function createPagesRouter({ env, auth } = {}) {
     const storeId = String(req.user?.storeId ?? "").trim();
     const firestoreCollectionId = getShopCollectionInfo({ storeId }).collectionId;
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.send(renderOrdersPage({ role: "shop", userLabel, storeId, firestoreCollectionId }));
+    res.send(renderOrdersPage({ role: "shop", userLabel, storeId, firestoreCollectionId, debugFooter }));
   });
 
   router.get("/shop/store", auth.requireRole("shop"), (req, res) => {
     const userLabel = String(req.user?.email ?? "Shop").trim() || "Shop";
     const storeId = String(req.user?.storeId ?? "").trim();
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.send(renderStoreDetailsPage({ userLabel, storeId }));
+    res.send(renderStoreDetailsPage({ userLabel, storeId, debugFooter }));
   });
 
   router.get("/admin/orders", auth.requireRole("admin"), (req, res) => {
     const userLabel = String(req.user?.email ?? env?.adminName ?? "Admin").trim() || "Admin";
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.send(renderOrdersPage({ role: "admin", userLabel, storeId: "", firestoreCollectionId: "" }));
+    res.send(renderOrdersPage({ role: "admin", userLabel, storeId: "", firestoreCollectionId: "", debugFooter }));
   });
 
   router.get("/admin/bulk-upload", auth.requireRole("admin"), (req, res) => {
     const userLabel = String(req.user?.email ?? env?.adminName ?? "Admin").trim() || "Admin";
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.send(renderBulkUploadPage({ userLabel }));
+    res.send(renderBulkUploadPage({ userLabel, debugFooter }));
   });
 
   router.get("/admin/create-orders", auth.requireRole("admin"), (req, res) => {
     const userLabel = String(req.user?.email ?? env?.adminName ?? "Admin").trim() || "Admin";
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.send(renderCreateOrdersPage({ role: "admin", userLabel, storeId: "" }));
+    res.send(renderCreateOrdersPage({ role: "admin", userLabel, storeId: "", debugFooter }));
   });
 
   router.get("/shop/create-orders", auth.requireRole("shop"), (req, res) => {
     const userLabel = String(req.user?.email ?? "Shop").trim() || "Shop";
     const storeId = String(req.user?.storeId ?? "").trim();
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.send(renderCreateOrdersPage({ role: "shop", userLabel, storeId }));
+    res.send(renderCreateOrdersPage({ role: "shop", userLabel, storeId, debugFooter }));
   });
 
   router.get("/shop/fulfillment-centers", auth.requireRole("shop"), (req, res) => {
     const userLabel = String(req.user?.email ?? "Shop").trim() || "Shop";
     const storeId = String(req.user?.storeId ?? "").trim();
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.send(renderFulfillmentCentersPage({ userLabel, storeId }));
+    res.send(renderFulfillmentCentersPage({ userLabel, storeId, debugFooter }));
   });
 
   return router;

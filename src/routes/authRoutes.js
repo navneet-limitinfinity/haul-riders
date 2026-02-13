@@ -4,6 +4,9 @@ const html = String.raw;
 
 export function createAuthRouter({ env }) {
   const router = Router();
+  const logLevel = String(env?.logLevel ?? "").trim().toLowerCase();
+  const nodeEnv = String(process.env.NODE_ENV ?? "").trim().toLowerCase();
+  const debugFooter = logLevel === "debug" || nodeEnv !== "production";
 
   router.get("/auth/firebase-config.js", (_req, res) => {
     const firebaseConfigJson = String(env?.auth?.firebase?.webConfigJson ?? "").trim();
@@ -124,8 +127,16 @@ export function createAuthRouter({ env }) {
       button:disabled { opacity: .6; cursor: not-allowed; }
       #status { text-align: center; min-height: 16px; }
     </style>
+    ${
+      debugFooter
+        ? html`
+            <link rel="stylesheet" href="/static/debug-footer.css?v=1" />
+            <script src="/static/debug-footer.js?v=1" defer></script>
+          `
+        : ""
+    }
   </head>
-  <body>
+  <body data-debug-footer="${debugFooter ? "1" : "0"}">
     <div class="card">
       <div class="brand">
         <img class="brandLogo" src="/static/icon.png" alt="Haul Riders" decoding="async" />
