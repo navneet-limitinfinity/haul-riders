@@ -534,6 +534,8 @@ export function createConsignmentsRouter({ env, auth }) {
 
         // In-memory filter to avoid requiring Firestore composite indexes.
         const batchSize = Math.min(250, Math.max(25, limit * 4));
+        const debugStatusCounts = debug ? new Map() : null;
+        const debugSamples = debug ? [] : null;
         for (let iter = 0; iter < 12 && orders.length < limit; iter += 1) {
           let q = col
             .orderBy("shippingDate", "desc")
@@ -551,6 +553,26 @@ export function createConsignmentsRouter({ env, auth }) {
           for (const doc of snap.docs) {
             const data = doc.data() ?? {};
             const displayStatus = getDocDisplayShipmentStatus(data);
+            if (debugStatusCounts) {
+              debugStatusCounts.set(displayStatus || "(missing)", (debugStatusCounts.get(displayStatus || "(missing)") ?? 0) + 1);
+              if (debugSamples && debugSamples.length < 5) {
+                debugSamples.push({
+                  docId: doc.id,
+                  shipmentStatus: String(data?.shipmentStatus ?? data?.shipment_status ?? ""),
+                  shipmentNested: String(
+                    data?.shipment && typeof data.shipment === "object"
+                      ? data.shipment?.shipmentStatus ?? data.shipment?.shipment_status ?? ""
+                      : ""
+                  ),
+                  orderNested: String(
+                    data?.order && typeof data.order === "object"
+                      ? data.order?.shipmentStatus ?? data.order?.shipment_status ?? ""
+                      : ""
+                  ),
+                  normalizedDisplay: displayStatus,
+                });
+              }
+            }
             const shippingDate = getDocShippingDateIso(data);
             const patch = buildMissingFieldsPatch({ data });
             if (!patch.shippingDate && shippingDate) patch.shippingDate = shippingDate;
@@ -606,6 +628,17 @@ export function createConsignmentsRouter({ env, auth }) {
           lastShippingDate && lastDocId
             ? encodeCursor({ shippingDate: lastShippingDate, docId: lastDocId })
             : "";
+
+        if (debug && orders.length === 0) {
+          console.log("[consignments] empty_result_debug", {
+            tab,
+            resolvedStoreId: storeId,
+            collectionId,
+            allowed: Array.from(allowed.values()),
+            counts: debugStatusCounts ? Object.fromEntries(debugStatusCounts.entries()) : {},
+            samples: debugSamples ?? [],
+          });
+        }
 
         res.setHeader("Cache-Control", "no-store");
         res.json({
