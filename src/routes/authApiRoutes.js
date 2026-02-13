@@ -1,5 +1,7 @@
 import { Router } from "express";
 import { getFirebaseAdmin } from "../auth/firebaseAdmin.js";
+import { getShopCollectionInfo } from "../firestore/shopCollections.js";
+import { ROLE_SHOP } from "../auth/roles.js";
 
 const SESSION_COOKIE = "haul_session";
 
@@ -81,11 +83,27 @@ export function createAuthApiRouter({ auth, env, logger }) {
       return;
     }
 
+    const shopInfo =
+      user.role === ROLE_SHOP
+        ? (() => {
+            const storeId = String(user.storeId ?? "").trim();
+            const storeKey = String(user.storeKey ?? "").trim();
+            const collectionId = getShopCollectionInfo({ storeId }).collectionId;
+            return {
+              storeId,
+              storeKey,
+              firestoreCollectionId: collectionId,
+            };
+          })()
+        : { storeId: "", storeKey: "", firestoreCollectionId: "" };
+
     res.json({
       uid: user.uid,
       email: user.email,
       role: user.role,
-      storeId: user.storeId,
+      storeId: shopInfo.storeId || user.storeId,
+      storeKey: shopInfo.storeKey || "",
+      firestoreCollectionId: shopInfo.firestoreCollectionId || "",
       provider: user.provider,
     });
   });

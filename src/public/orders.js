@@ -896,6 +896,10 @@ async function fetchConsignments({ tab, storeId, limit }) {
   // Admin must pass storeId; shop store is resolved from auth profile.
   const role = String(document.body?.dataset?.role ?? "").trim().toLowerCase();
   if (role === "admin" && storeId) url.searchParams.set("storeId", String(storeId));
+  if (role === "shop") {
+    const collectionId = String(document.body?.dataset?.firestoreCollection ?? "").trim();
+    if (collectionId) url.searchParams.set("collectionId", collectionId);
+  }
   if (limit) url.searchParams.set("limit", String(limit));
   if (serverSearchState.active && serverSearchState.q) url.searchParams.set("q", String(serverSearchState.q));
   if (serverSearchState.active && serverSearchState.nextCursor) url.searchParams.set("cursor", String(serverSearchState.nextCursor));
@@ -1063,6 +1067,35 @@ async function fetchStores() {
     throw new Error(`${response.status} ${response.statusText} ${text}`.trim());
   }
   return response.json();
+}
+
+async function fetchMe() {
+  const response = await fetch("/api/me", { cache: "no-store", headers: getAuthHeaders() });
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`${response.status} ${response.statusText} ${text}`.trim());
+  }
+  return response.json();
+}
+
+async function bootstrapSessionContext() {
+  try {
+    const me = await fetchMe();
+    const role = normalizeRole(me?.role);
+    activeRole = role;
+    if (document.body) {
+      document.body.dataset.role = role;
+      if (role === "shop") {
+        const storeId = String(me?.storeId ?? "").trim();
+        const firestoreCollectionId = String(me?.firestoreCollectionId ?? "").trim();
+        if (storeId) document.body.dataset.storeId = storeId;
+        if (firestoreCollectionId) document.body.dataset.firestoreCollection = firestoreCollectionId;
+      }
+    }
+  } catch {
+    activeRole = normalizeRole(document.body?.dataset?.role);
+    if (document.body) document.body.dataset.role = activeRole;
+  }
 }
 
 function getActiveStoreId() {
@@ -2859,58 +2892,58 @@ async function refreshServerSearch({ append = false } = {}) {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-  activeRole = normalizeRole(document.body?.dataset?.role);
-  if (document.body) document.body.dataset.role = activeRole;
+  (async () => {
+    await bootstrapSessionContext();
 
-  setDateRange(getDateRange());
+    setDateRange(getDateRange());
 
-  const searchEl = $("dashboardSearch");
-  if (searchEl) {
-    searchEl.addEventListener("input", (e) => {
-      dashboardSearchQuery = String(e.target?.value ?? "");
-      const q = String(dashboardSearchQuery ?? "").trim();
-      if (!q) {
-        serverSearchState = { active: false, q: "", tab: "", nextCursor: "", loading: false };
-        syncLoadMoreButton();
+    const searchEl = $("dashboardSearch");
+    if (searchEl) {
+      searchEl.addEventListener("input", (e) => {
+        dashboardSearchQuery = String(e.target?.value ?? "");
+        const q = String(dashboardSearchQuery ?? "").trim();
+        if (!q) {
+          serverSearchState = { active: false, q: "", tab: "", nextCursor: "", loading: false };
+          syncLoadMoreButton();
+          refresh({ forceNetwork: false });
+          return;
+        }
+        serverSearchState = { active: true, q, tab: activeTab, nextCursor: "", loading: false };
+        refreshServerSearch({ append: false });
+      });
+      searchEl.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          searchEl.value = "";
+          dashboardSearchQuery = "";
+          serverSearchState = { active: false, q: "", tab: "", nextCursor: "", loading: false };
+          syncLoadMoreButton();
+          applyFiltersAndSort();
+          refresh({ forceNetwork: false });
+        }
+      });
+    }
+
+    $("loadMore")?.addEventListener("click", () => refreshServerSearch({ append: true }));
+
+    const url = new URL(window.location.href);
+    const tabFromUrl = String(url.searchParams.get("tab") ?? "").trim().toLowerCase();
+    const allowedTabs = new Set(["assigned", "in_transit", "delivered", "rto", "all"]);
+    if (activeRole === "shop") allowedTabs.add("new");
+    setActiveTab(allowedTabs.has(tabFromUrl) ? tabFromUrl : getDefaultTabForRole(activeRole));
+
+    if (activeRole === "shop") {
+      ensureFulfillmentCentersLoaded().then(() => {
+        if (activeTab === "new") renderRows(currentOrders);
+      });
+    }
+
+    document.querySelectorAll(".tabBtn[data-tab]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const tab = String(btn.dataset.tab ?? "");
+        setActiveTab(tab);
         refresh({ forceNetwork: false });
-        return;
-      }
-      serverSearchState = { active: true, q, tab: activeTab, nextCursor: "", loading: false };
-      refreshServerSearch({ append: false });
+      });
     });
-    searchEl.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") {
-        searchEl.value = "";
-        dashboardSearchQuery = "";
-        serverSearchState = { active: false, q: "", tab: "", nextCursor: "", loading: false };
-        syncLoadMoreButton();
-        applyFiltersAndSort();
-        refresh({ forceNetwork: false });
-      }
-    });
-  }
-
-  $("loadMore")?.addEventListener("click", () => refreshServerSearch({ append: true }));
-
-  const url = new URL(window.location.href);
-  const tabFromUrl = String(url.searchParams.get("tab") ?? "").trim().toLowerCase();
-  const allowedTabs = new Set(["assigned", "in_transit", "delivered", "rto", "all"]);
-  if (activeRole === "shop") allowedTabs.add("new");
-  setActiveTab(allowedTabs.has(tabFromUrl) ? tabFromUrl : getDefaultTabForRole(activeRole));
-
-  if (activeRole === "shop") {
-    ensureFulfillmentCentersLoaded().then(() => {
-      if (activeTab === "new") renderRows(currentOrders);
-    });
-  }
-
-  document.querySelectorAll(".tabBtn[data-tab]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const tab = String(btn.dataset.tab ?? "");
-      setActiveTab(tab);
-      refresh({ forceNetwork: false });
-    });
-  });
 
   if (activeRole === "admin") {
     fetchStores()
@@ -3479,4 +3512,5 @@ window.addEventListener("DOMContentLoaded", () => {
       signOut();
     }
   });
+  })();
 });

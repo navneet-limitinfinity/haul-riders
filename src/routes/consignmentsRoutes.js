@@ -467,20 +467,31 @@ export function createConsignmentsRouter({ env, auth }) {
           return;
         }
 
+        const role = String(req.user?.role ?? "");
         const limit = parseLimit(req.query?.limit);
         const cursor = decodeCursor(req.query?.cursor);
         const q = String(req.query?.q ?? "").trim();
         const allowed = allowedStatusesForTab(tab);
 
         const admin = await getFirebaseAdmin({ env });
-        const primaryInfo = getShopCollectionInfo({ storeId });
+        const storeIdForCollection =
+          role === ROLE_SHOP ? String(req.user?.storeId ?? "").trim().toLowerCase() : storeId;
+        const primaryInfo = getShopCollectionInfo({ storeId: storeIdForCollection || storeId });
         let { collectionId, displayName, storeId: normalizedStoreId } = primaryInfo;
 
         const firestore = admin.firestore();
+        if (role === ROLE_SHOP) {
+          const requestedCollectionId = String(req.query?.collectionId ?? "").trim();
+          // Align shop API reads with the same collection id used by the Assigned realtime tab,
+          // but do not allow a shop user to read another shop's collection.
+          if (requestedCollectionId && requestedCollectionId === primaryInfo.collectionId) {
+            collectionId = requestedCollectionId;
+          }
+        }
         // Some legacy deployments used the full shop domain string for the collection id
         // (e.g. `smylo-devstore_myshopify_com`) instead of the domain key (`smylo-devstore`).
         // If the primary collection is empty, fall back to the legacy naming.
-        const legacyCollectionId = toFirestoreCollectionId(storeId);
+        const legacyCollectionId = toFirestoreCollectionId(storeIdForCollection || storeId);
         const debug = String(env?.logLevel ?? "").trim().toLowerCase() === "debug";
         let usedLegacyCollectionId = false;
         if (legacyCollectionId && legacyCollectionId !== collectionId) {
