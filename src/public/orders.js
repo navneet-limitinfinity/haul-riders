@@ -893,7 +893,9 @@ async function ensureFulfillmentCentersLoaded() {
 async function fetchConsignments({ tab, storeId, limit }) {
   const safeTab = String(tab ?? "").trim().toLowerCase();
   const url = new URL(`/api/consignments/${encodeURIComponent(safeTab)}`, window.location.origin);
-  if (storeId) url.searchParams.set("storeId", String(storeId));
+  // Admin must pass storeId; shop store is resolved from auth profile.
+  const role = String(document.body?.dataset?.role ?? "").trim().toLowerCase();
+  if (role === "admin" && storeId) url.searchParams.set("storeId", String(storeId));
   if (limit) url.searchParams.set("limit", String(limit));
   if (serverSearchState.active && serverSearchState.q) url.searchParams.set("q", String(serverSearchState.q));
   if (serverSearchState.active && serverSearchState.nextCursor) url.searchParams.set("cursor", String(serverSearchState.nextCursor));
