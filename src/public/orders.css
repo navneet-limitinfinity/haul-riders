@@ -1698,39 +1698,42 @@ body[data-role="shop"][data-tab="new"] .table {
 }
 
 /* Shop orders view: keep only essential columns (except New/Assigned which have custom layouts). */
-body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"])
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"]):not([data-tab="all"])
   .table th:nth-child(2),
-body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"])
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"]):not([data-tab="all"])
   .table td:nth-child(2),
-body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"])
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"]):not([data-tab="all"])
   .table th:nth-child(4),
-body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"])
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"]):not([data-tab="all"])
   .table td:nth-child(4),
-body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"])
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"]):not([data-tab="all"])
   .table th:nth-child(6),
-body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"])
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"]):not([data-tab="all"])
   .table td:nth-child(6),
-body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"])
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"]):not([data-tab="all"])
   .table th:nth-child(7),
-body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"])
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"]):not([data-tab="all"])
   .table td:nth-child(7),
-body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"])
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"]):not([data-tab="all"])
   .table th:nth-child(12),
-body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"])
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"]):not([data-tab="all"])
   .table td:nth-child(12),
-body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"])
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"]):not([data-tab="all"])
   .table th:nth-child(14),
-body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"])
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"]):not([data-tab="all"])
   .table td:nth-child(14),
-body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"])
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"]):not([data-tab="all"])
   .table th:nth-child(17),
-body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"])
+body[data-role="shop"][data-page="orders"]:not([data-tab="new"]):not([data-tab="assigned"]):not([data-tab="in_transit"]):not([data-tab="delivered"]):not([data-tab="rto"]):not([data-tab="all"])
   .table td:nth-child(17) {
   display: none;
 }
-
+body[data-page="orders"][data-tab="all"] .table th:nth-child(1),
+body[data-page="orders"][data-tab="all"] .table td:nth-child(1),
 body[data-page="orders"][data-tab="all"] .table th:nth-child(2),
 body[data-page="orders"][data-tab="all"] .table td:nth-child(2),
+body[data-page="orders"][data-tab="all"] .table th:nth-child(3),
+body[data-page="orders"][data-tab="all"] .table td:nth-child(3),
 body[data-page="orders"][data-tab="all"] .table th:nth-child(4),
 body[data-page="orders"][data-tab="all"] .table td:nth-child(4),
 body[data-page="orders"][data-tab="all"] .table th:nth-child(6),
