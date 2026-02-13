@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { getFirebaseAdmin } from "../auth/firebaseAdmin.js";
 import { ROLE_ADMIN, ROLE_SHOP } from "../auth/roles.js";
-import { getShopCollectionInfo } from "../firestore/shopCollections.js";
+import { getShopCollectionInfo, toFirestoreCollectionId } from "../firestore/shopCollections.js";
 import { toOrderDocId } from "../firestore/ids.js";
 
 const IN_TRANSIT_DISPLAY_STATUSES = [
@@ -470,11 +470,30 @@ export function createConsignmentsRouter({ env, auth }) {
         const allowed = allowedStatusesForTab(tab);
 
         const admin = await getFirebaseAdmin({ env });
-        const { collectionId, displayName, storeId: normalizedStoreId } = getShopCollectionInfo({
-          storeId,
-        });
+        const primaryInfo = getShopCollectionInfo({ storeId });
+        let { collectionId, displayName, storeId: normalizedStoreId } = primaryInfo;
 
         const firestore = admin.firestore();
+        // Some legacy deployments used the full shop domain string for the collection id
+        // (e.g. `smylo-devstore_myshopify_com`) instead of the domain key (`smylo-devstore`).
+        // If the primary collection is empty, fall back to the legacy naming.
+        const legacyCollectionId = toFirestoreCollectionId(storeId);
+        if (legacyCollectionId && legacyCollectionId !== collectionId) {
+          try {
+            const probePrimary = await firestore.collection(collectionId).limit(1).get();
+            if (probePrimary.empty) {
+              const probeLegacy = await firestore.collection(legacyCollectionId).limit(1).get();
+              if (!probeLegacy.empty) {
+                collectionId = legacyCollectionId;
+                // displayName / normalizedStoreId should still be the shop key for UI.
+                ({ displayName, storeId: normalizedStoreId } = primaryInfo);
+              }
+            }
+          } catch {
+            // ignore probe failures
+          }
+        }
+
         const col = firestore.collection(collectionId);
 
         // Backfill legacy docs that don't have `shippingDate` yet.
