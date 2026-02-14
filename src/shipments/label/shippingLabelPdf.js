@@ -453,7 +453,7 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
   // Product description strip (full width).
   if (productDescription && fields.productDescriptionBlock) {
     // Label in bold (required).
-    page.drawText("Product Description:\n\n", {
+    page.drawText("\n\n", {
       x: fields.productDescriptionBlock.x,
       y: fields.productDescriptionBlock.yTop,
       size: fields.productDescriptionBlock.size,
