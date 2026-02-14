@@ -139,6 +139,150 @@ let fulfillmentCentersState = {
 };
 let firestoreClientState = null;
 
+const TAB_STATUS_VARIANTS = {
+  assigned: ["Assigned"],
+  in_transit: ["In Transit", "Undelivered", "At Destination", "Out for Delivery", "Set RTO"],
+  delivered: ["Delivered"],
+  rto: ["RTO Accepted", "RTO In Transit", "RTO Reached At Destination", "RTO Delivered"],
+};
+
+const getOrderMap = (row) => (row?.order && typeof row.order === "object" ? row.order : {});
+const getShippingMap = (row) => {
+  const candidates = [
+    row?.shipping,
+    row?.order && typeof row.order === "object" ? row.order.shipping : null,
+    row?.shippingAddress,
+    row?.order && typeof row.order === "object" ? row.order.shippingAddress : null,
+  ];
+  for (const candidate of candidates) {
+    if (candidate && typeof candidate === "object") {
+      return candidate;
+    }
+  }
+  return {};
+};
+
+const normalizeString = (value) => String(value ?? "").trim();
+const getOrderIdValue = (row) =>
+  normalizeString(row?.orderId ?? getOrderMap(row)?.orderId ?? row?.orderName ?? "");
+
+const buildSchemaRow = (row) => {
+  const order = getOrderMap(row);
+  const shipping = getShippingMap(row);
+  const canonicalOrderId = normalizeString(row?.orderId ?? order.orderId ?? row?.orderName ?? "");
+  const orderDisplayName = normalizeString(
+    row?.orderName ?? order.orderName ?? order.orderId ?? row?.orderId ?? ""
+  );
+  const orderDateText = formatOrderDate(row?.createdAt ?? order.createdAt);
+  const customerName = normalizeString(shipping.fullName ?? order.shipping?.fullName ?? "");
+  const address1 = normalizeString(shipping.address1 ?? order.shipping?.address1 ?? "");
+  const address2 = normalizeString(shipping.address2 ?? order.shipping?.address2 ?? "");
+  const pinCode = normalizeString(
+    shipping.pinCode ??
+      shipping.zip ??
+      order.shipping?.pinCode ??
+      order.shipping?.zip ??
+      ""
+  );
+  const city = normalizeString(shipping.city ?? order.shipping?.city ?? "");
+  const state = normalizeString(shipping.state ?? order.shipping?.state ?? "");
+  const phone1 = normalizeString(shipping.phone1 ?? shipping.phone ?? order.shipping?.phone ?? "");
+  const phone2 = normalizeString(shipping.phone2 ?? "");
+  const productDescription = normalizeString(
+    order.productDescription ??
+      order.productDiscription ??
+      row.productDescription ??
+      row.productDiscription ??
+      ""
+  );
+  const invoiceValue = normalizeString(
+    row.invoiceValue ?? order.invoiceValue ?? row.totalPrice ?? order.totalPrice ?? ""
+  );
+  const paymentStatusValue = normalizeString(
+    row.paymentStatus ??
+      order.paymentStatus ??
+      row.financialStatus ??
+      order.financialStatus ??
+      ""
+  );
+  const fulfillmentStatusValue = normalizeString(
+    row.fulfillmentStatus ??
+      order.fulfillmentStatus ??
+      row.orderFulfillmentStatus ??
+      order.orderFulfillmentStatus ??
+      ""
+  );
+  const fulfillmentCenter = normalizeString(order.fulfillmentCenter ?? row.fulfillmentCenter ?? "");
+  const weightValue = normalizeString(
+    row.weightKg ??
+      row.weight ??
+      order.weight ??
+      order.weightKg ??
+      ""
+  );
+  const courierTypeValue = normalizeString(
+    row.courierType ??
+      row.courier_type ??
+      order.courierType ??
+      order.courier_type ??
+      ""
+  );
+  const shippingDateText = formatOrderDate(row.shippingDate ?? order.shippingDate ?? "");
+  const updatedOnText = formatOrderDate(row.updatedAt ?? order.updatedAt ?? "");
+  const expectedDeliveryText = formatOrderDate(
+    row.expectedDeliveryDate ?? order.expectedDeliveryDate ?? ""
+  );
+  const courierPartner = normalizeString(
+    row.courierPartner ??
+      order.courierPartner ??
+      row.courier_partner ??
+      order.courier_partner ??
+      ""
+  );
+  const trackingNumber = normalizeString(
+    row.consignmentNumber ??
+      row.consignment_number ??
+      order.consignmentNumber ??
+      order.trackingNumber ??
+      row.trackingNumber ??
+      ""
+  );
+  const shipmentStatusValue = normalizeString(
+    row.shipmentStatus ??
+      row.shipment_status ??
+      order.shipmentStatus ??
+      order.shipment_status ??
+      ""
+  );
+
+  return {
+    canonicalOrderId,
+    orderDisplayName,
+    orderDateText,
+    customerName,
+    address1,
+    address2,
+    pinCode,
+    city,
+    state,
+    phone1,
+    phone2,
+    productDescription,
+    invoiceValue,
+    paymentStatusValue,
+    fulfillmentStatusValue,
+    fulfillmentCenter,
+    weightValue,
+    courierTypeValue,
+    shippingDateText,
+    updatedOnText,
+    expectedDeliveryText,
+    courierPartner,
+    trackingNumber,
+    shipmentStatusValue,
+  };
+};
+
 async function ensureFirestoreClient() {
   if (firestoreClientState) return firestoreClientState;
 
@@ -151,7 +295,7 @@ async function ensureFirestoreClient() {
     if (!firebaseConfig) throw new Error("firebase_config_missing");
   }
 
-  const [{ initializeApp, getApps }, { getFirestore }, firestoreModules] = await Promise.all([
+  const [{ initializeApp, getApps }, firestoreModules] = await Promise.all([
     import("https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"),
     import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"),
   ]);
@@ -165,9 +309,37 @@ async function ensureFirestoreClient() {
     app = initializeApp(firebaseConfig);
   }
 
-  const firestore = getFirestore(app);
+  const firestore = firestoreModules.getFirestore
+    ? firestoreModules.getFirestore(app)
+    : firestoreModules.getFirestore(app);
   firestoreClientState = { firestore, modules: firestoreModules };
   return firestoreClientState;
+}
+
+const getStatusesForTab = (tab) => {
+  const normalized = String(tab ?? "").trim().toLowerCase();
+  if (normalized === "all") return [];
+  return TAB_STATUS_VARIANTS[normalized] ?? [];
+};
+
+async function fetchFirestoreOrdersForTab({ tab, sinceIso, limit = 50 }) {
+  const collectionId = String(document.body?.dataset?.firestoreCollection ?? "").trim();
+  if (!collectionId) throw new Error("missing_store_collection");
+  const { firestore, modules } = await ensureFirestoreClient();
+  const col = modules.collection(firestore, collectionId);
+  const clauses = [];
+  const statuses = getStatusesForTab(tab);
+  if (statuses.length) {
+    clauses.push(modules.where("shipmentStatus", "in", statuses));
+  }
+  if (sinceIso) {
+    clauses.push(modules.where("shippingDate", ">=", sinceIso));
+  }
+  clauses.push(modules.orderBy("shippingDate", "desc"));
+  clauses.push(modules.limit(limit));
+  const q = modules.query(col, ...clauses);
+  const snap = await modules.getDocs(q);
+  return snap.docs.map((doc) => ({ docId: String(doc.id ?? ""), ...doc.data() }));
 }
 
 async function fetchFirestoreAllOrders({ sinceIso, limit = 50 }) {
@@ -175,19 +347,15 @@ async function fetchFirestoreAllOrders({ sinceIso, limit = 50 }) {
   if (!collectionId) throw new Error("missing_store_collection");
   const { firestore, modules } = await ensureFirestoreClient();
   const col = modules.collection(firestore, collectionId);
-  const clauses = [
-    modules.orderBy("shippingDate", "desc"),
-    modules.limit(limit),
-  ];
+  const clauses = [];
   if (sinceIso) {
-    clauses.unshift(modules.where("shippingDate", ">=", sinceIso));
+    clauses.push(modules.where("shippingDate", ">=", sinceIso));
   }
+  clauses.push(modules.orderBy("shippingDate", "desc"));
+  clauses.push(modules.limit(limit));
   const q = modules.query(col, ...clauses);
   const snap = await modules.getDocs(q);
-  return snap.docs.map((doc) => {
-    const data = doc.data() ?? {};
-    return { docId: String(doc.id ?? ""), ...data };
-  });
+  return snap.docs.map((doc) => ({ docId: String(doc.id ?? ""), ...doc.data() }));
 }
 function pruneSelectionToVisible(orders) {
   const allowed = new Set();
@@ -435,7 +603,7 @@ function getAssignedEdits(row) {
   const orderKey = getOrderKey(row);
   const key = String(orderKey ?? "").trim();
   if (!key) {
-    const shipping = row?.shipping ?? {};
+    const shipping = getShippingMap(row);
     return {
       fullName: String(shipping.fullName ?? ""),
       address1: String(shipping.address1 ?? ""),
@@ -450,7 +618,7 @@ function getAssignedEdits(row) {
 
   const existing = assignedEditState.get(key);
   if (existing) return existing;
-  const shipping = row?.shipping ?? {};
+  const shipping = getShippingMap(row);
   const initial = {
     fullName: String(shipping.fullName ?? ""),
     address1: String(shipping.address1 ?? ""),
@@ -1445,6 +1613,115 @@ const createFulfillmentCenterSelect = ({ orderKey, value, options, disabled }) =
   disabled: Boolean(disabled),
 });
 
+const getAllTabRowData = (row) => {
+  const order = getOrderMap(row);
+  const shipping = getShippingMap(row);
+  const canonicalOrderId = normalizeString(row?.orderId ?? order.orderId ?? row?.orderName ?? "");
+  const orderDateText = formatOrderDate(row?.createdAt ?? order.createdAt);
+  const customerName = normalizeString(shipping.fullName ?? order.shipping?.fullName ?? "");
+  const address1 = normalizeString(shipping.address1 ?? order.shipping?.address1 ?? "");
+  const address2 = normalizeString(shipping.address2 ?? order.shipping?.address2 ?? "");
+  const pinCode = normalizeString(shipping.pinCode ?? shipping.zip ?? order.shipping?.pinCode ?? order.shipping?.zip ?? "");
+  const city = normalizeString(shipping.city ?? order.shipping?.city ?? "");
+  const state = normalizeString(shipping.state ?? order.shipping?.state ?? "");
+  const phone1 = normalizeString(shipping.phone1 ?? shipping.phone ?? order.shipping?.phone ?? "");
+  const phone2 = normalizeString(shipping.phone2 ?? "");
+  const productDescription = normalizeString(
+    order.productDescription ??
+      order.productDiscription ??
+      row.productDescription ??
+      row.productDiscription ??
+      ""
+  );
+  const invoiceValue = normalizeString(
+    row.invoiceValue ?? order.invoiceValue ?? row.totalPrice ?? order.totalPrice ?? ""
+  );
+  const paymentStatusValue = normalizeString(
+    row.paymentStatus ??
+      order.paymentStatus ??
+      row.financialStatus ??
+      order.financialStatus ??
+      ""
+  );
+  const fulfillmentStatusRaw = normalizeString(
+    row.fulfillmentStatus ??
+      order.fulfillmentStatus ??
+      row.orderFulfillmentStatus ??
+      order.orderFulfillmentStatus ??
+      ""
+  );
+  const fulfillmentCenter = normalizeString(
+    order.fulfillmentCenter ?? row.fulfillmentCenter ?? ""
+  );
+  const weightValue = normalizeString(
+    row.weightKg ??
+      row.weight ??
+      order.weight ??
+      order.weightKg ??
+      ""
+  );
+  const courierTypeValue = normalizeString(
+    row.courierType ??
+      row.courier_type ??
+      order.courierType ??
+      order.courier_type ??
+      ""
+  );
+  const shippingDateText = formatOrderDate(row.shippingDate ?? order.shippingDate ?? "");
+  const updatedOnText = formatOrderDate(row.updatedAt ?? order.updatedAt ?? "");
+  const expectedDeliveryText = formatOrderDate(
+    row.expectedDeliveryDate ?? order.expectedDeliveryDate ?? ""
+  );
+  const courierPartnerText = normalizeString(
+    row.courierPartner ??
+      order.courierPartner ??
+      row.courier_partner ??
+      order.courier_partner ??
+      ""
+  );
+  const trackingNumber = normalizeString(
+    row.consignmentNumber ??
+      row.consignment_number ??
+      order.consignmentNumber ??
+      order.trackingNumber ??
+      row.trackingNumber ??
+      ""
+  );
+  const shipmentStatusValue = normalizeString(
+    row.shipmentStatus ??
+      row.shipment_status ??
+      order.shipmentStatus ??
+      order.shipment_status ??
+      ""
+  );
+
+  return {
+    canonicalOrderId,
+    orderDateText,
+    customerName,
+    address1,
+    address2,
+    pinCode,
+    city,
+    state,
+    phone1,
+    phone2,
+    productDescription,
+    invoiceValue,
+    paymentStatusValue,
+    fulfillmentStatusRaw,
+    fulfillmentCenter,
+    weightValue,
+    courierTypeValue,
+    shippingDateText,
+    courierPartnerText,
+    trackingNumber,
+    shipmentStatusValue,
+    updatedOnText,
+    expectedDeliveryText,
+  };
+};
+
 function renderRows(orders) {
   if (activeRole === "shop" && activeTab === "new") {
     renderRowsNewTab(orders);
@@ -1483,12 +1760,15 @@ function renderRows(orders) {
 
     const shipping = row?.shipping ?? {};
 
-    const fulfillmentNorm = normalizeFulfillmentStatus(row?.fulfillmentStatus);
+    const fulfillmentStatusRaw = normalizeString(row?.fulfillmentStatus ?? getOrderMap(row)?.fulfillmentStatus);
+    const fulfillmentNorm = normalizeFulfillmentStatus(fulfillmentStatusRaw);
     const isFulfilled = fulfillmentNorm === "fulfilled";
     const fulfillmentLabel = isFulfilled ? "Fulfilled" : "Unfulfilled";
     const fulfillmentBadgeKind = isFulfilled ? "ok" : "muted";
 
-    const awb = String(row?.consignmentNumber ?? row?.consignment_number ?? "").trim();
+    const awb = normalizeString(
+      row?.consignmentNumber ?? row?.consignment_number ?? row?.trackingNumber ?? getOrderMap(row)?.consignmentNumber
+    );
     const trackingText = awb || (row.trackingNumbersText ?? formatTrackingNumbers(row.trackingNumbers));
     const trackingUrl = trackingText ? buildDtdcTrackingUrl(getPrimaryTrackingCode(trackingText)) : "";
     const trackingBadge =
@@ -1547,14 +1827,10 @@ function renderRows(orders) {
               ? "error"
               : "muted";
 
-    const phone1 = String(shipping.phone1 ?? "").trim();
-    const phone2 = String(shipping.phone2 ?? "").trim();
-    const phone1Badge = phone1 ? null : createBadge({ label: "Missing", kind: "error" });
-    const phone2Badge = null;
-
     const courierPartner =
-      String(row.courierPartner ?? row.courier_partner ?? row.trackingCompany ?? "").trim() ||
-      (trackingUrl ? "DTDC" : "");
+      normalizeString(
+        row.courierPartner ?? row.courier_partner ?? row.trackingCompany ?? getOrderMap(row)?.courierPartner
+      ) || (trackingUrl ? "DTDC" : "");
     const courierCell =
       courierPartner && trackingUrl
         ? createMenu({ label: courierPartner, url: trackingUrl, trackingText })
@@ -1580,61 +1856,36 @@ function renderRows(orders) {
             trackingText,
           });
 
-    const isShopNewTab = activeRole === "shop" && activeTab === "new";
-    const createdAt = formatOrderDate(row?.createdAt);
-    const customerEmail = String(row?.customerEmail ?? "").trim();
-    const phoneNumber = String(shipping.phone1 ?? shipping.phone2 ?? "").trim();
-    const addressLine = [shipping.address1, shipping.address2].filter(Boolean).join(", ");
-    const statePin = [shipping.state, shipping.pinCode].filter(Boolean).join("-");
-    const fullAddress = [addressLine, statePin].filter(Boolean).join(" ");
-
-    const orderDetailsHtml = `<div class="cellStack">
-      <div class="cellPrimary">${escapeHtml(row.orderName ?? "")}</div>
-      <div class="cellMuted">${escapeHtml(createdAt)}</div>
-    </div>`;
-
-    const customerDetailsHtml = `<div class="cellStack">
-      <div class="cellPrimary">${escapeHtml(shipping.fullName ?? "")}</div>
-      <div class="cellMuted">${escapeHtml(phoneNumber)}</div>
-      <div class="cellMuted">${escapeHtml(customerEmail)}</div>
-      <div class="truncate" title="${escapeHtml(fullAddress)}">${escapeHtml(fullAddress)}</div>
-    </div>`;
-
-    const paymentFlag = getPaymentFlag(row?.financialStatus);
-    const paymentHtml = `<div class="cellStack">
-      <div class="cellPrimary mono">${escapeHtml(row.totalPrice ?? "")}</div>
-      <div class="cellMuted">${escapeHtml(paymentFlag)}</div>
-    </div>`;
-
-    const shipForm = getShipForm(orderKey);
-    const weightCell = isShopNewTab
-      ? createWeightInput({ orderKey, value: shipForm.weightKg })
-      : "";
-    const courierTypeCell = isShopNewTab
-      ? createCourierTypeSelect({ orderKey, value: shipForm.courierType })
-      : "";
+    const allTabRow = getAllTabRowData(row);
+    const paymentDisplay =
+      allTabRow.paymentStatusValue || getPaymentFlag(allTabRow.paymentStatusValue || row?.financialStatus);
+    const fulfillmentBadge = createBadge({ label: fulfillmentLabel, kind: fulfillmentBadgeKind });
 
     const cells = [
       { check: true, checked: orderKey && selectedOrderIds.has(orderKey) },
-      row.index ?? "",
-      isShopNewTab ? { html: orderDetailsHtml } : { text: row.orderName ?? "", className: "mono" },
-      { text: row.orderId ?? "", className: "mono" },
-      isShopNewTab ? { html: customerDetailsHtml } : (shipping.fullName ?? ""),
-      shipping.address1 ?? "",
-      shipping.address2 ?? "",
-      shipping.city ?? "",
-      shipping.state ?? "",
-      { text: shipping.pinCode ?? "", className: "mono" },
-      phone1Badge ?? { text: phone1, className: "mono" },
-      phone2Badge ?? { text: phone2, className: "mono" },
-      isShopNewTab ? { html: paymentHtml } : { text: row.totalPrice ?? "", className: "mono" },
-      createBadge({ label: fulfillmentLabel, kind: fulfillmentBadgeKind }),
+      { text: allTabRow.canonicalOrderId ?? "", className: "mono" },
+      { text: allTabRow.orderDateText ?? "", className: "mono" },
+      allTabRow.customerName ?? "",
+      allTabRow.address1 ?? "",
+      allTabRow.address2 ?? "",
+      { text: allTabRow.pinCode ?? "", className: "mono" },
+      allTabRow.city ?? "",
+      allTabRow.state ?? "",
+      { text: allTabRow.phone1 ?? "", className: "mono" },
+      { text: allTabRow.phone2 ?? "", className: "mono" },
+      { text: allTabRow.productDescription ?? "" },
+      { text: allTabRow.invoiceValue ?? "", className: "mono" },
+      { text: paymentDisplay, className: "mono" },
+      fulfillmentBadge,
+      { text: allTabRow.fulfillmentCenter ?? "" },
+      { text: allTabRow.weightValue ?? "", className: "mono" },
+      { text: allTabRow.courierTypeValue ?? "" },
+      { text: allTabRow.shippingDateText ?? "", className: "mono" },
+      courierCell,
       trackingBadge ?? createTrackingValue({ text: trackingText }),
       createBadge({ label: shipmentLabel, kind: shipmentKind }),
-      courierCell,
-      weightCell,
-      courierTypeCell,
-      actionCell,
+      { text: allTabRow.updatedOnText ?? "", className: "mono" },
+      { text: allTabRow.expectedDeliveryText ?? "", className: "mono" },
     ];
 
     for (const value of cells) {
@@ -1907,7 +2158,8 @@ function renderRowsAssignedTab(orders) {
     tr.dataset.orderKey = orderKey;
 
     const edits = getAssignedEdits(row);
-    const createdAt = formatDate(row?.createdAt);
+    const assignedRow = getAllTabRowData(row);
+    const createdAt = assignedRow.orderDateText;
     const pin = normalizePincode(edits.pinCode);
     const serviceable = Boolean(pin) && Boolean(assignedServiceableByPin.get(pin));
     const isEditing = assignedEditMode.has(orderKey) && !serviceable;
@@ -1976,8 +2228,9 @@ function renderRowsAssignedTab(orders) {
           </div>`,
         };
 
-    const invoiceValue = row?.invoiceValue ?? row?.totalPrice ?? "";
-    const paymentRaw = row?.paymentStatus ?? row?.financialStatus ?? "";
+    const invoiceValue = assignedRow.invoiceValue ?? "";
+    const paymentRaw =
+      assignedRow.paymentStatusValue ?? row?.paymentStatus ?? row?.financialStatus ?? "";
     const payment = getPaymentLabel(paymentRaw);
 
     const paymentCell = {
@@ -1990,10 +2243,9 @@ function renderRowsAssignedTab(orders) {
     const fulfillmentStatusKind = serviceable ? "ok" : "error";
 
     const shipmentStatusLabel =
-      String(row?.shipmentStatus ?? row?.shipment_status ?? "").trim() || "Assigned";
-
-    const trackingNumber = serviceable ? getTrackingNumber(row) : "";
-    const courierPartner = String(row?.courierPartner ?? row?.courier_partner ?? "").trim();
+      assignedRow.shipmentStatusValue || String(row?.shipmentStatus ?? row?.shipment_status ?? "").trim() || "Assigned";
+    const trackingNumber = serviceable ? assignedRow.trackingNumber : "";
+    const courierPartner = assignedRow.courierPartner || "DTDC";
     const trackingUrl = buildDtdcTrackingUrl(trackingNumber);
 
     const trackingCell = {
@@ -2032,8 +2284,8 @@ function renderRowsAssignedTab(orders) {
       { check: true, checked: orderKey && selectedOrderIds.has(orderKey) },
       {
         html: `<div class="cellStack">
-          <div class="cellPrimary mono">${escapeHtml(row?.orderName ?? "")}</div>
-          <div class="cellMuted mono">${escapeHtml(row?.orderId ?? "")}</div>
+          <div class="cellPrimary mono">${escapeHtml(row?.orderName ?? assignedRow.canonicalOrderId)}</div>
+          <div class="cellMuted mono">${escapeHtml(assignedRow.canonicalOrderId)}</div>
         </div>`,
       },
       { text: createdAt, className: "mono" },
@@ -2043,7 +2295,7 @@ function renderRowsAssignedTab(orders) {
       phoneCell,
       { text: String(invoiceValue ?? ""), className: "mono" },
       paymentCell,
-      { text: String(row?.productDescription ?? row?.productDiscription ?? row?.product_description ?? "") },
+      { text: String(assignedRow.productDescription ?? ""), className: "" },
       createBadge({ label: fulfillmentStatusLabel, kind: fulfillmentStatusKind }),
       createBadge({
         label: shipmentStatusLabel.replaceAll("_", " "),
@@ -2126,39 +2378,39 @@ function renderRowsInTransitTab(orders) {
     const orderKey = getOrderKey(row);
     tr.dataset.orderKey = orderKey;
 
-    const orderName = String(row.order_name ?? row.orderName ?? row.order_id ?? "").trim();
+    const schemaRow = buildSchemaRow(row);
     const orderDetailsHtml = `<div class="cellStack">
-      <div class="cellPrimary">${escapeHtml(orderName)}</div>
-      <div class="cellMuted">${escapeHtml(formatDate(row.order_date))}</div>
+      <div class="cellPrimary">${escapeHtml(schemaRow.orderDisplayName)}</div>
+      <div class="cellMuted">${escapeHtml(schemaRow.orderDateText)}</div>
     </div>`;
 
     const customerDetailsHtml = `<div class="cellStack">
-      <div class="cellPrimary">${escapeHtml(row.name ?? "")}</div>
-      <div class="cellMuted">${escapeHtml(row.address_line_1 ?? "")}</div>
-      <div class="cellMuted">${escapeHtml(row.address_line_2 ?? "")}</div>
-      <div class="cellMuted">${escapeHtml(row.pincode ?? "")}</div>
-      <div class="cellMuted">${escapeHtml(row.city ?? "")}</div>
-      <div class="cellMuted">${escapeHtml(row.state ?? "")}</div>
+      <div class="cellPrimary">${escapeHtml(schemaRow.customerName)}</div>
+      <div class="cellMuted">${escapeHtml(schemaRow.address1)}</div>
+      <div class="cellMuted">${escapeHtml(schemaRow.address2)}</div>
+      <div class="cellMuted">${escapeHtml(schemaRow.pinCode)}</div>
+      <div class="cellMuted">${escapeHtml(schemaRow.city)}</div>
+      <div class="cellMuted">${escapeHtml(schemaRow.state)}</div>
     </div>`;
 
     const phoneHtml = `<div class="cellStack">
-      <div class="cellMuted mono">${escapeHtml(row.phone_1 ?? "")}</div>
-      <div class="cellMuted mono">${escapeHtml(row.phone_2 ?? "")}</div>
+      <div class="cellMuted mono">${escapeHtml(schemaRow.phone1)}</div>
+      <div class="cellMuted mono">${escapeHtml(schemaRow.phone2)}</div>
     </div>`;
 
     const invoiceHtml = `<div class="cellStack">
-      <div class="cellPrimary">${escapeHtml(row.content_and_quantity ?? "")}</div>
-      <div class="cellMuted mono">${escapeHtml(row.invoice_value ?? "")}</div>
-      <div class="cellMuted">${escapeHtml(row.payment_status ?? "")}</div>
+      <div class="cellPrimary">${escapeHtml(schemaRow.productDescription)}</div>
+      <div class="cellMuted mono">${escapeHtml(schemaRow.invoiceValue)}</div>
+      <div class="cellMuted">${escapeHtml(schemaRow.paymentStatusValue)}</div>
     </div>`;
 
     const shippingDateHtml = `<div class="cellStack">
-      <div class="cellPrimary">${escapeHtml(formatDate(row.shippingDate ?? row.shipping_date))}</div>
+      <div class="cellPrimary">${escapeHtml(schemaRow.shippingDateText)}</div>
     </div>`;
 
-    const awb = String(row.consignmentNumber ?? row.consignment_number ?? "").trim();
+    const awb = schemaRow.trackingNumber;
     const courierPartner =
-      String(row.courierPartner ?? row.courier_partner ?? "").trim() || (awb ? "DTDC" : "");
+      schemaRow.courierPartner || (awb ? "DTDC" : "");
     const trackingUrl = awb ? buildDtdcTrackingUrl(awb) : "";
     const courierHtml =
       courierPartner && trackingUrl
@@ -2170,11 +2422,13 @@ function renderRowsInTransitTab(orders) {
     </div>`;
 
     const shipmentDetailsHtml = `<div class="cellStack">
-      <div class="cellPrimary mono">${escapeHtml(row.weightKg ?? row.weight ?? "")}</div>
-      <div class="cellMuted">${escapeHtml(row.courierType ?? row.courier_type ?? "")}</div>
+      <div class="cellPrimary mono">${escapeHtml(schemaRow.weightValue)}</div>
+      <div class="cellMuted">${escapeHtml(schemaRow.courierTypeValue)}</div>
     </div>`;
 
-    const statusValue = String(row.shipmentStatus ?? row.shipment_status ?? "").trim();
+    const statusValue =
+      schemaRow.shipmentStatusValue ||
+      String(row.shipmentStatus ?? row.shipment_status ?? "").trim();
     const statusOptionsHtml = allowed
       .map((v) => {
         const selected = v === statusValue ? " selected" : "";
@@ -2260,39 +2514,39 @@ function renderRowsDeliveredTab(orders) {
     const orderKey = getOrderKey(row);
     tr.dataset.orderKey = orderKey;
 
-    const orderName = String(row.order_name ?? row.orderName ?? row.order_id ?? "").trim();
+    const schemaRow = buildSchemaRow(row);
     const orderDetailsHtml = `<div class="cellStack">
-      <div class="cellPrimary">${escapeHtml(orderName)}</div>
-      <div class="cellMuted">${escapeHtml(formatDate(row.order_date))}</div>
+      <div class="cellPrimary">${escapeHtml(schemaRow.orderDisplayName)}</div>
+      <div class="cellMuted">${escapeHtml(schemaRow.orderDateText)}</div>
     </div>`;
 
     const customerDetailsHtml = `<div class="cellStack">
-      <div class="cellPrimary">${escapeHtml(row.name ?? "")}</div>
-      <div class="cellMuted">${escapeHtml(row.address_line_1 ?? "")}</div>
-      <div class="cellMuted">${escapeHtml(row.address_line_2 ?? "")}</div>
-      <div class="cellMuted">${escapeHtml(row.pincode ?? "")}</div>
-      <div class="cellMuted">${escapeHtml(row.city ?? "")}</div>
-      <div class="cellMuted">${escapeHtml(row.state ?? "")}</div>
+      <div class="cellPrimary">${escapeHtml(schemaRow.customerName)}</div>
+      <div class="cellMuted">${escapeHtml(schemaRow.address1)}</div>
+      <div class="cellMuted">${escapeHtml(schemaRow.address2)}</div>
+      <div class="cellMuted">${escapeHtml(schemaRow.pinCode)}</div>
+      <div class="cellMuted">${escapeHtml(schemaRow.city)}</div>
+      <div class="cellMuted">${escapeHtml(schemaRow.state)}</div>
     </div>`;
 
     const phoneHtml = `<div class="cellStack">
-      <div class="cellMuted mono">${escapeHtml(row.phone_1 ?? "")}</div>
-      <div class="cellMuted mono">${escapeHtml(row.phone_2 ?? "")}</div>
+      <div class="cellMuted mono">${escapeHtml(schemaRow.phone1)}</div>
+      <div class="cellMuted mono">${escapeHtml(schemaRow.phone2)}</div>
     </div>`;
 
     const invoiceHtml = `<div class="cellStack">
-      <div class="cellPrimary">${escapeHtml(row.content_and_quantity ?? "")}</div>
-      <div class="cellMuted mono">${escapeHtml(row.total_price_including_gst ?? "")}</div>
-      <div class="cellMuted">${escapeHtml(row.payment_mode ?? "")}</div>
+      <div class="cellPrimary">${escapeHtml(schemaRow.productDescription)}</div>
+      <div class="cellMuted mono">${escapeHtml(schemaRow.invoiceValue)}</div>
+      <div class="cellMuted">${escapeHtml(schemaRow.paymentStatusValue)}</div>
     </div>`;
 
     const shippingDateHtml = `<div class="cellStack">
-      <div class="cellPrimary">${escapeHtml(formatDate(row.shippingDate ?? row.shipping_date))}</div>
+      <div class="cellPrimary">${escapeHtml(schemaRow.shippingDateText)}</div>
     </div>`;
 
-    const awb = String(row.consignmentNumber ?? row.consignment_number ?? "").trim();
+    const awb = schemaRow.trackingNumber;
     const courierPartner =
-      String(row.courierPartner ?? row.courier_partner ?? "").trim() || (awb ? "DTDC" : "");
+      schemaRow.courierPartner || (awb ? "DTDC" : "");
     const trackingUrl = awb ? buildDtdcTrackingUrl(awb) : "";
     const courierHtml =
       courierPartner && trackingUrl
@@ -2304,12 +2558,12 @@ function renderRowsDeliveredTab(orders) {
     </div>`;
 
     const shipmentDetailsHtml = `<div class="cellStack">
-      <div class="cellPrimary mono">${escapeHtml(row.weightKg ?? row.weight ?? "")}</div>
-      <div class="cellMuted">${escapeHtml(row.courierType ?? row.courier_type ?? "")}</div>
+      <div class="cellPrimary mono">${escapeHtml(schemaRow.weightValue)}</div>
+      <div class="cellMuted">${escapeHtml(schemaRow.courierTypeValue)}</div>
     </div>`;
 
     const updatedOnHtml = `<div class="cellStack">
-      <div class="cellPrimary">${escapeHtml(formatDateTime(row.updatedAt ?? row.updated_at))}</div>
+      <div class="cellPrimary">${escapeHtml(formatDateTime(schemaRow.updatedOnText ?? row.updatedAt ?? row.updated_at))}</div>
     </div>`;
 
     const cells = [
@@ -2379,39 +2633,39 @@ function renderRowsRtoTab(orders) {
     const orderKey = getOrderKey(row);
     tr.dataset.orderKey = orderKey;
 
-    const orderName = String(row.order_name ?? row.orderName ?? row.order_id ?? "").trim();
+    const schemaRow = buildSchemaRow(row);
     const orderDetailsHtml = `<div class="cellStack">
-      <div class="cellPrimary">${escapeHtml(orderName)}</div>
-      <div class="cellMuted">${escapeHtml(formatDate(row.order_date))}</div>
+      <div class="cellPrimary">${escapeHtml(schemaRow.orderDisplayName)}</div>
+      <div class="cellMuted">${escapeHtml(schemaRow.orderDateText)}</div>
     </div>`;
 
     const customerDetailsHtml = `<div class="cellStack">
-      <div class="cellPrimary">${escapeHtml(row.name ?? "")}</div>
-      <div class="cellMuted">${escapeHtml(row.address_line_1 ?? "")}</div>
-      <div class="cellMuted">${escapeHtml(row.address_line_2 ?? "")}</div>
-      <div class="cellMuted">${escapeHtml(row.pincode ?? "")}</div>
-      <div class="cellMuted">${escapeHtml(row.city ?? "")}</div>
-      <div class="cellMuted">${escapeHtml(row.state ?? "")}</div>
+      <div class="cellPrimary">${escapeHtml(schemaRow.customerName)}</div>
+      <div class="cellMuted">${escapeHtml(schemaRow.address1)}</div>
+      <div class="cellMuted">${escapeHtml(schemaRow.address2)}</div>
+      <div class="cellMuted">${escapeHtml(schemaRow.pinCode)}</div>
+      <div class="cellMuted">${escapeHtml(schemaRow.city)}</div>
+      <div class="cellMuted">${escapeHtml(schemaRow.state)}</div>
     </div>`;
 
     const phoneHtml = `<div class="cellStack">
-      <div class="cellMuted mono">${escapeHtml(row.phone_1 ?? "")}</div>
-      <div class="cellMuted mono">${escapeHtml(row.phone_2 ?? "")}</div>
+      <div class="cellMuted mono">${escapeHtml(schemaRow.phone1)}</div>
+      <div class="cellMuted mono">${escapeHtml(schemaRow.phone2)}</div>
     </div>`;
 
     const invoiceHtml = `<div class="cellStack">
-      <div class="cellPrimary">${escapeHtml(row.content_and_quantity ?? "")}</div>
-      <div class="cellMuted mono">${escapeHtml(row.total_price_including_gst ?? "")}</div>
-      <div class="cellMuted">${escapeHtml(row.payment_mode ?? "")}</div>
+      <div class="cellPrimary">${escapeHtml(schemaRow.productDescription)}</div>
+      <div class="cellMuted mono">${escapeHtml(schemaRow.invoiceValue)}</div>
+      <div class="cellMuted">${escapeHtml(schemaRow.paymentStatusValue)}</div>
     </div>`;
 
     const shippingDateHtml = `<div class="cellStack">
-      <div class="cellPrimary">${escapeHtml(formatDate(row.shippingDate ?? row.shipping_date))}</div>
+      <div class="cellPrimary">${escapeHtml(schemaRow.shippingDateText)}</div>
     </div>`;
 
-    const awb = String(row.consignmentNumber ?? row.consignment_number ?? "").trim();
+    const awb = schemaRow.trackingNumber;
     const courierPartner =
-      String(row.courierPartner ?? row.courier_partner ?? "").trim() || (awb ? "DTDC" : "");
+      schemaRow.courierPartner || (awb ? "DTDC" : "");
     const trackingUrl = awb ? buildDtdcTrackingUrl(awb) : "";
     const courierHtml =
       courierPartner && trackingUrl
@@ -2423,11 +2677,13 @@ function renderRowsRtoTab(orders) {
     </div>`;
 
     const shipmentDetailsHtml = `<div class="cellStack">
-      <div class="cellPrimary mono">${escapeHtml(row.weightKg ?? row.weight ?? "")}</div>
-      <div class="cellMuted">${escapeHtml(row.courierType ?? row.courier_type ?? "")}</div>
+      <div class="cellPrimary mono">${escapeHtml(schemaRow.weightValue)}</div>
+      <div class="cellMuted">${escapeHtml(schemaRow.courierTypeValue)}</div>
     </div>`;
 
-    const statusValue = String(row.shipmentStatus ?? row.shipment_status ?? "").trim();
+    const statusValue =
+      schemaRow.shipmentStatusValue ||
+      String(row.shipmentStatus ?? row.shipment_status ?? "").trim();
     const statusOptionsHtml = allowed
       .map((v) => {
         const selected = v === statusValue ? " selected" : "";
@@ -2441,7 +2697,7 @@ function renderRowsRtoTab(orders) {
       : `<span class="badge badgeMuted">${escapeHtml(statusValue || "—")}</span>`;
 
     const updatedOnHtml = `<div class="cellStack">
-      <div class="cellPrimary">${escapeHtml(formatDateTime(row.updatedAt ?? row.updated_at))}</div>
+      <div class="cellPrimary">${escapeHtml(formatDateTime(schemaRow.updatedOnText ?? row.updatedAt ?? row.updated_at))}</div>
     </div>`;
 
     const cells = [
@@ -2845,65 +3101,33 @@ async function refresh({ forceNetwork = false } = {}) {
       return;
     }
 
-      if (activeRole === "shop") {
-        if (activeTab === "assigned") {
+    if (activeRole === "shop") {
+      if (["assigned", "in_transit", "delivered", "rto", "all"].includes(activeTab)) {
         debugLog("tab_fetch", {
           tab: activeTab,
-          source: "firestore(orders)",
+          source: "firestore(client)",
           role: "shop",
-          firestoreCollection: String(document.body?.dataset?.firestoreCollection ?? ""),
+          status: activeTab,
         });
-        const data = await fetchFirestoreOrders({ status: "assigned", limit: 250 });
-        const orders = Array.isArray(data?.orders) ? data.orders : [];
-        allOrders = orders;
-        pruneSelectionToVisible(orders);
-        applyFiltersAndSort();
-        hydrateAssignedProductDescriptions(orders).catch(() => {});
-        hydrateAssignedServiceablePins(orders).catch(() => {});
-        setStatus(`Loaded ${allOrders.length} assigned order(s).`, { kind: "ok" });
-        debugLog("tab_result", { tab: activeTab, count: allOrders.length });
-        return;
-      }
-
-        if (["in_transit", "delivered", "rto", "all"].includes(activeTab)) {
-          if (activeTab === "all") {
-            debugLog("tab_fetch", {
-              tab: activeTab,
-              source: "firestore(client)",
-              role: "shop",
-              firestoreCollection: String(document.body?.dataset?.firestoreCollection ?? ""),
-            });
-            try {
-              const sinceIso = getSinceIsoForRange(getDateRange());
-              const orders = await fetchFirestoreAllOrders({ sinceIso, limit: 50 });
-              allOrders = orders;
-              pruneSelectionToVisible(orders);
-              applyFiltersAndSort();
-              setStatus(`Loaded ${orders.length} order(s).`, { kind: "ok" });
-              debugLog("tab_result", { tab: activeTab, count: orders.length });
-            } catch (error) {
-              setStatus(error?.message ?? "Failed to load orders.", { kind: "error" });
-              debugLog("tab_error", { tab: activeTab, message: String(error?.message ?? error) });
-            }
-            return;
-          }
-
-        const storeId = String(document.body?.dataset?.storeId ?? "").trim();
-        debugLog("tab_fetch", {
-          tab: activeTab,
-          source: "firestore(consignments)",
-          role: "shop",
-          storeId,
-          firestoreCollection: String(document.body?.dataset?.firestoreCollection ?? ""),
-          q: serverSearchState.active ? String(serverSearchState.q ?? "") : "",
-        });
-        const data = await fetchConsignments({ tab: activeTab, storeId, limit: 250 });
-        const orders = Array.isArray(data?.orders) ? data.orders : [];
-        allOrders = orders;
-        pruneSelectionToVisible(orders);
-        applyFiltersAndSort();
-        setStatus(`Loaded ${orders.length} order(s).`, { kind: "ok" });
-        debugLog("tab_result", { tab: activeTab, count: orders.length, debug: data?.debug ?? null });
+        try {
+          const sinceIso = getSinceIsoForRange(getDateRange());
+          const orders =
+            activeTab === "all"
+              ? await fetchFirestoreAllOrders({ sinceIso, limit: 50 })
+              : await fetchFirestoreOrdersForTab({ tab: activeTab, sinceIso, limit: 50 });
+          allOrders = orders;
+          pruneSelectionToVisible(orders);
+          applyFiltersAndSort();
+          hydrateAssignedProductDescriptions(orders).catch(() => {});
+          hydrateAssignedServiceablePins(orders).catch(() => {});
+          setStatus(`Loaded ${orders.length} ${activeTab === "assigned" ? "assigned " : ""}order(s).`, {
+            kind: "ok",
+          });
+          debugLog("tab_result", { tab: activeTab, count: orders.length });
+        } catch (error) {
+          setStatus(error?.message ?? "Failed to load orders.", { kind: "error" });
+          debugLog("tab_error", { tab: activeTab, message: String(error?.message ?? error) });
+        }
         return;
       }
     }
