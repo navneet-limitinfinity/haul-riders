@@ -982,7 +982,7 @@ async function downloadBulkShipmentLabelsPdf({ docIds, storeId }) {
 }
 
 function getDefaultTabForRole(role) {
-  if (role === "shop") return "new";
+  if (role === "shop") return "assigned";
   return "assigned";
 }
 
