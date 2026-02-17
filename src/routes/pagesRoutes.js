@@ -1370,10 +1370,10 @@ function renderCreateOrdersPage({ role, userLabel, storeId, debugFooter }) {
             <input id="singleInvoiceValue" type="text" class="mono" inputmode="decimal" required />
             <small id="singleInvoiceValueHint" class="fieldHint"></small>
           </label>
-          <label class="field span-4">
+          <label id="ewayField" class="field span-4" style="display: none;">
             <span>E-Way Bill Number</span>
             <input id="singleEwayBill" type="text" />
-            <small id="singleEwayBillHint" class="fieldHint">Required for invoices above ₹49,999.</small>
+            <small id="singleEwayBillHint" class="fieldHint">Enter E-Way Bill for invoices ₹50,000 and above.</small>
           </label>
             <label class="field span-4">
               <span>Courier Partner (optional)</span>

@@ -80,29 +80,39 @@ function parseInvoiceValue(value) {
   return { ok: true, value: s, amount: n };
 }
 
-const EWAY_THRESHOLD = 49999;
+const EWAY_THRESHOLD = 50000;
 
 function requiresEwayBill(amount) {
-  return Number.isFinite(amount) && amount > EWAY_THRESHOLD;
+  return Number.isFinite(amount) && amount >= EWAY_THRESHOLD;
 }
 
-function ensureEwayRequirement() {
-  const parsed = parseInvoiceValue($("singleInvoiceValue")?.value ?? "");
-  const ewayValue = String($("singleEwayBill")?.value ?? "").trim();
-  if (!parsed.ok) {
-    setFieldHint("singleEwayBillHint", { kind: "", text: "Required for invoices above ₹49,999." });
-    return true;
+function updateEwayFieldVisibility(parsedResult) {
+  const needs = parsedResult && requiresEwayBill(parsedResult.amount);
+  const container = $("ewayField");
+  if (container) container.style.display = needs ? "" : "none";
+  const input = $("singleEwayBill");
+  if (input) input.required = needs;
+  if (!needs) {
+    setFieldHint("singleEwayBillHint", { kind: "", text: "Enter E-Way Bill for invoices ₹50,000 and above." });
   }
+  return needs;
+}
 
-  if (requiresEwayBill(parsed.amount) && !ewayValue) {
+function ensureEwayRequirement(parsedResult) {
+  const parsed = parsedResult ?? parseInvoiceValue($("singleInvoiceValue")?.value ?? "");
+  const needs = updateEwayFieldVisibility(parsed);
+  if (!needs) {
+    return parsed.ok;
+  }
+  const ewayValue = String($("singleEwayBill")?.value ?? "").trim();
+  if (!ewayValue) {
     setFieldHint("singleEwayBillHint", {
       kind: "error",
-      text: "E-Way Bill is required for invoices above ₹49,999.",
+      text: "E-Way Bill is required for invoices ₹50,000 and above.",
     });
     return false;
   }
-
-  setFieldHint("singleEwayBillHint", { kind: "", text: "Required for invoices above ₹49,999." });
+  setFieldHint("singleEwayBillHint", { kind: "", text: "Enter E-Way Bill for invoices ₹50,000 and above." });
   return true;
 }
 
