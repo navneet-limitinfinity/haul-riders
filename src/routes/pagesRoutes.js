@@ -187,16 +187,18 @@ function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId, deb
           <label id="navToggle" class="navToggle" for="navState" role="button" tabindex="0" aria-label="Open navigation">
             <i class="fa-solid fa-bars" aria-hidden="true"></i>
           </label>
-          <img
-            class="brandLogo"
-            src="/static/haul_riders_logo.jpeg?v=${assetVersion}"
-            alt="Haul Riders"
-            decoding="async"
-          />
-          <div class="brandText">
-            <div class="brandTitle">Haul Riders</div>
-            <div class="brandSub">Orders dashboard</div>
-          </div>
+          <a class="brandLink" href="${role === "admin" ? "/admin/orders" : "/shop/orders"}" aria-label="Go to dashboard">
+            <img
+              class="brandLogo"
+              src="/static/haul_riders_logo.jpeg?v=${assetVersion}"
+              alt="Haul Riders"
+              decoding="async"
+            />
+            <div class="brandText">
+              <div class="brandTitle">Haul Riders</div>
+              <div class="brandSub">Orders dashboard</div>
+            </div>
+          </a>
         </div>
 
         <div class="topbarSearch" role="search" aria-label="Search orders">
@@ -414,20 +416,22 @@ function renderBulkUploadPage({ userLabel, debugFooter }) {
     ${renderNavDrawer({ role: "admin", userLabel, activePath: "/admin/bulk-upload" })}
 	    <header class="topbar">
 	      <div class="topbarInner">
-	        <div class="brand">
-	          <label id="navToggle" class="navToggle" for="navState" role="button" tabindex="0" aria-label="Open navigation">
-	            <i class="fa-solid fa-bars" aria-hidden="true"></i>
-	          </label>
-	          <img
-	            class="brandLogo"
-	            src="/static/haul_riders_logo.jpeg?v=29"
-	            alt="Haul Riders"
-	            decoding="async"
-          />
-          <div class="brandText">
-            <div class="brandTitle">Haul Riders</div>
-            <div class="brandSub">Bulk tools</div>
-          </div>
+        <div class="brand">
+          <label id="navToggle" class="navToggle" for="navState" role="button" tabindex="0" aria-label="Open navigation">
+            <i class="fa-solid fa-bars" aria-hidden="true"></i>
+          </label>
+          <a class="brandLink" href="/admin/orders" aria-label="Go to dashboard">
+            <img
+              class="brandLogo"
+              src="/static/haul_riders_logo.jpeg?v=29"
+              alt="Haul Riders"
+              decoding="async"
+            />
+            <div class="brandText">
+              <div class="brandTitle">Haul Riders</div>
+              <div class="brandSub">Bulk tools</div>
+            </div>
+          </a>
         </div>
 
         <div class="topbarActions">
@@ -632,20 +636,22 @@ function renderFulfillmentCentersPage({ userLabel, storeId, debugFooter }) {
     ${renderNavDrawer({ role: "shop", userLabel, activePath: "/shop/fulfillment-centers" })}
 	    <header class="topbar">
 	      <div class="topbarInner">
-	        <div class="brand">
-	          <label id="navToggle" class="navToggle" for="navState" role="button" tabindex="0" aria-label="Open navigation">
-	            <i class="fa-solid fa-bars" aria-hidden="true"></i>
-	          </label>
-	          <img
-	            class="brandLogo"
-	            src="/static/haul_riders_logo.jpeg?v=${assetVersion}"
-	            alt="Haul Riders"
-	            decoding="async"
-          />
-          <div class="brandText">
-            <div class="brandTitle">Fulfillment Centers</div>
-            <div class="brandSub">Manage pickup/origin addresses</div>
-          </div>
+        <div class="brand">
+          <label id="navToggle" class="navToggle" for="navState" role="button" tabindex="0" aria-label="Open navigation">
+            <i class="fa-solid fa-bars" aria-hidden="true"></i>
+          </label>
+          <a class="brandLink" href="/shop/orders" aria-label="Go to dashboard">
+            <img
+              class="brandLogo"
+              src="/static/haul_riders_logo.jpeg?v=${assetVersion}"
+              alt="Haul Riders"
+              decoding="async"
+            />
+            <div class="brandText">
+              <div class="brandTitle">Fulfillment Centers</div>
+              <div class="brandSub">Manage pickup/origin addresses</div>
+            </div>
+          </a>
         </div>
 
         <div class="topbarActions">
@@ -798,11 +804,13 @@ function renderStoreDetailsPage({ userLabel, storeId, debugFooter }) {
           <label id="navToggle" class="navToggle" for="navState" role="button" tabindex="0" aria-label="Open navigation">
             <i class="fa-solid fa-bars" aria-hidden="true"></i>
           </label>
-          <img class="brandLogo" src="/static/haul_riders_logo.jpeg?v=${assetVersion}" alt="Haul Riders" decoding="async" />
-          <div class="brandText">
-            <div class="brandTitle">Store / Shop Details</div>
-            <div class="brandSub">Manage store info, branding, and fulfillment centers</div>
-          </div>
+          <a class="brandLink" href="/shop/orders" aria-label="Go to dashboard">
+            <img class="brandLogo" src="/static/haul_riders_logo.jpeg?v=${assetVersion}" alt="Haul Riders" decoding="async" />
+            <div class="brandText">
+              <div class="brandTitle">Store / Shop Details</div>
+              <div class="brandSub">Manage store info, branding, and fulfillment centers</div>
+            </div>
+          </a>
         </div>
 
         <div class="topbarActions">
@@ -1119,11 +1127,13 @@ function renderCreateOrdersPage({ role, userLabel, storeId, debugFooter }) {
           <label id="navToggle" class="navToggle" for="navState" role="button" tabindex="0" aria-label="Open navigation">
             <i class="fa-solid fa-bars" aria-hidden="true"></i>
           </label>
-          <img class="brandLogo" src="/static/haul_riders_logo.jpeg?v=54" alt="Haul Riders" decoding="async" />
-          <div class="brandText">
-            <div class="brandTitle">Create Orders</div>
-            <div class="brandSub">Bulk upload (CSV) or create a single order</div>
-          </div>
+          <a class="brandLink" href="${role === "admin" ? "/admin/orders" : "/shop/orders"}" aria-label="Go to dashboard">
+            <img class="brandLogo" src="/static/haul_riders_logo.jpeg?v=54" alt="Haul Riders" decoding="async" />
+            <div class="brandText">
+              <div class="brandTitle">Create Orders</div>
+              <div class="brandSub">Bulk upload (CSV) or create a single order</div>
+            </div>
+          </a>
         </div>
 
         <div class="topbarActions">

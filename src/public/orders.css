@@ -1184,6 +1184,14 @@ body[data-page="store"] .storeDetailsValueMultiline {
   min-width: 0;
 }
 
+.brandLink {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+}
+
 .brandLogo {
   height: 42px;
   width: auto;
