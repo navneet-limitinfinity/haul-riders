@@ -1353,11 +1353,11 @@ function renderCreateOrdersPage({ role, userLabel, storeId, debugFooter }) {
           </label>
         </div>
 
-        <div class="drawerSectionHeader">Payment & Fulfillment</div>
-        <div class="orderCreateGrid">
-          <label class="field span-4">
-            <span>Payment Status</span>
-            <select id="singlePaymentStatus" required>
+          <div class="drawerSectionHeader">Payment & Fulfillment</div>
+          <div class="orderCreateGrid">
+            <label class="field span-4">
+              <span>Payment Status</span>
+              <select id="singlePaymentStatus" required>
               <option value="" disabled selected>Select</option>
               <option value="paid">Paid</option>
               <option value="cod" disabled>COD</option>
@@ -1371,8 +1371,13 @@ function renderCreateOrdersPage({ role, userLabel, storeId, debugFooter }) {
             <small id="singleInvoiceValueHint" class="fieldHint"></small>
           </label>
           <label class="field span-4">
-            <span>Courier Partner (optional)</span>
-            <select id="singleCourierPartner">
+            <span>E-Way Bill Number</span>
+            <input id="singleEwayBill" type="text" />
+            <small id="singleEwayBillHint" class="fieldHint">Required for invoices above ₹49,999.</small>
+          </label>
+            <label class="field span-4">
+              <span>Courier Partner (optional)</span>
+              <select id="singleCourierPartner">
               <option value="DTDC" selected>DTDC</option>
             </select>
           </label>

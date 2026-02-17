@@ -74,10 +74,36 @@ function parseWeightKg(value) {
 
 function parseInvoiceValue(value) {
   const s = String(value ?? "").trim();
-  if (!s) return { ok: false, value: "" };
+  if (!s) return { ok: false, value: "", amount: NaN };
   const n = Number(s);
-  if (!Number.isFinite(n) || n <= 0) return { ok: false, value: "" };
-  return { ok: true, value: s };
+  if (!Number.isFinite(n) || n <= 0) return { ok: false, value: "", amount: NaN };
+  return { ok: true, value: s, amount: n };
+}
+
+const EWAY_THRESHOLD = 49999;
+
+function requiresEwayBill(amount) {
+  return Number.isFinite(amount) && amount > EWAY_THRESHOLD;
+}
+
+function ensureEwayRequirement() {
+  const parsed = parseInvoiceValue($("singleInvoiceValue")?.value ?? "");
+  const ewayValue = String($("singleEwayBill")?.value ?? "").trim();
+  if (!parsed.ok) {
+    setFieldHint("singleEwayBillHint", { kind: "", text: "Required for invoices above ₹49,999." });
+    return true;
+  }
+
+  if (requiresEwayBill(parsed.amount) && !ewayValue) {
+    setFieldHint("singleEwayBillHint", {
+      kind: "error",
+      text: "E-Way Bill is required for invoices above ₹49,999.",
+    });
+    return false;
+  }
+
+  setFieldHint("singleEwayBillHint", { kind: "", text: "Required for invoices above ₹49,999." });
+  return true;
 }
 
 function normalizeWeightInput(value) {
@@ -384,6 +410,7 @@ function readSingleOrderPayload() {
     weightKg: weightParsed.value,
     courierType: String($("singleCourierType")?.value ?? "").trim(),
     courierPartner: String($("singleCourierPartner")?.value ?? "").trim() || "DTDC",
+    ewayBill: String($("singleEwayBill")?.value ?? "").trim(),
   };
 }
 
@@ -617,6 +644,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       const parsed = parseInvoiceValue(v);
       if (!parsed.ok) setFieldHint("singleInvoiceValueHint", { kind: "error", text: "Enter a valid amount" });
       else setFieldHint("singleInvoiceValueHint", { kind: "", text: "" });
+      ensureEwayRequirement();
     };
     invoiceEl.addEventListener("input", sync);
     invoiceEl.addEventListener("blur", sync);
@@ -653,6 +681,15 @@ window.addEventListener("DOMContentLoaded", async () => {
     };
     centerEl.addEventListener("change", sync);
     centerEl.addEventListener("blur", sync);
+  }
+
+  const ewayEl = $("singleEwayBill");
+  if (ewayEl) {
+    const sync = () => {
+      ensureEwayRequirement();
+    };
+    ewayEl.addEventListener("input", sync);
+    ewayEl.addEventListener("blur", sync);
   }
 
   $("singleWeightKg")?.addEventListener("input", (e) => {
@@ -834,14 +871,25 @@ window.addEventListener("DOMContentLoaded", async () => {
       return;
     }
     if (String($("singlePaymentStatus")?.value ?? "").trim().toLowerCase() !== "paid") {
-      setStatus("Payment Status must be Paid.", { kind: "error" });
-      return;
-    }
+    setStatus("Payment Status must be Paid.", { kind: "error" });
+    return;
+  }
 
-    if (!String($("singleInvoiceValue")?.value ?? "").trim()) {
-      setStatus("Invoice Value is required.", { kind: "error" });
-      return;
-    }
+  if (!String($("singleInvoiceValue")?.value ?? "").trim()) {
+    setStatus("Invoice Value is required.", { kind: "error" });
+    return;
+  }
+
+  const invoiceValueRaw = String($("singleInvoiceValue")?.value ?? "").trim();
+  const invoiceParsed = parseInvoiceValue(invoiceValueRaw);
+  if (!invoiceParsed.ok) {
+    setStatus("Enter a valid Invoice Value.", { kind: "error" });
+    return;
+  }
+  if (!ensureEwayRequirement()) {
+    setStatus("Orders above ₹49,999 must include an E-Way Bill number.", { kind: "error" });
+    return;
+  }
 
     const phone1 = normalizePhoneDigits($("singlePhone1")?.value ?? "");
     if (!phone1 || phone1.length !== 10) {

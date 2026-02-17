@@ -214,6 +214,7 @@ function normalizeManualRow(row) {
     courierPartner: normalizeCourierPartner(
       pickRowValue(row, ["courierPartner", "courier_partner", "Courier Partner", "courier"])
     ),
+    ewayBill: pickRowValue(row, ["ewayBill", "eway_bill", "eWayBill", "ewayBillNumber", "ewayBillNo", "eway_bill_number"]),
   };
 }
 
@@ -253,12 +254,21 @@ function validateManualRow(normalized, rowIndex) {
     return { ok: false, error: `Row ${rowIndex + 2}: courierType must be one of Z- Express, D- Surface, D- Air` };
   }
 
+  const invoiceValueNumber = Number(normalized.invoiceValue || normalized.totalPrice || "");
+  if (Number.isFinite(invoiceValueNumber) && invoiceValueNumber > 49999 && !String(normalized.ewayBill ?? "").trim()) {
+    return {
+      ok: false,
+      error: `Row ${rowIndex + 2}: ewayBill is required for invoice values above 49,999`,
+    };
+  }
+
   return { ok: true, error: "" };
 }
 
 function buildManualOrderDoc({ normalized, index, storeId, displayName, user, fulfillmentCenterString, hrGid }) {
   // Per requirement: Order Date should reflect upload/create time.
   const createdAt = nowIso();
+  const ewayValue = String(normalized.ewayBill ?? "").trim();
 
   const order = {
     index,
@@ -273,6 +283,7 @@ function buildManualOrderDoc({ normalized, index, storeId, displayName, user, fu
     productDescription: normalized.productDescription,
     fulfillmentCenter: fulfillmentCenterString || "",
     fulfillmentStatus: normalized.fulfillmentStatus || "fulfilled",
+    ewayBill: ewayValue,
     shipping: {
       fullName: normalized.fullName,
       address1: normalized.address1,
@@ -308,6 +319,7 @@ function buildManualOrderDoc({ normalized, index, storeId, displayName, user, fu
     expectedDeliveryDate: "",
     updatedAt: ts,
     event: "manual_order_create",
+    ewayBill: ewayValue,
     requestedBy: {
       uid: String(user?.uid ?? ""),
       email: String(user?.email ?? ""),
