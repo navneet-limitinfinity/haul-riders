@@ -140,6 +140,7 @@ let fulfillmentCentersState = {
 let firestoreClientState = null;
 
 const TAB_STATUS_VARIANTS = {
+  new_fs: ["New"],
   assigned: ["Assigned"],
   in_transit: ["In Transit", "Undelivered", "At Destination", "Out for Delivery", "Set RTO"],
   delivered: ["Delivered"],
@@ -832,13 +833,13 @@ function renderTableHeaderForActiveTab() {
   const thead = document.querySelector(".table thead");
   if (!thead) return;
   const isShopNew = activeRole === "shop" && activeTab === "new";
-  const isShopAssigned = activeRole === "shop" && activeTab === "assigned";
+  const isAssignedLike = activeTab === "assigned" || activeTab === "new_fs";
   const isInTransit = activeTab === "in_transit";
   const isDelivered = activeTab === "delivered";
   const isRto = activeTab === "rto";
   const html = isShopNew
     ? NEW_TAB_HEADER_HTML
-    : isShopAssigned
+    : isAssignedLike
       ? ASSIGNED_TAB_HEADER_HTML
       : isInTransit
         ? IN_TRANSIT_TAB_HEADER_HTML
@@ -855,7 +856,7 @@ function renderTableHeaderForActiveTab() {
 
 function syncNewTabLayout() {
   if (!document.body) return;
-  document.body.dataset.tab = activeTab;
+  document.body.dataset.tab = activeTab === "new_fs" ? "assigned" : activeTab;
   const isShopNew = activeRole === "shop" && activeTab === "new";
   if (isShopNew) {
     sortState = { key: "createdAt", dir: "desc" };
@@ -1760,7 +1761,7 @@ function renderRows(orders) {
     renderRowsNewTab(orders);
     return;
   }
-  if (activeRole === "shop" && activeTab === "assigned") {
+  if (activeTab === "assigned" || activeTab === "new_fs") {
     renderRowsAssignedTab(orders);
     return;
   }
@@ -3128,7 +3129,7 @@ async function refresh({ forceNetwork = false } = {}) {
         return;
       }
 
-      const useConsignments = ["in_transit", "delivered", "rto"].includes(activeTab);
+      const useConsignments = ["in_transit", "delivered", "rto", "new_fs"].includes(activeTab);
       debugLog("tab_fetch", {
         tab: activeTab,
         source: useConsignments ? "firestore(consignments)" : "firestore(orders)",
@@ -3158,7 +3159,7 @@ async function refresh({ forceNetwork = false } = {}) {
     }
 
     if (activeRole === "shop") {
-      if (["assigned", "in_transit", "delivered", "rto", "all"].includes(activeTab)) {
+      if (["assigned", "in_transit", "delivered", "rto", "all", "new_fs"].includes(activeTab)) {
         debugLog("tab_fetch", {
           tab: activeTab,
           source: "firestore(client)",
@@ -3254,7 +3255,7 @@ async function refreshServerSearch({ append = false } = {}) {
         syncLoadMoreButton();
         return;
       }
-      const useConsignments = ["in_transit", "delivered", "rto"].includes(activeTab);
+      const useConsignments = ["in_transit", "delivered", "rto", "new_fs"].includes(activeTab);
       data = useConsignments
         ? await fetchConsignments({ tab: activeTab, storeId, limit: 50 })
         : await fetchFirestoreAdminOrders({
@@ -3265,6 +3266,8 @@ async function refreshServerSearch({ append = false } = {}) {
     } else {
       if (activeTab === "assigned") {
         data = await fetchFirestoreOrders({ status: activeTab, limit: 50 });
+      } else if (activeTab === "new_fs") {
+        data = await fetchFirestoreOrders({ status: "new", limit: 50 });
       } else if (activeTab === "all") {
         data = await fetchFirestoreOrders({ limit: 50 });
       } else if (["in_transit", "delivered", "rto"].includes(activeTab)) {
@@ -3333,7 +3336,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
     const url = new URL(window.location.href);
     const tabFromUrl = String(url.searchParams.get("tab") ?? "").trim().toLowerCase();
-    const allowedTabs = new Set(["assigned", "in_transit", "delivered", "rto", "all"]);
+    const allowedTabs = new Set(["assigned", "in_transit", "delivered", "rto", "all", "new_fs"]);
     if (activeRole === "shop") allowedTabs.add("new");
     setActiveTab(allowedTabs.has(tabFromUrl) ? tabFromUrl : getDefaultTabForRole(activeRole));
 

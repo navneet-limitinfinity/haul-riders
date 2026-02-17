@@ -271,6 +271,7 @@ function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId, deb
               ${role === "shop"
                 ? html`<button class="tabBtn" type="button" data-tab="new" role="tab">New at Shopify</button>`
                 : ""}
+              <button class="tabBtn" type="button" data-tab="new_fs" role="tab">New (Firestore)</button>
               <button class="tabBtn" type="button" data-tab="assigned" role="tab">Assigned</button>
               <button class="tabBtn" type="button" data-tab="in_transit" role="tab">In Transit</button>
               <button class="tabBtn" type="button" data-tab="delivered" role="tab">Delivered</button>

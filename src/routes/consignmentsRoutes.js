@@ -413,7 +413,7 @@ const parseLimit = (value) => {
 
 const isAllowedTab = (tab) => {
   const t = String(tab ?? "").trim().toLowerCase();
-  return t === "in_transit" || t === "delivered" || t === "rto";
+  return t === "in_transit" || t === "delivered" || t === "rto" || t === "new_fs";
 };
 
 const allowedStatusesForTab = (tab) => {
@@ -422,6 +422,7 @@ const allowedStatusesForTab = (tab) => {
     return new Set(IN_TRANSIT_DISPLAY_STATUSES.map((value) => value.toLowerCase()));
   if (t === "delivered") return new Set([DELIVERED_DISPLAY_STATUS.toLowerCase()]);
   if (t === "rto") return new Set(RTO_DISPLAY_STATUSES.map((value) => value.toLowerCase()));
+  if (t === "new_fs") return new Set(["new"]);
   return new Set();
 };
 
