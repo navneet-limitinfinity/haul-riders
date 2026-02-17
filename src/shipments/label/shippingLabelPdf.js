@@ -554,35 +554,63 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, storeId,
 
   // FROM block (multiline).
   if (fields.fromBlock) {
-    // Per requirements: show direct fulfillment address only (no "Haul Riders -" prefix/suffix).
-    const hasInline = Boolean(String(parsedFulfillment?.address ?? "").trim());
-    const fromName = hasInline ? String(parsedFulfillment?.name ?? "").trim() : fulfillmentCenterLabel || "";
-    const fromAddress1 = hasInline ? String(parsedFulfillment?.address ?? "").trim() : fulfillmentCenter?.address1 || shipFrom.address1;
-    const fromAddress2 = hasInline ? "" : fulfillmentCenter?.address2 || shipFrom.address2;
-    const fromCity = hasInline ? "" : fulfillmentCenter?.city || shipFrom.city;
-    const fromState = hasInline ? "" : fulfillmentCenter?.state || shipFrom.state;
-    const fromPin = hasInline ? "" : fulfillmentCenter?.pinCode || shipFrom.pinCode;
-    const fromCountry = hasInline ? "" : fulfillmentCenter?.country || shipFrom.country;
+    const parsedAddress = String(parsedFulfillment?.address ?? "").trim();
+    const parsedSource = parsedAddress
+      ? {
+          name: String(parsedFulfillment?.name ?? "").trim(),
+          address1: parsedAddress,
+          address2: "",
+          city: "",
+          state: "",
+          pinCode: "",
+          country: "",
+        }
+      : null;
+    const fallbackSource = parsedSource || shipFrom || {};
 
-    const fromLines = [
+    const fromName = String(
+      fulfillmentCenter?.originName ||
+        fulfillmentCenterLabel ||
+        fallbackSource.name ||
+        ""
+    ).trim();
+    const fromAddress1 = String(fulfillmentCenter?.address1 || fallbackSource.address1 || "").trim();
+    const fromAddress2 = String(fulfillmentCenter?.address2 || fallbackSource.address2 || "").trim();
+    const fromCity = String(fulfillmentCenter?.city || fallbackSource.city || "").trim();
+    const fromPin = String(fulfillmentCenter?.pinCode || fallbackSource.pinCode || "").trim();
+    const fromState = String(fulfillmentCenter?.state || fallbackSource.state || "").trim();
+    const fromCountry = String(fulfillmentCenter?.country || fallbackSource.country || "").trim();
+
+    const firstLineParts = [
       fromName,
       fromAddress1,
       fromAddress2,
-      [fromCity, fromPin].filter(Boolean).join(" "),
-      [fromState, fromCountry].filter(Boolean).join(", "),
+      [fromCity, fromState].filter(Boolean).join(", "),
+      [fromCountry].filter(Boolean).join(", "),
     ]
       .filter(Boolean)
-      .join(" ");
+      .join(" · ");
 
-    const lines = wrapText({
-      text: fromLines,
-      font: fontRegular,
-      size: fields.fromBlock.size,
-      maxWidth: fields.fromBlock.maxWidth,
-    }).slice(0, fields.fromBlock.maxLines);
+    const textLines = [
+      firstLineParts,
+      fromPin,
+    ].filter(Boolean);
 
-    for (let i = 0; i < lines.length; i++) {
-      page.drawText(lines[i], {
+    const renderedLines = [];
+    for (const line of textLines) {
+      renderedLines.push(
+        ...wrapText({
+          text: line,
+          font: fontRegular,
+          size: fields.fromBlock.size,
+          maxWidth: fields.fromBlock.maxWidth,
+        })
+      );
+    }
+
+    const limitedLines = renderedLines.slice(0, fields.fromBlock.maxLines);
+    for (let i = 0; i < limitedLines.length; i++) {
+      page.drawText(limitedLines[i], {
         x: fields.fromBlock.x,
         y: fields.fromBlock.yTop - i * fields.fromBlock.lineHeight,
         size: fields.fromBlock.size,
