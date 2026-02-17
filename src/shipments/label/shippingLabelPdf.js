@@ -8,6 +8,16 @@ import { resolveShipFrom } from "./resolveShipFrom.js";
 import { extractAwbNumber } from "./extractAwb.js";
 
 const normalizeDomain = (domain) => String(domain ?? "").trim().toLowerCase();
+const resolveShopIdentifiers = ({ storeId, shopDomain }) => {
+  const normalizedId = String(storeId ?? "").trim();
+  const identifiers = [];
+  if (normalizedId) identifiers.push(normalizedId);
+  const domainCandidate = normalizeDomain(shopDomain);
+  if (domainCandidate && domainCandidate !== normalizedId) {
+    identifiers.push(domainCandidate);
+  }
+  return identifiers;
+};
 
 function formatDateDDMMYYYY(date) {
   const d = date instanceof Date ? date : new Date(String(date ?? ""));
@@ -158,51 +168,52 @@ async function getTemplateAssets() {
   return templateAssetsPromise;
 }
 
-async function resolveDefaultFulfillmentCenterName({ env, shopDomain }) {
+async function resolveDefaultFulfillmentCenterName({ env, storeId, shopDomain }) {
   if (env?.auth?.provider !== "firebase") return "";
-  const domain = normalizeDomain(shopDomain);
-  if (!domain) return "";
+  const identifiers = resolveShopIdentifiers({ storeId, shopDomain });
+  if (identifiers.length === 0) return "";
 
   const admin = await getFirebaseAdmin({ env });
   const firestore = admin.firestore();
   const shopsCollection = String(env.auth.firebase.shopsCollection ?? "shops").trim() || "shops";
 
-  const centersCol = firestore.collection(shopsCollection).doc(domain).collection("fulfillmentCenter");
+  for (const identifier of identifiers) {
+    const centersCol = firestore.collection(shopsCollection).doc(identifier).collection("fulfillmentCenter");
 
-  try {
-    const defaultSnap = await centersCol.where("default", "==", true).limit(1).get();
-    const defaultDoc = defaultSnap.docs[0];
-    if (defaultDoc?.exists) {
-      const data = defaultDoc.data() ?? {};
-      return String(data?.originName ?? "").trim();
+    try {
+      const defaultSnap = await centersCol.where("default", "==", true).limit(1).get();
+      const defaultDoc = defaultSnap.docs[0];
+      if (defaultDoc?.exists) {
+        const data = defaultDoc.data() ?? {};
+        return String(data?.originName ?? "").trim();
+      }
+    } catch {
+      // ignore
     }
-  } catch {
-    // ignore
-  }
 
-  try {
-    const firstSnap = await centersCol.limit(1).get();
-    const firstDoc = firstSnap.docs[0];
-    if (firstDoc?.exists) {
-      const data = firstDoc.data() ?? {};
-      return String(data?.originName ?? "").trim();
+    try {
+      const firstSnap = await centersCol.limit(1).get();
+      const firstDoc = firstSnap.docs[0];
+      if (firstDoc?.exists) {
+        const data = firstDoc.data() ?? {};
+        return String(data?.originName ?? "").trim();
+      }
+    } catch {
+      // ignore
     }
-  } catch {
-    // ignore
   }
 
   return "";
 }
 
-async function resolveFulfillmentCenter({ env, shopDomain, originName }) {
+async function resolveFulfillmentCenter({ env, storeId, shopDomain, originName }) {
   if (env?.auth?.provider !== "firebase") return null;
-  const domain = normalizeDomain(shopDomain);
-  if (!domain) return null;
+  const identifiers = resolveShopIdentifiers({ storeId, shopDomain });
+  if (identifiers.length === 0) return null;
 
   const admin = await getFirebaseAdmin({ env });
   const firestore = admin.firestore();
   const shopsCollection = String(env.auth.firebase.shopsCollection ?? "shops").trim() || "shops";
-  const centersCol = firestore.collection(shopsCollection).doc(domain).collection("fulfillmentCenter");
 
   const normalizeCenter = (data) => {
     const d = data && typeof data === "object" ? data : {};
@@ -223,44 +234,56 @@ async function resolveFulfillmentCenter({ env, shopDomain, originName }) {
 
   const requested = String(originName ?? "").trim();
   if (requested) {
+    for (const identifier of identifiers) {
+      try {
+        const matches = await firestore
+          .collection(shopsCollection)
+          .doc(identifier)
+          .collection("fulfillmentCenter")
+          .where("originName", "==", requested)
+          .limit(1)
+          .get();
+        const doc = matches.docs[0];
+        if (doc?.exists) return normalizeCenter(doc.data());
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  for (const identifier of identifiers) {
+    const centersCol = firestore.collection(shopsCollection).doc(identifier).collection("fulfillmentCenter");
+
     try {
-      const match = await centersCol.where("originName", "==", requested).limit(1).get();
-      const doc = match.docs[0];
+      const def = await centersCol.where("default", "==", true).limit(1).get();
+      const doc = def.docs[0];
+      if (doc?.exists) return normalizeCenter(doc.data());
+    } catch {
+      // ignore
+    }
+
+    try {
+      const first = await centersCol.limit(1).get();
+      const doc = first.docs[0];
       if (doc?.exists) return normalizeCenter(doc.data());
     } catch {
       // ignore
     }
   }
 
-  try {
-    const def = await centersCol.where("default", "==", true).limit(1).get();
-    const doc = def.docs[0];
-    if (doc?.exists) return normalizeCenter(doc.data());
-  } catch {
-    // ignore
-  }
-
-  try {
-    const first = await centersCol.limit(1).get();
-    const doc = first.docs[0];
-    if (doc?.exists) return normalizeCenter(doc.data());
-  } catch {
-    // ignore
-  }
-
   return null;
 }
 
-async function resolveBrandingLogo({ env, shopDomain }) {
+async function resolveBrandingLogo({ env, storeId }) {
   if (env?.auth?.provider !== "firebase") return null;
-  const domain = normalizeDomain(shopDomain);
-  if (!domain) return null;
-
   const admin = await getFirebaseAdmin({ env });
   const firestore = admin.firestore();
   const shopsCollection = String(env.auth.firebase.shopsCollection ?? "shops").trim() || "shops";
 
-  const docRef = firestore.collection(shopsCollection).doc(domain).collection("branding").doc("logo");
+  const normalizedId = String(storeId ?? "").trim();
+  if (!normalizedId) return null;
+
+  const docRef = firestore.collection(shopsCollection).doc(normalizedId).collection("branding").doc("logo");
   const snap = await docRef.get();
   if (!snap.exists) return null;
 
@@ -300,7 +323,7 @@ async function resolveStoreName({ env, shopDomain }) {
   }
 }
 
-export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestoreDoc }) {
+export async function generateShippingLabelPdfBuffer({ env, shopDomain, storeId, firestoreDoc }) {
   const data = firestoreDoc && typeof firestoreDoc === "object" ? firestoreDoc : {};
   const order = data.order && typeof data.order === "object" ? data.order : null;
   if (!order) {
@@ -321,7 +344,7 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
   const shipDate = formatDateDDMMYYYY(now);
   const shipTime = formatTimeHHMMSS(now);
 
-  const shipFrom = await resolveShipFrom({ env, shopDomain });
+  const shipFrom = await resolveShipFrom({ env, storeId });
   const fulfillmentCenterRaw = String(order?.fulfillmentCenter ?? data?.fulfillmentCenter ?? "").trim();
   const parsedFulfillment = (() => {
     const raw = String(fulfillmentCenterRaw ?? "").trim();
@@ -340,14 +363,15 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
   const fulfillmentCenterName = "";
   const fulfillmentCenter = await resolveFulfillmentCenter({
     env,
+    storeId,
     shopDomain,
     originName: fulfillmentCenterName,
   });
   const fulfillmentCenterLabel =
     fulfillmentCenter?.originName ||
     parsedFulfillment?.name ||
-    (await resolveDefaultFulfillmentCenterName({ env, shopDomain }));
-  const brandingLogo = await resolveBrandingLogo({ env, shopDomain });
+    (await resolveDefaultFulfillmentCenterName({ env, storeId, shopDomain }));
+  const brandingLogo = await resolveBrandingLogo({ env, storeId });
   // Store name intentionally not rendered in branding section (logo only).
   // const storeName = await resolveStoreName({ env, shopDomain });
   const shipTo = getBestShipTo(order) ?? {};
@@ -453,14 +477,14 @@ export async function generateShippingLabelPdfBuffer({ env, shopDomain, firestor
   // Product description strip (full width).
   if (productDescription && fields.productDescriptionBlock) {
     // Label in bold (required).
-    page.drawText("\n\n", {
-      x: fields.productDescriptionBlock.x,
-      y: fields.productDescriptionBlock.yTop,
-      size: fields.productDescriptionBlock.size,
-      font: fontBold,
-      size: 16,
-      color: black,
-    });
+    // page.drawText("Product Description:\n\n", {
+    //   x: fields.productDescriptionBlock.x,
+    //   y: fields.productDescriptionBlock.yTop,
+    //   size: fields.productDescriptionBlock.size,
+    //   font: fontBold,
+    //   size: 16,
+    //   color: black,
+    // });
 
     const lines = wrapText({
       text: productDescription,

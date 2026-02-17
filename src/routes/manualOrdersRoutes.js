@@ -3,6 +3,7 @@ import multer from "multer";
 import { getFirebaseAdmin } from "../auth/firebaseAdmin.js";
 import { ROLE_ADMIN, ROLE_SHOP } from "../auth/roles.js";
 import { getShopCollectionInfo } from "../firestore/shopCollections.js";
+import { ensureStoreIdForShop } from "../firestore/storeIdGenerator.js";
 import { parseCsvRows } from "../orders/import/parseCsvRows.js";
 import { assignManualOrders, createManualOrders } from "../orders/manualOrdersService.js";
 
@@ -16,6 +17,57 @@ const jobs = new Map();
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+const CONSIGNMENTS_COLLECTION = "consignments";
+
+const normalizeShopDomain = (storeId) => {
+  const raw = String(storeId ?? "").trim().toLowerCase();
+  if (!raw) return "";
+  return raw.includes(".") ? raw : `${raw}.myshopify.com`;
+};
+
+async function resolveStoreMetaForWrite({ firestore, shopsCollection, storeIdInput }) {
+  const raw = String(storeIdInput ?? "").trim().toLowerCase();
+  if (!raw) throw new Error("store_id_required");
+
+  // If a numeric storeId is provided (no Shopify domain), locate the shops doc by field match.
+  if (/^\d{6,}$/.test(raw)) {
+    const found = await firestore.collection(shopsCollection).where("storeId", "==", raw).limit(1).get();
+    const doc = found.docs[0] ?? null;
+    if (!doc) throw new Error("store_id_required");
+    const data = doc.data() ?? {};
+    const storeDetails = data?.storeDetails && typeof data.storeDetails === "object" ? data.storeDetails : {};
+    const storeName = String(storeDetails?.storeName ?? "").trim();
+    return {
+      shopDomain: doc.id,
+      numericStoreId: raw,
+      storeName,
+    };
+  }
+
+  const shopDomain = normalizeShopDomain(raw);
+  if (!shopDomain) throw new Error("store_id_required");
+
+  const ensuredStoreId = await ensureStoreIdForShop({
+    firestore,
+    shopsCollection,
+    shopDomain,
+    referenceDate: new Date(),
+  });
+
+  const snap = await firestore.collection(shopsCollection).doc(shopDomain).get();
+  const data = snap.exists ? snap.data() ?? {} : {};
+
+  const numericStoreId = String(data?.storeId ?? ensuredStoreId ?? "").trim();
+  const storeDetails = data?.storeDetails && typeof data.storeDetails === "object" ? data.storeDetails : {};
+  const storeName = String(storeDetails?.storeName ?? "").trim();
+
+  return {
+    shopDomain,
+    numericStoreId,
+    storeName,
+  };
 }
 
 function cleanupJobs() {
@@ -127,15 +179,20 @@ export function createManualOrdersRouter({ env, auth }) {
         try {
           const admin = await getFirebaseAdmin({ env });
           const firestore = admin.firestore();
-          const { collectionId, displayName, storeId: normalizedStoreId } = getShopCollectionInfo({
-            storeId,
+          const { storeId: storeKey, displayName } = getShopCollectionInfo({ storeId });
+          const meta = await resolveStoreMetaForWrite({
+            firestore,
+            shopsCollection,
+            storeIdInput: storeId,
           });
 
           const result = await createManualOrders({
             firestore,
-            collectionId,
-            storeId: normalizedStoreId,
-            displayName,
+            collectionId: CONSIGNMENTS_COLLECTION,
+            storeId: meta.numericStoreId,
+            storeKey,
+            shopDomain: meta.shopDomain,
+            displayName: meta.storeName || displayName,
             user: req.user,
             shopsCollection,
             rows,
@@ -192,15 +249,20 @@ export function createManualOrdersRouter({ env, auth }) {
         const row = req.body && typeof req.body === "object" ? req.body : {};
         const admin = await getFirebaseAdmin({ env });
         const firestore = admin.firestore();
-        const { collectionId, displayName, storeId: normalizedStoreId } = getShopCollectionInfo({
-          storeId,
+        const { storeId: storeKey, displayName } = getShopCollectionInfo({ storeId });
+        const meta = await resolveStoreMetaForWrite({
+          firestore,
+          shopsCollection,
+          storeIdInput: storeId,
         });
 
         const result = await createManualOrders({
           firestore,
-          collectionId,
-          storeId: normalizedStoreId,
-          displayName,
+          collectionId: CONSIGNMENTS_COLLECTION,
+          storeId: meta.numericStoreId,
+          storeKey,
+          shopDomain: meta.shopDomain,
+          displayName: meta.storeName || displayName,
           user: req.user,
           shopsCollection,
           rows: [row],
@@ -244,15 +306,18 @@ export function createManualOrdersRouter({ env, auth }) {
 
         const admin = await getFirebaseAdmin({ env });
         const firestore = admin.firestore();
-        const { collectionId, displayName, storeId: normalizedStoreId } = getShopCollectionInfo({
-          storeId,
+        const { displayName } = getShopCollectionInfo({ storeId });
+        const meta = await resolveStoreMetaForWrite({
+          firestore,
+          shopsCollection,
+          storeIdInput: storeId,
         });
 
         const result = await assignManualOrders({
           firestore,
-          collectionId,
-          storeId: normalizedStoreId,
-          displayName,
+          collectionId: CONSIGNMENTS_COLLECTION,
+          storeId: meta.numericStoreId,
+          displayName: meta.storeName || displayName,
           user: req.user,
           orderKeys,
         });

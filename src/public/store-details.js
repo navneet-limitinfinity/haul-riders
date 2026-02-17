@@ -65,6 +65,22 @@ function setStatus(message, { kind = "info" } = {}) {
   el.textContent = message;
 }
 
+function setStoreIdText(value) {
+  const el = $("storeIdText");
+  if (!el) return;
+  const normalized = String(value ?? "").trim();
+  el.textContent = normalized;
+  el.hidden = !normalized;
+}
+
+function setRegisteredEntityText(value) {
+  const el = $("registeredEntityNameText");
+  if (!el) return;
+  const normalized = String(value ?? "").trim();
+  el.textContent = normalized;
+  el.hidden = !normalized;
+}
+
 function toggleNav(open) {
   document.body.classList.toggle("navOpen", open);
   const overlay = $("navOverlay");
@@ -157,10 +173,12 @@ function populateStateSelect(selectEl) {
 
 function normalizeStoreDetails(details) {
   const d = details && typeof details === "object" ? details : {};
+  const registeredEntityName = String(d?.registeredEntityName ?? "").trim();
   const stateCode = String(d?.stateCode ?? "").trim();
   const stateNameRaw = String(d?.stateName ?? "").trim();
   const stateName = stateNameRaw || resolveStateName(stateCode);
   return {
+    registeredEntityName,
     storeName: String(d?.storeName ?? "").trim(),
     registeredAddress: String(d?.registeredAddress ?? "").trim(),
     gstNumber: String(d?.gstNumber ?? "").trim(),
@@ -193,6 +211,7 @@ function fillStoreDetailsRead(details) {
     el.hidden = !v;
   };
   setText("storeNameText", d.storeName);
+  setRegisteredEntityText(d.registeredEntityName);
   setText("gstNumberText", d.gstNumber);
   setTextHidden("stateCodeText", d.stateCode);
   setTextHidden("stateNameText", d.stateName);
@@ -207,6 +226,11 @@ async function loadStoreDetails() {
   const data = await requestJson("/api/store/details");
   const details = normalizeStoreDetails(data?.storeDetails ?? {});
   fillStoreDetailsRead(details);
+  const storeIdValue = String(data?.storeId ?? document.body.dataset.storeId ?? "").trim();
+  if (storeIdValue) {
+    document.body.dataset.storeId = storeIdValue;
+  }
+  setStoreIdText(storeIdValue);
   return details;
 }
 
@@ -398,15 +422,20 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
+  setStoreIdText(document.body.dataset.storeId ?? "");
+
   refreshBrandingLogoImages();
   populateStateSelect($("drawerStateCode"));
 
   let initialDetails = normalizeStoreDetails({});
   let canEdit = true;
   let currentDetails = normalizeStoreDetails({});
+  const bodyStoreId = String(document.body.dataset.storeId ?? "").trim();
+  setStoreIdText(bodyStoreId);
 
   const getDrawerPayload = () => ({
     storeName: String($("drawerStoreName")?.value ?? "").trim(),
+    registeredEntityName: String($("drawerRegisteredEntityName")?.value ?? "").trim(),
     gstNumber: String($("drawerGstNumber")?.value ?? "").trim(),
     stateCode: String($("drawerStateCode")?.value ?? "").trim(),
     stateName: resolveStateName(String($("drawerStateCode")?.value ?? "").trim()),
@@ -420,6 +449,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   const setDrawerValues = (details) => {
     const d = normalizeStoreDetails(details);
     if ($("drawerStoreName")) $("drawerStoreName").value = d.storeName;
+    if ($("drawerRegisteredEntityName")) $("drawerRegisteredEntityName").value = d.registeredEntityName;
     if ($("drawerGstNumber")) $("drawerGstNumber").value = d.gstNumber;
     if ($("drawerStateCode")) $("drawerStateCode").value = d.stateCode;
     if ($("drawerWebsiteAddress")) $("drawerWebsiteAddress").value = d.websiteAddress;
@@ -452,11 +482,17 @@ window.addEventListener("DOMContentLoaded", async () => {
   };
 
   try {
-    initialDetails = (await loadStoreDetails()) || normalizeStoreDetails({});
-    currentDetails = initialDetails;
-    canEdit = hasStoreDetails(initialDetails);
-    if (!canEdit) setStatus("Add store details using Edit Details.", { kind: "info" });
-
+    if (bodyStoreId) {
+      initialDetails = (await loadStoreDetails()) || normalizeStoreDetails({});
+      currentDetails = initialDetails;
+      canEdit = hasStoreDetails(initialDetails);
+      if (!canEdit) {
+        setStatus("Add store details using Edit Details.", { kind: "warn" });
+      }
+    } else {
+      canEdit = false;
+      setStatus("Please add your store details.", { kind: "warn" });
+    }
     setStoreDetailsMode(canEdit ? "read" : "edit");
   } catch (error) {
     setStatus(error?.message ?? "Failed to load store details.", { kind: "error" });

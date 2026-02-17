@@ -254,6 +254,7 @@ const buildSchemaRow = (row) => {
       order.shipment_status ??
       ""
   );
+  const hrGid = normalizeString(row.hrGid ?? order.hrGid ?? order?.order?.hrGid ?? "");
 
   return {
     canonicalOrderId,
@@ -280,6 +281,7 @@ const buildSchemaRow = (row) => {
     courierPartner,
     trackingNumber,
     shipmentStatusValue,
+    hrGid,
   };
 };
 
@@ -323,19 +325,21 @@ const getStatusesForTab = (tab) => {
 };
 
 async function fetchFirestoreOrdersForTab({ tab, sinceIso, limit = 50 }) {
-  const collectionId = String(document.body?.dataset?.firestoreCollection ?? "").trim();
-  if (!collectionId) throw new Error("missing_store_collection");
+  const collectionId = "consignments";
+  const storeId = String(document.body?.dataset?.storeId ?? "").trim();
+  if (!storeId) throw new Error("missing_store_id");
   const { firestore, modules } = await ensureFirestoreClient();
   const col = modules.collection(firestore, collectionId);
   const clauses = [];
+  clauses.push(modules.where("storeId", "==", storeId));
   const statuses = getStatusesForTab(tab);
   if (statuses.length) {
     clauses.push(modules.where("shipmentStatus", "in", statuses));
   }
   if (sinceIso) {
-    clauses.push(modules.where("shippingDate", ">=", sinceIso));
+    clauses.push(modules.where("requestedAt", ">=", sinceIso));
   }
-  clauses.push(modules.orderBy("shippingDate", "desc"));
+  clauses.push(modules.orderBy("requestedAt", "desc"));
   clauses.push(modules.limit(limit));
   const q = modules.query(col, ...clauses);
   const snap = await modules.getDocs(q);
@@ -343,19 +347,42 @@ async function fetchFirestoreOrdersForTab({ tab, sinceIso, limit = 50 }) {
 }
 
 async function fetchFirestoreAllOrders({ sinceIso, limit = 50 }) {
-  const collectionId = String(document.body?.dataset?.firestoreCollection ?? "").trim();
-  if (!collectionId) throw new Error("missing_store_collection");
+  const collectionId = "consignments";
+  const storeId = String(document.body?.dataset?.storeId ?? "").trim();
+  if (!storeId) throw new Error("missing_store_id");
   const { firestore, modules } = await ensureFirestoreClient();
   const col = modules.collection(firestore, collectionId);
-  const clauses = [];
+
+  const baseClauses = [];
+  baseClauses.push(modules.where("storeId", "==", storeId));
   if (sinceIso) {
-    clauses.push(modules.where("shippingDate", ">=", sinceIso));
+    baseClauses.push(modules.where("requestedAt", ">=", sinceIso));
   }
-  clauses.push(modules.orderBy("shippingDate", "desc"));
-  clauses.push(modules.limit(limit));
-  const q = modules.query(col, ...clauses);
-  const snap = await modules.getDocs(q);
-  return snap.docs.map((doc) => ({ docId: String(doc.id ?? ""), ...doc.data() }));
+  baseClauses.push(modules.orderBy("requestedAt", "desc"));
+  baseClauses.push(modules.limit(limit));
+  const baseQuery = modules.query(col, ...baseClauses);
+  const baseSnap = await modules.getDocs(baseQuery);
+  const docs = Array.from(baseSnap.docs);
+  const seen = new Set(docs.map((d) => String(d.id ?? "")));
+
+  if (docs.length < limit) {
+    const newClauses = [
+      modules.where("storeId", "==", storeId),
+      modules.where("shipmentStatus", "==", "New"),
+      modules.orderBy("requestedAt", "desc"),
+      modules.limit(limit),
+    ];
+    const newSnap = await modules.getDocs(modules.query(col, ...newClauses));
+    for (const doc of newSnap.docs) {
+      const docId = String(doc.id ?? "");
+      if (seen.has(docId)) continue;
+      docs.push(doc);
+      seen.add(docId);
+      if (docs.length >= limit) break;
+    }
+  }
+
+  return docs.slice(0, limit).map((doc) => ({ docId: String(doc.id ?? ""), ...doc.data() }));
 }
 function pruneSelectionToVisible(orders) {
   const allowed = new Set();
@@ -1148,9 +1175,10 @@ async function ensureFirestoreAssignedRealtime() {
   if (firestoreAssignedState.started) return;
   firestoreAssignedState.started = true;
 
-  const collectionId = String(document.body?.dataset?.firestoreCollection ?? "").trim();
-  if (!collectionId) {
-    setStatus("Missing shop collection id.", { kind: "error" });
+  const collectionId = "consignments";
+  const storeId = String(document.body?.dataset?.storeId ?? "").trim();
+  if (!storeId) {
+    setStatus("Missing store id.", { kind: "error" });
     firestoreAssignedState.ready = true;
     return;
   }
@@ -1176,6 +1204,7 @@ async function ensureFirestoreAssignedRealtime() {
         getFirestore,
         enableIndexedDbPersistence,
         collection,
+        where,
         query,
         orderBy,
         limit,
@@ -1206,6 +1235,7 @@ async function ensureFirestoreAssignedRealtime() {
 
     const q = query(
       collection(db, collectionId),
+      where("storeId", "==", storeId),
       orderBy("requestedAt", "desc"),
       limit(200)
     );
@@ -1215,6 +1245,7 @@ async function ensureFirestoreAssignedRealtime() {
       (snap) => {
         debugLog("assigned_realtime_snapshot", {
           collectionId,
+          storeId,
           scannedDocs: snap?.docs?.length ?? 0,
           filteredDocs: "shipmentStatus == Assigned (client-side)",
         });
@@ -1694,6 +1725,7 @@ const getAllTabRowData = (row) => {
       order.shipment_status ??
       ""
   );
+  const hrGid = normalizeString(row.hrGid ?? order.hrGid ?? order?.order?.hrGid ?? "");
 
   return {
     canonicalOrderId,
@@ -1719,6 +1751,7 @@ const getAllTabRowData = (row) => {
     shipmentStatusValue,
     updatedOnText,
     expectedDeliveryText,
+    hrGid,
   };
 };
 
@@ -1861,9 +1894,16 @@ function renderRows(orders) {
       allTabRow.paymentStatusValue || getPaymentFlag(allTabRow.paymentStatusValue || row?.financialStatus);
     const fulfillmentBadge = createBadge({ label: fulfillmentLabel, kind: fulfillmentBadgeKind });
 
+    const allTabHrGidLine = allTabRow.hrGid
+      ? `<div class="cellMuted mono hrGidValue">${escapeHtml(allTabRow.hrGid)}</div>`
+      : "";
+    const allTabOrderIdHtml = `<div class="cellStack">
+      <div class="cellPrimary mono">${escapeHtml(allTabRow.canonicalOrderId ?? "")}</div>
+      ${allTabHrGidLine}
+    </div>`;
     const cells = [
       { check: true, checked: orderKey && selectedOrderIds.has(orderKey) },
-      { text: allTabRow.canonicalOrderId ?? "", className: "mono" },
+      { html: allTabOrderIdHtml },
       { text: allTabRow.orderDateText ?? "", className: "mono" },
       allTabRow.customerName ?? "",
       allTabRow.address1 ?? "",
@@ -2280,12 +2320,16 @@ function renderRowsAssignedTab(orders) {
       );
     }
 
+    const hrGidLine = assignedRow.hrGid
+      ? `<div class="cellMuted mono hrGidValue">${escapeHtml(assignedRow.hrGid)}</div>`
+      : "";
     const cells = [
       { check: true, checked: orderKey && selectedOrderIds.has(orderKey) },
       {
         html: `<div class="cellStack">
           <div class="cellPrimary mono">${escapeHtml(row?.orderName ?? assignedRow.canonicalOrderId)}</div>
           <div class="cellMuted mono">${escapeHtml(assignedRow.canonicalOrderId)}</div>
+          ${hrGidLine}
         </div>`,
       },
       { text: createdAt, className: "mono" },
@@ -2379,9 +2423,13 @@ function renderRowsInTransitTab(orders) {
     tr.dataset.orderKey = orderKey;
 
     const schemaRow = buildSchemaRow(row);
+    const hrGidLine = schemaRow.hrGid
+      ? `<div class="cellMuted mono hrGidValue">${escapeHtml(schemaRow.hrGid)}</div>`
+      : "";
     const orderDetailsHtml = `<div class="cellStack">
       <div class="cellPrimary">${escapeHtml(schemaRow.orderDisplayName)}</div>
       <div class="cellMuted">${escapeHtml(schemaRow.orderDateText)}</div>
+      ${hrGidLine}
     </div>`;
 
     const customerDetailsHtml = `<div class="cellStack">
@@ -2515,9 +2563,13 @@ function renderRowsDeliveredTab(orders) {
     tr.dataset.orderKey = orderKey;
 
     const schemaRow = buildSchemaRow(row);
+    const hrGidLine = schemaRow.hrGid
+      ? `<div class="cellMuted mono hrGidValue">${escapeHtml(schemaRow.hrGid)}</div>`
+      : "";
     const orderDetailsHtml = `<div class="cellStack">
       <div class="cellPrimary">${escapeHtml(schemaRow.orderDisplayName)}</div>
       <div class="cellMuted">${escapeHtml(schemaRow.orderDateText)}</div>
+      ${hrGidLine}
     </div>`;
 
     const customerDetailsHtml = `<div class="cellStack">
@@ -2634,9 +2686,13 @@ function renderRowsRtoTab(orders) {
     tr.dataset.orderKey = orderKey;
 
     const schemaRow = buildSchemaRow(row);
+    const hrGidLine = schemaRow.hrGid
+      ? `<div class="cellMuted mono hrGidValue">${escapeHtml(schemaRow.hrGid)}</div>`
+      : "";
     const orderDetailsHtml = `<div class="cellStack">
       <div class="cellPrimary">${escapeHtml(schemaRow.orderDisplayName)}</div>
       <div class="cellMuted">${escapeHtml(schemaRow.orderDateText)}</div>
+      ${hrGidLine}
     </div>`;
 
     const customerDetailsHtml = `<div class="cellStack">
@@ -3207,8 +3263,10 @@ async function refreshServerSearch({ append = false } = {}) {
             limit: 50,
           });
     } else {
-      if (activeTab === "assigned" || activeTab === "all") {
+      if (activeTab === "assigned") {
         data = await fetchFirestoreOrders({ status: activeTab, limit: 50 });
+      } else if (activeTab === "all") {
+        data = await fetchFirestoreOrders({ limit: 50 });
       } else if (["in_transit", "delivered", "rto"].includes(activeTab)) {
         const storeId = String(document.body?.dataset?.storeId ?? "").trim();
         data = await fetchConsignments({ tab: activeTab, storeId, limit: 50 });

@@ -88,7 +88,7 @@ export function createAuthApiRouter({ auth, env, logger }) {
         ? (() => {
             const storeId = String(user.storeId ?? "").trim();
             const storeKey = String(user.storeKey ?? "").trim();
-            const collectionId = getShopCollectionInfo({ storeId }).collectionId;
+            const collectionId = "consignments";
             return {
               storeId,
               storeKey,

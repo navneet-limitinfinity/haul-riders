@@ -1,4 +1,3 @@
-import { toOrderDocId } from "../firestore/ids.js";
 import { reserveOrderSequences, formatManualOrderName } from "../firestore/orderSequence.js";
 import { allocateAwbFromPool } from "../awb/awbPoolService.js";
 import { buildSearchTokensFromDoc } from "../firestore/searchTokens.js";
@@ -114,8 +113,8 @@ function pickRowValue(row, keys) {
   return "";
 }
 
-function resolveShopDomainFromStoreId(storeId) {
-  const raw = String(storeId ?? "").trim().toLowerCase();
+function resolveShopDomainFromStoreKey(storeKey) {
+  const raw = String(storeKey ?? "").trim().toLowerCase();
   if (!raw) return "";
   if (raw.includes(".")) return raw;
   return `${raw}.myshopify.com`;
@@ -139,8 +138,8 @@ function normalizeCenterForOrder(data) {
   };
 }
 
-async function loadFulfillmentCentersMap({ firestore, shopsCollection, storeId }) {
-  const domain = resolveShopDomainFromStoreId(storeId);
+async function loadFulfillmentCentersMap({ firestore, shopsCollection, storeKey, shopDomain }) {
+  const domain = String(shopDomain ?? "").trim().toLowerCase() || resolveShopDomainFromStoreKey(storeKey);
   if (!domain) return { byName: new Map(), defaultCenter: null };
   const col = firestore.collection(shopsCollection).doc(domain).collection("fulfillmentCenter");
   try {
@@ -295,7 +294,7 @@ function buildManualOrderDoc({ normalized, index, storeId, displayName, user, fu
   });
   return {
     ...(hrGid ? { hrGid: String(hrGid).trim() } : {}),
-    docId: toOrderDocId(normalized.orderKey),
+    docId: String(hrGid ?? "").trim(),
     storeId,
     shopName: displayName,
     order,
@@ -322,6 +321,8 @@ export async function createManualOrders({
   firestore,
   collectionId,
   storeId,
+  storeKey = "",
+  shopDomain = "",
   displayName,
   user,
   shopsCollection = "shops",
@@ -335,7 +336,8 @@ export async function createManualOrders({
   const { byName: centersByName, defaultCenter } = await loadFulfillmentCentersMap({
     firestore,
     shopsCollection,
-    storeId,
+    storeKey,
+    shopDomain,
   });
 
   const missingOrderIdIndexes = [];
@@ -400,16 +402,51 @@ export async function createManualOrders({
       continue;
     }
 
-    const docId = toOrderDocId(norm.orderKey);
-    const docRef = firestore.collection(collectionId).doc(docId);
+    const orderId = String(norm.orderId ?? "").trim();
+    let docRef = null;
+    let existing = null;
+    let docId = "";
+
+    // Upsert behavior: find existing doc by orderId (unique for onboarding/manual orders).
+    try {
+      const found = await firestore
+        .collection(collectionId)
+        .where("order.orderId", "==", orderId)
+        .limit(2)
+        .get();
+      const match =
+        found.docs.find((d) => String(d.data()?.storeId ?? "").trim() === String(storeId ?? "").trim()) ??
+        found.docs[0] ??
+        null;
+      if (match) {
+        existing = match;
+        docRef = match.ref;
+        docId = match.id;
+      }
+    } catch {
+      // ignore lookup errors; will create new doc
+    }
+
+    if (!docRef) {
+      const allocated = (await reserveHrGids({ firestore, count: 1 }))[0] || "";
+      const hrGidNew = String(allocated ?? "").trim();
+      if (!hrGidNew) {
+        failed += 1;
+        errors.push(`Row ${i + 2}: hrGid_allocation_failed`);
+        continue;
+      }
+      docId = hrGidNew;
+      docRef = firestore.collection(collectionId).doc(docId);
+    }
+
     const centerName = String(norm.fulfillmentCenter ?? "").trim();
     const fulfillmentCenterAddress = centerName ? centersByName.get(centerName) ?? null : defaultCenter;
     const fulfillmentCenterString = fulfillmentCenterAddress ? formatFulfillmentCenterString(fulfillmentCenterAddress) : "";
     try {
-      const existing = await docRef.get();
-      const existingData = existing.data() ?? {};
-      const existingHrGid = String(existingData?.hrGid ?? "").trim();
-      const hrGid = existingHrGid || (await reserveHrGids({ firestore, count: 1 }))[0] || "";
+      const existingSnap = existing || (await docRef.get());
+      const existingData = existingSnap.data() ?? {};
+      const existingHrGid = String(existingData?.hrGid ?? docId ?? "").trim();
+      const hrGid = existingHrGid || String(docId ?? "").trim();
       const doc = buildManualOrderDoc({
         normalized: { ...norm, orderKey: norm.orderKey, orderId: norm.orderId },
         index: i + 1,
@@ -420,7 +457,7 @@ export async function createManualOrders({
         hrGid,
       });
       await docRef.set(doc, { merge: true });
-      if (existing.exists) updated += 1;
+      if (existingSnap.exists) updated += 1;
       else created += 1;
 
       orders.push({
@@ -466,13 +503,26 @@ export async function assignManualOrders({
   let updated = 0;
 
   for (const orderKey of keys) {
-    const docId = toOrderDocId(orderKey);
-    const docRef = firestore.collection(collectionId).doc(docId);
-    const snap = await docRef.get();
-    if (!snap.exists) {
+    const orderId = String(orderKey ?? "").trim();
+    let snap = null;
+    try {
+      const found = await firestore
+        .collection(collectionId)
+        .where("order.orderId", "==", orderId)
+        .limit(2)
+        .get();
+      snap =
+        found.docs.find((d) => String(d.data()?.storeId ?? "").trim() === String(storeId ?? "").trim()) ??
+        found.docs[0] ??
+        null;
+    } catch {
+      snap = null;
+    }
+    if (!snap) {
       missing.push(orderKey);
       continue;
     }
+    const docRef = snap.ref;
 
     const data = snap.data() ?? {};
     const existingDisplayStatus = String(data?.shipmentStatus ?? data?.shipment_status ?? "").trim();
@@ -480,16 +530,16 @@ export async function assignManualOrders({
 
     const existingConsignment = String(data?.consignmentNumber ?? data?.consignment_number ?? "").trim();
     const courierType = String(data?.courierType ?? data?.courier_type ?? "").trim();
-    const orderId = String(data?.order?.orderId ?? "").trim();
+    const orderIdValue = String(data?.order?.orderId ?? "").trim();
     let allocatedAwb = existingConsignment;
     if (!allocatedAwb) {
       try {
         const alloc = await allocateAwbFromPool({
           firestore,
           courierType,
-          docId,
+          docId: snap.id,
           assignedStoreId: storeId,
-          orderId,
+          orderId: orderIdValue,
         });
         allocatedAwb = String(alloc?.awbNumber ?? "").trim();
       } catch {

@@ -2,6 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import { getFirebaseAdmin } from "../auth/firebaseAdmin.js";
 import { ROLE_SHOP } from "../auth/roles.js";
+import { getShopsCollectionName } from "../firestore/storeDocs.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -10,21 +11,50 @@ const upload = multer({
 
 const nowIso = () => new Date().toISOString();
 
-const normalizeShopDomain = (storeId) => {
-  const raw = String(storeId ?? "").trim().toLowerCase();
-  if (!raw) return "";
-  if (raw.includes(".")) return raw;
-  return `${raw}.myshopify.com`;
-};
-
 const normalizePhone10 = (value) => {
   const digits = String(value ?? "").replaceAll(/\D/g, "");
   if (digits.length < 10) return "";
   return digits.slice(-10);
 };
 
+const normalizeStoreIdValue = (value) => String(value ?? "").trim().toLowerCase();
+
+async function resolveStoreDocument({ env, firestore, storeId }) {
+  const normalized = normalizeStoreIdValue(storeId);
+  if (!normalized) return null;
+  const shopsCollection = getShopsCollectionName(env);
+  const collectionRef = firestore.collection(shopsCollection);
+
+  let docRef = collectionRef.doc(normalized);
+  let snap = await docRef.get();
+
+  if (!snap.exists) {
+    const byStoreId = await collectionRef.where("storeId", "==", normalized).limit(1).get();
+    if (!byStoreId.empty) {
+      docRef = byStoreId.docs[0].ref;
+      snap = byStoreId.docs[0];
+    }
+  }
+
+  if (!snap.exists) {
+    const domainQuery = await collectionRef.where("storeDomain", "==", normalized).limit(1).get();
+    if (!domainQuery.empty) {
+      docRef = domainQuery.docs[0].ref;
+      snap = domainQuery.docs[0];
+    }
+  }
+
+  if (!snap.exists) {
+    await docRef.set({ storeId: normalized }, { merge: true });
+    snap = await docRef.get();
+  }
+
+  return { docRef, data: snap.data() ?? {}, id: docRef.id };
+}
+
 const normalizeDetailsPayload = (body) => {
   const storeName = String(body?.storeName ?? "").trim();
+  const registeredEntityName = String(body?.registeredEntityName ?? "").trim();
   const registeredAddress = String(body?.registeredAddress ?? "").trim();
   const gstNumber = String(body?.gstNumber ?? "").trim();
   const stateCode = String(body?.stateCode ?? "").trim();
@@ -35,6 +65,7 @@ const normalizeDetailsPayload = (body) => {
   const contactPersonPhone = normalizePhone10(body?.contactPersonPhone ?? "");
 
   return {
+    registeredEntityName,
     storeName,
     registeredAddress,
     gstNumber,
@@ -60,6 +91,7 @@ const coerceBytesToBuffer = (value) => {
 
 export function createStoreRouter({ env, auth }) {
   const router = Router();
+  const shopsCollection = getShopsCollectionName(env);
 
   router.get("/store/details", auth.requireRole(ROLE_SHOP), async (req, res, next) => {
     try {
@@ -69,18 +101,21 @@ export function createStoreRouter({ env, auth }) {
       }
 
       const storeId = String(req.user?.storeId ?? "").trim().toLowerCase();
-      const shopDomain = normalizeShopDomain(storeId);
-      if (!shopDomain) {
+      if (!storeId) {
         res.status(400).json({ error: "store_id_required" });
         return;
       }
 
       const admin = await getFirebaseAdmin({ env });
       const firestore = admin.firestore();
-      const shopsCollection = String(env.auth.firebase.shopsCollection ?? "shops").trim() || "shops";
-      const snap = await firestore.collection(shopsCollection).doc(shopDomain).get();
-      const data = snap.exists ? snap.data() ?? {} : {};
+      const storeDoc = await resolveStoreDocument({ env, firestore, storeId });
+      if (!storeDoc) {
+        res.status(404).json({ error: "store_document_missing" });
+        return;
+      }
 
+      const data = storeDoc.data;
+      const shopDomain = String(data?.storeDomain ?? storeDoc.id ?? storeId).trim();
       const details = data?.storeDetails && typeof data.storeDetails === "object" ? data.storeDetails : {};
 
       // Shopify UI links (read-only; configured in Firestore).
@@ -93,7 +128,7 @@ export function createStoreRouter({ env, auth }) {
       try {
         const shopifySnap = await firestore
           .collection(shopsCollection)
-          .doc(shopDomain)
+          .doc(storeDoc.id)
           .collection("shopify")
           .doc("config")
           .get();
@@ -106,8 +141,10 @@ export function createStoreRouter({ env, auth }) {
       res.setHeader("Cache-Control", "no-store");
       res.json({
         shopDomain,
+        storeId: String(data?.storeId ?? storeId ?? "").trim(),
         storeDetails: {
           storeName: String(details?.storeName ?? "").trim(),
+          registeredEntityName: String(details?.registeredEntityName ?? "").trim(),
           registeredAddress: String(details?.registeredAddress ?? "").trim(),
           gstNumber: String(details?.gstNumber ?? "").trim(),
           stateCode: String(details?.stateCode ?? "").trim(),
@@ -137,8 +174,7 @@ export function createStoreRouter({ env, auth }) {
       }
 
       const storeId = String(req.user?.storeId ?? "").trim().toLowerCase();
-      const shopDomain = normalizeShopDomain(storeId);
-      if (!shopDomain) {
+      if (!storeId) {
         res.status(400).json({ error: "store_id_required" });
         return;
       }
@@ -148,12 +184,15 @@ export function createStoreRouter({ env, auth }) {
 
       const admin = await getFirebaseAdmin({ env });
       const firestore = admin.firestore();
-      const shopsCollection = String(env.auth.firebase.shopsCollection ?? "shops").trim() || "shops";
+      const storeDoc = await resolveStoreDocument({ env, firestore, storeId });
+      if (!storeDoc) {
+        res.status(404).json({ error: "store_document_missing" });
+        return;
+      }
 
-      await firestore
-        .collection(shopsCollection)
-        .doc(shopDomain)
-        .set({ storeDetails: { ...payload, updatedAt } }, { merge: true });
+      const shopDomain = String(storeDoc.data?.storeDomain ?? storeDoc.id ?? storeId).trim();
+
+      await storeDoc.docRef.set({ storeDetails: { ...payload, updatedAt } }, { merge: true });
 
       res.setHeader("Cache-Control", "no-store");
       res.json({ ok: true, shopDomain, updatedAt });
@@ -170,18 +209,26 @@ export function createStoreRouter({ env, auth }) {
       }
 
       const storeId = String(req.user?.storeId ?? "").trim().toLowerCase();
-      const shopDomain = normalizeShopDomain(storeId);
-      if (!shopDomain) {
+      if (!storeId) {
         res.status(400).json({ error: "store_id_required" });
         return;
       }
 
       const admin = await getFirebaseAdmin({ env });
       const firestore = admin.firestore();
-      const shopsCollection = String(env.auth.firebase.shopsCollection ?? "shops").trim() || "shops";
+      const storeDoc = await resolveStoreDocument({ env, firestore, storeId });
+      if (!storeDoc) {
+        res.status(404).json({ error: "store_document_missing" });
+        return;
+      }
 
-      const docRef = firestore.collection(shopsCollection).doc(shopDomain).collection("branding").doc("logo");
-      const snap = await docRef.get();
+      const brandDocId = String(storeDoc?.data?.storeId ?? storeId ?? storeDoc.id ?? "").trim();
+      const brandDocRef = firestore
+        .collection(shopsCollection)
+        .doc(brandDocId)
+        .collection("branding")
+        .doc("logo");
+      const snap = await brandDocRef.get();
       if (!snap.exists) {
         res.status(404).json({ error: "logo_not_found" });
         return;
@@ -215,8 +262,7 @@ export function createStoreRouter({ env, auth }) {
         }
 
         const storeId = String(req.user?.storeId ?? "").trim().toLowerCase();
-        const shopDomain = normalizeShopDomain(storeId);
-        if (!shopDomain) {
+        if (!storeId) {
           res.status(400).json({ error: "store_id_required" });
           return;
         }
@@ -242,9 +288,19 @@ export function createStoreRouter({ env, auth }) {
 
         const admin = await getFirebaseAdmin({ env });
         const firestore = admin.firestore();
-        const shopsCollection = String(env.auth.firebase.shopsCollection ?? "shops").trim() || "shops";
+        const storeDoc = await resolveStoreDocument({ env, firestore, storeId });
+        if (!storeDoc) {
+          res.status(404).json({ error: "store_document_missing" });
+          return;
+        }
+        const shopDomain = String(storeDoc.data?.storeDomain ?? storeDoc.id ?? storeId).trim();
 
-        const docRef = firestore.collection(shopsCollection).doc(shopDomain).collection("branding").doc("logo");
+        const brandDocId = String(storeDoc?.data?.storeId ?? storeId ?? storeDoc?.id ?? "").trim();
+        const docRef = firestore
+          .collection(shopsCollection)
+          .doc(brandDocId)
+          .collection("branding")
+          .doc("logo");
         const updatedAt = nowIso();
         await docRef.set({ contentType, sizeBytes, updatedAt, data: file.buffer }, { merge: true });
 

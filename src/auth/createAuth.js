@@ -90,13 +90,11 @@ async function resolveUserFromFirebase({ env, logger, req }) {
   }
 
   // Shop users: use users/<uid>.storeId (full shop domain like `abc.myshopify.com`).
-  const profileStoreId = String(profile?.storeId ?? "").trim().toLowerCase();
-  const tokenStoreId = String(decoded?.storeId ?? decoded?.shopDomain ?? decoded?.shop ?? "")
-    .trim()
-    .toLowerCase();
+  const profileStoreId = String(profile?.storeId ?? "").trim();
+  const tokenStoreId = String(decoded?.storeId ?? decoded?.shopDomain ?? decoded?.shop ?? "").trim();
   // Always prefer Firestore profile storeId (source of truth); fall back to token only if missing.
   const storeId = profileStoreId || tokenStoreId;
-  const storeKey = toShopDomainKey(storeId);
+  const storeKey = storeId;
 
   return {
     provider: "firebase",
@@ -117,7 +115,7 @@ function resolveUserFromDev({ env }) {
     email: "",
     role: env.auth.dev.role === ROLE_ADMIN ? ROLE_ADMIN : ROLE_SHOP,
     storeId,
-    storeKey: toShopDomainKey(storeId),
+    storeKey: storeId,
     claims: {},
   };
 }

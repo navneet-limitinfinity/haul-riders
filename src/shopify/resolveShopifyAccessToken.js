@@ -1,20 +1,14 @@
 import { getFirebaseAdmin } from "../auth/firebaseAdmin.js";
+import { loadStoreDoc } from "../firestore/storeDocs.js";
 
-const normalizeDomain = (domain) => String(domain ?? "").trim().toLowerCase();
-
-const tokenCache = new Map();
 const CACHE_TTL_MS = 60_000;
+const tokenCache = new Map();
 
-async function readAccessTokenFromShopsDoc({ firestore, shopsCollection, shopDomain }) {
-  const docRef = firestore.collection(shopsCollection).doc(shopDomain);
-  const snap = await docRef.get();
-  if (!snap.exists) return "";
-  const data = snap.data() ?? {};
+const normalizeValue = (value) => String(value ?? "").trim().toLowerCase();
 
-  // Supported structures (historical + current):
-  // - shops/<shopDomain> { shopify: { accessToken: "..." } }
-  // - shops/<shopDomain> { accessToken: "..." }
-  // - shops/<shopDomain> { shopifyAccessToken: "..." }
+async function readAccessTokenFromDoc({ doc }) {
+  if (!doc?.exists) return "";
+  const data = doc.data() ?? {};
   const shopify = data.shopify && typeof data.shopify === "object" ? data.shopify : null;
   const direct = String(data.accessToken ?? "").trim();
   const legacy = String(data.shopifyAccessToken ?? "").trim();
@@ -23,9 +17,8 @@ async function readAccessTokenFromShopsDoc({ firestore, shopsCollection, shopDom
   if (direct) return direct;
   if (legacy) return legacy;
 
-  // Fallback: shops/<shopDomain>/shopify/config { accessToken: "..." }
   try {
-    const configSnap = await docRef.collection("shopify").doc("config").get();
+    const configSnap = await doc.ref.collection("shopify").doc("config").get();
     if (!configSnap.exists) return "";
     const config = configSnap.data() ?? {};
     return String(config?.accessToken ?? "").trim();
@@ -34,25 +27,21 @@ async function readAccessTokenFromShopsDoc({ firestore, shopsCollection, shopDom
   }
 }
 
-export async function resolveShopifyAccessToken({ env, shopDomain }) {
-  const domain = normalizeDomain(shopDomain);
-  if (!domain) return "";
+export async function resolveShopifyAccessToken({ env, storeId, shopDomain }) {
+  const identifier = normalizeValue(storeId ?? shopDomain ?? "");
+  if (!identifier) return "";
 
-  const cached = tokenCache.get(domain);
+  const cached = tokenCache.get(identifier);
   if (cached && cached.expiresAt > Date.now()) return cached.token;
 
   if (env?.auth?.provider !== "firebase") return "";
 
   const admin = await getFirebaseAdmin({ env });
   const firestore = admin.firestore();
-  const shopsCollection = String(env.auth.firebase.shopsCollection ?? "shops").trim() || "shops";
 
-  const token = await readAccessTokenFromShopsDoc({
-    firestore,
-    shopsCollection,
-    shopDomain: domain,
-  });
+  const doc = await loadStoreDoc({ env, firestore, storeId: identifier });
+  const token = await readAccessTokenFromDoc({ doc });
 
-  tokenCache.set(domain, { token, expiresAt: Date.now() + CACHE_TTL_MS });
+  tokenCache.set(identifier, { token, expiresAt: Date.now() + CACHE_TTL_MS });
   return token;
 }

@@ -17,7 +17,7 @@ function normalizeShipFrom(value) {
   };
 }
 
-export async function resolveShipFrom({ env, shopDomain }) {
+export async function resolveShipFrom({ env, storeId }) {
   const fallback = normalizeShipFrom(env?.shipFrom) ?? {
     name: "Haul Riders",
     address1: "",
@@ -29,7 +29,7 @@ export async function resolveShipFrom({ env, shopDomain }) {
     phone: "",
   };
 
-  const doc = await getShopDoc({ env, shopDomain });
+  const doc = await getShopDoc({ env, storeId });
   const data = doc?.data ?? null;
   const from = normalizeShipFrom(data?.shipFrom);
   if (!from) return fallback;
@@ -40,4 +40,3 @@ export async function resolveShipFrom({ env, shopDomain }) {
     name: from.name || fallback.name,
   };
 }
-

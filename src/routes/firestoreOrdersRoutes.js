@@ -3,9 +3,14 @@ import { getFirebaseAdmin } from "../auth/firebaseAdmin.js";
 import { getShopCollectionInfo } from "../firestore/shopCollections.js";
 import { toOrderDocId } from "../firestore/ids.js";
 import { buildSearchTokensFromDoc } from "../firestore/searchTokens.js";
+import { loadStoreDoc } from "../firestore/storeDocs.js";
 
 export function createFirestoreOrdersRouter({ env, auth }) {
   const router = Router();
+  const wantsDebug = (req) =>
+    String(req.query?.debug ?? "").trim() === "1" ||
+    String(env?.logLevel ?? "").trim().toLowerCase() === "debug" ||
+    String(process.env.NODE_ENV ?? "").trim().toLowerCase() !== "production";
 
   const normalizeShipmentStatus = (value) => {
     const s = String(value ?? "").trim().toLowerCase();
@@ -250,21 +255,77 @@ export function createFirestoreOrdersRouter({ env, auth }) {
         Math.min(250, Number.parseInt(req.query?.limit ?? "200", 10) || 200)
       );
 
-      const { collectionId, displayName, storeId: normalizedStoreId } = getShopCollectionInfo({
-        storeId: storeId || shopDomain,
-      });
-      // NOTE: Firestore order-reading logic intentionally removed for `/shop/orders` and `/admin/orders`.
-      // You will implement your new architecture to fetch/read orders in all tabs.
-      const orders = [];
-      const nextCursor = "";
+      const admin = await getFirebaseAdmin({ env });
+      const firestore = admin.firestore();
+      const storeDoc =
+        (storeId || shopDomain)
+          ? await loadStoreDoc({ env, firestore, storeId: storeId || shopDomain })
+          : null;
+      const canonicalStoreId = String(storeDoc?.id ?? storeDoc?.data()?.storeId ?? storeId ?? "").trim();
+      if (!canonicalStoreId) {
+        res.status(404).json({ error: "store_document_missing" });
+        return;
+      }
+
+      const storeDetails = storeDoc?.data() ?? {};
+      const shopName =
+        String(
+          storeDetails?.storeDetails?.storeName ??
+            storeDetails?.storeName ??
+            storeDetails?.displayName ??
+            canonicalStoreId
+        ).trim();
+
+      const collectionId = "consignments";
+      const scanLimit = Math.min(Math.max(limit * 3, limit + 10, 50), 500);
+
+      const snapshot = await firestore
+        .collection(collectionId)
+        .where("storeId", "==", canonicalStoreId)
+        .orderBy("requestedAt", "desc")
+        .limit(scanLimit)
+        .get();
+
+      const statusVariants =
+        statusNorm && statusNorm !== "all" ? getStatusVariants(statusNorm) : [];
+      const statusSet =
+        statusVariants.length > 0
+          ? new Set(statusVariants.map((value) => String(value ?? "").trim().toLowerCase()))
+          : null;
+
+      const filtered = [];
+      for (const doc of snapshot.docs) {
+        const data = doc.data() ?? {};
+        if (statusSet) {
+          const display = String(
+            normalizeDisplayShipmentStatus(data?.shipmentStatus ?? data?.shipment_status)
+          )
+            .toLowerCase()
+            .trim();
+          if (!display || !statusSet.has(display)) continue;
+        }
+        if (q && !matchesSearch({ data, q })) continue;
+        filtered.push({ docId: doc.id, data });
+        if (filtered.length >= limit) break;
+      }
+
+      const orders = filtered.map(({ docId, data }) => ({ docId, ...data }));
+      const hasMore = filtered.length >= limit && snapshot.docs.length > filtered.length;
+      const nextCursor =
+        hasMore && filtered.length > 0
+          ? encodeCursor({
+              requestedAt: String(filtered[filtered.length - 1]?.data?.requestedAt ?? ""),
+              docId: filtered[filtered.length - 1]?.docId ?? "",
+            })
+          : "";
 
       res.setHeader("Cache-Control", "no-store");
       res.json({
-        shopName: displayName,
-        storeId: normalizedStoreId,
+        shopName,
+        storeId: canonicalStoreId,
         status: statusNorm || "assigned",
         count: orders.length,
-        nextCursor: nextCursor || "",
+        nextCursor,
         orders,
         ...(wantsDebug(req)
           ? {
@@ -273,10 +334,8 @@ export function createFirestoreOrdersRouter({ env, auth }) {
                 status: statusNorm || "assigned",
                 query: q,
                 limit,
-                scannedDocs: 0,
-                scannedBatches: 0,
-                returnedDocs: 0,
-                note: "firestore_read_logic_removed",
+                scannedDocs: snapshot.docs.length,
+                returnedDocs: orders.length,
               },
             }
           : {}),
@@ -454,16 +513,11 @@ export function createFirestoreOrdersRouter({ env, auth }) {
     }
   });
 
-  const resolveShopDomain = ({ storeId }) => {
-    const raw = String(storeId ?? "").trim().toLowerCase();
-    if (!raw) return "";
-    if (raw.includes(".")) return raw;
-    return `${raw}.myshopify.com`;
-  };
-
-  const getFulfillmentCentersRef = ({ firestore, shopDomain }) => {
+  const getFulfillmentCentersRef = ({ firestore, storeDocId }) => {
     const shopsCollection = String(env?.auth?.firebase?.shopsCollection ?? "shops").trim() || "shops";
-    return firestore.collection(shopsCollection).doc(shopDomain).collection("fulfillmentCenter");
+    const normalized = String(storeDocId ?? "").trim().toLowerCase();
+    if (!normalized) return null;
+    return firestore.collection(shopsCollection).doc(normalized).collection("fulfillmentCenter");
   };
 
   router.get(
@@ -476,21 +530,25 @@ export function createFirestoreOrdersRouter({ env, auth }) {
           return;
         }
 
-        const storeId = String(req.query?.storeId ?? req.query?.store ?? req.query?.shopDomain ?? "").trim().toLowerCase();
-        const shopDomain = resolveShopDomain({ storeId });
-        if (!shopDomain) {
+        const rawStoreId = String(req.query?.storeId ?? req.query?.store ?? req.query?.shopDomain ?? "").trim();
+        const { storeId: storeKey } = getShopCollectionInfo({ storeId: rawStoreId });
+        if (!storeKey) {
           res.status(400).json({ error: "store_id_required" });
           return;
         }
 
         const admin = await getFirebaseAdmin({ env });
         const firestore = admin.firestore();
-        const centersRef = getFulfillmentCentersRef({ firestore, shopDomain });
+        const centersRef = getFulfillmentCentersRef({ firestore, storeDocId: storeKey });
+        if (!centersRef) {
+          res.status(400).json({ error: "store_id_required" });
+          return;
+        }
         const snap = await centersRef.orderBy("originName", "asc").get();
         const centers = snap.docs.map((d) => ({ id: d.id, ...(d.data() ?? {}) }));
 
         res.setHeader("Cache-Control", "no-store");
-        res.json({ shopDomain, count: centers.length, centers });
+        res.json({ storeId: storeKey, count: centers.length, centers });
       } catch (error) {
         next(error);
       }
@@ -529,21 +587,25 @@ export function createFirestoreOrdersRouter({ env, auth }) {
           return;
         }
 
-        const storeId = String(req.user?.storeId ?? "").trim().toLowerCase();
-        const shopDomain = resolveShopDomain({ storeId });
-        if (!shopDomain) {
+        const rawStoreId = String(req.user?.storeId ?? "").trim();
+        const { storeId: storeKey } = getShopCollectionInfo({ storeId: rawStoreId });
+        if (!storeKey) {
           res.status(400).json({ error: "store_id_required" });
           return;
         }
 
         const admin = await getFirebaseAdmin({ env });
         const firestore = admin.firestore();
-        const centersRef = getFulfillmentCentersRef({ firestore, shopDomain });
+        const centersRef = getFulfillmentCentersRef({ firestore, storeDocId: storeKey });
+        if (!centersRef) {
+          res.status(400).json({ error: "store_id_required" });
+          return;
+        }
         const snap = await centersRef.orderBy("originName", "asc").get();
         const centers = snap.docs.map((d) => ({ id: d.id, ...(d.data() ?? {}) }));
 
         res.setHeader("Cache-Control", "no-store");
-        res.json({ shopDomain, count: centers.length, centers });
+        res.json({ storeId: storeKey, count: centers.length, centers });
       } catch (error) {
         next(error);
       }
@@ -560,9 +622,9 @@ export function createFirestoreOrdersRouter({ env, auth }) {
           return;
         }
 
-        const storeId = String(req.user?.storeId ?? "").trim().toLowerCase();
-        const shopDomain = resolveShopDomain({ storeId });
-        if (!shopDomain) {
+        const rawStoreId = String(req.user?.storeId ?? "").trim();
+        const { storeId: storeKey } = getShopCollectionInfo({ storeId: rawStoreId });
+        if (!storeKey) {
           res.status(400).json({ error: "store_id_required" });
           return;
         }
@@ -575,7 +637,11 @@ export function createFirestoreOrdersRouter({ env, auth }) {
 
         const admin = await getFirebaseAdmin({ env });
         const firestore = admin.firestore();
-        const centersRef = getFulfillmentCentersRef({ firestore, shopDomain });
+        const centersRef = getFulfillmentCentersRef({ firestore, storeDocId: storeKey });
+        if (!centersRef) {
+          res.status(400).json({ error: "store_id_required" });
+          return;
+        }
         const existing = await centersRef.get();
 
         const isFirst = existing.empty;
@@ -618,9 +684,9 @@ export function createFirestoreOrdersRouter({ env, auth }) {
           return;
         }
 
-        const storeId = String(req.user?.storeId ?? "").trim().toLowerCase();
-        const shopDomain = resolveShopDomain({ storeId });
-        if (!shopDomain) {
+        const rawStoreId = String(req.user?.storeId ?? "").trim();
+        const { storeId: storeKey } = getShopCollectionInfo({ storeId: rawStoreId });
+        if (!storeKey) {
           res.status(400).json({ error: "store_id_required" });
           return;
         }
@@ -633,7 +699,11 @@ export function createFirestoreOrdersRouter({ env, auth }) {
 
         const admin = await getFirebaseAdmin({ env });
         const firestore = admin.firestore();
-        const centersRef = getFulfillmentCentersRef({ firestore, shopDomain });
+        const centersRef = getFulfillmentCentersRef({ firestore, storeDocId: storeKey });
+        if (!centersRef) {
+          res.status(400).json({ error: "store_id_required" });
+          return;
+        }
         const docRef = centersRef.doc(centerId);
         const snap = await docRef.get();
         if (!snap.exists) {
@@ -679,16 +749,20 @@ export function createFirestoreOrdersRouter({ env, auth }) {
           return;
         }
 
-        const storeId = String(req.user?.storeId ?? "").trim().toLowerCase();
-        const shopDomain = resolveShopDomain({ storeId });
-        if (!shopDomain) {
+        const rawStoreId = String(req.user?.storeId ?? "").trim();
+        const { storeId: storeKey } = getShopCollectionInfo({ storeId: rawStoreId });
+        if (!storeKey) {
           res.status(400).json({ error: "store_id_required" });
           return;
         }
 
         const admin = await getFirebaseAdmin({ env });
         const firestore = admin.firestore();
-        const centersRef = getFulfillmentCentersRef({ firestore, shopDomain });
+        const centersRef = getFulfillmentCentersRef({ firestore, storeDocId: storeKey });
+        if (!centersRef) {
+          res.status(400).json({ error: "store_id_required" });
+          return;
+        }
         const all = await centersRef.get();
         if (all.empty) {
           res.status(404).json({ error: "center_not_found" });
@@ -732,16 +806,20 @@ export function createFirestoreOrdersRouter({ env, auth }) {
           return;
         }
 
-        const storeId = String(req.user?.storeId ?? "").trim().toLowerCase();
-        const shopDomain = resolveShopDomain({ storeId });
-        if (!shopDomain) {
+        const rawStoreId = String(req.user?.storeId ?? "").trim();
+        const { storeId: storeKey } = getShopCollectionInfo({ storeId: rawStoreId });
+        if (!storeKey) {
           res.status(400).json({ error: "store_id_required" });
           return;
         }
 
         const admin = await getFirebaseAdmin({ env });
         const firestore = admin.firestore();
-        const centersRef = getFulfillmentCentersRef({ firestore, shopDomain });
+        const centersRef = getFulfillmentCentersRef({ firestore, storeDocId: storeKey });
+        if (!centersRef) {
+          res.status(400).json({ error: "store_id_required" });
+          return;
+        }
         const all = await centersRef.get();
         if (all.empty) {
           res.status(404).json({ error: "center_not_found" });

@@ -6,6 +6,7 @@
   --bg2: #0a0f1c;
   --panel: rgba(255, 255, 255, 0.04);
   --panel2: rgba(255, 255, 255, 0.02);
+  --drawer-bg: rgba(10, 15, 28, 0.95);
   --text: #e6edf7;
   --muted: #9fb0cc;
   --border: rgba(255, 255, 255, 0.12);
@@ -18,11 +19,12 @@
 }
 
 @media (prefers-color-scheme: light) {
-  :root {
+:root {
     --bg: #f4f7fb;
     --bg2: #eef3ff;
     --panel: rgba(255, 255, 255, 0.72);
     --panel2: rgba(255, 255, 255, 0.86);
+    --drawer-bg: #ffffff;
     --text: #0f172a;
     --muted: #475569;
     --border: rgba(15, 23, 42, 0.12);
@@ -1026,7 +1028,7 @@ body[data-page="store"] #brandingLogoFile {
   right: 0;
   height: 100dvh;
   width: min(520px, 92vw);
-  background: var(--panel2);
+  background: var(--drawer-bg);
   border-left: 1px solid var(--border);
   box-shadow: -20px 0 60px rgba(0, 0, 0, 0.25);
   z-index: 61;
@@ -1078,6 +1080,9 @@ body[data-page="fulfillment-centers"] .sideDrawer select {
   width: 100%;
   border-radius: 8px;
   box-sizing: border-box;
+  background: var(--bg2);
+  color: var(--text);
+  border: 1px solid var(--border);
 }
 
 body[data-page="store"] .sideDrawer .field textarea,

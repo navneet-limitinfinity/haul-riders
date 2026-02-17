@@ -1,14 +1,16 @@
 import { Router } from "express";
 import { getFirebaseAdmin } from "../auth/firebaseAdmin.js";
 import { ROLE_ADMIN, ROLE_SHOP } from "../auth/roles.js";
-import { getShopCollectionInfo } from "../firestore/shopCollections.js";
 import { toOrderDocId } from "../firestore/ids.js";
 import { generateShippingLabelPdfBuffer } from "../shipments/label/shippingLabelPdf.js";
 import { PDFDocument } from "pdf-lib";
 import { allocateAwbFromPool } from "../awb/awbPoolService.js";
 import { buildSearchTokensFromDoc } from "../firestore/searchTokens.js";
 import { reserveHrGids } from "../firestore/hrGid.js";
+import { getShopCollectionInfo } from "../firestore/shopCollections.js";
+import { getShopsCollectionName, loadStoreDoc } from "../firestore/storeDocs.js";
 
+const CONSIGNMENTS_COLLECTION = "consignments";
 const internalToDisplayShipmentStatus = (value) => {
   const s = String(value ?? "").trim().toLowerCase();
   if (!s) return "";
@@ -57,17 +59,11 @@ const normalizeShipmentStatus = (value) => {
 export function createShipmentsRouter({ env, auth }) {
   const router = Router();
 
-  const resolveShopDomain = ({ storeId }) => {
-    const raw = String(storeId ?? "").trim().toLowerCase();
-    if (!raw) return "";
-    if (raw.includes(".")) return raw;
-    return `${raw}.myshopify.com`;
-  };
-
   const normalizeCenterForOrder = (data) => {
     const d = data && typeof data === "object" ? data : {};
     const originName = String(d.originName ?? "").trim();
     if (!originName) return null;
+    const countryCandidate = String(d.country ?? "IN").trim();
     return {
       originName,
       contactPersonName: String(d.contactPersonName ?? "").trim(),
@@ -76,17 +72,17 @@ export function createShipmentsRouter({ env, auth }) {
       city: String(d.city ?? "").trim(),
       state: String(d.state ?? "").trim(),
       pinCode: String(d.pinCode ?? "").trim(),
-      country: String(d.country ?? "IN").trim() || "IN",
+      country: countryCandidate || "IN",
       phone: String(d.phone ?? "").trim(),
       default: Boolean(d.default),
     };
   };
 
-  const resolveFulfillmentCenterAddress = async ({ firestore, shopDomain, originName }) => {
-    const domain = resolveShopDomain({ storeId: shopDomain });
-    if (!domain) return null;
-    const shopsCollection = String(env?.auth?.firebase?.shopsCollection ?? "shops").trim() || "shops";
-    const centersCol = firestore.collection(shopsCollection).doc(domain).collection("fulfillmentCenter");
+  const resolveFulfillmentCenterAddress = async ({ firestore, storeDocId, originName }) => {
+    const normalized = String(storeDocId ?? "").trim().toLowerCase();
+    if (!normalized) return null;
+    const shopsCollection = getShopsCollectionName(env);
+    const centersCol = firestore.collection(shopsCollection).doc(normalized).collection("fulfillmentCenter");
     const requested = String(originName ?? "").trim();
     if (!requested) return null;
     try {
@@ -185,11 +181,16 @@ export function createShipmentsRouter({ env, auth }) {
       }
 
       const admin = await getFirebaseAdmin({ env });
-      const { collectionId, displayName, storeId: normalizedStoreId } = getShopCollectionInfo({
-        storeId,
-      });
+      const firestore = admin.firestore();
+      const collectionId = CONSIGNMENTS_COLLECTION;
       const docId = toOrderDocId(orderKey);
-      const docRef = admin.firestore().collection(collectionId).doc(docId);
+      const docRef = firestore.collection(collectionId).doc(docId);
+      const storeDoc = await loadStoreDoc({ firestore, env, storeId });
+      const storeData = storeDoc?.data() ?? {};
+      const storeNameCandidate =
+        storeData?.storeDetails?.storeName ?? storeData?.storeName ?? "";
+      const storeName = String(storeNameCandidate).trim() || storeId;
+      const storeKey = getShopCollectionInfo({ storeId }).storeId;
 
       const existing = await docRef.get();
       if (existing.exists) {
@@ -205,16 +206,16 @@ export function createShipmentsRouter({ env, auth }) {
         return;
       }
 
-      const firestore = admin.firestore();
       const hrGid = (await reserveHrGids({ firestore, count: 1 }))[0] || "";
       const centerName = String(order?.fulfillmentCenter ?? "").trim();
-      const centerAddress = centerName
-        ? await resolveFulfillmentCenterAddress({
-            firestore,
-            shopDomain: normalizedStoreId,
-            originName: centerName,
-          })
-        : null;
+      const centerAddress =
+        centerName && storeKey
+          ? await resolveFulfillmentCenterAddress({
+              firestore,
+              storeDocId: storeKey,
+              originName: centerName,
+            })
+          : null;
       const centerString = centerAddress ? formatFulfillmentCenterString(centerAddress) : "";
       const orderToPersist =
         order && typeof order === "object"
@@ -228,7 +229,7 @@ export function createShipmentsRouter({ env, auth }) {
           firestore,
           courierType,
           docId,
-          assignedStoreId: normalizedStoreId,
+          assignedStoreId: storeId,
           orderId,
         });
         allocatedAwb = String(alloc?.awbNumber ?? "").trim();
@@ -245,8 +246,8 @@ export function createShipmentsRouter({ env, auth }) {
           {
             docId,
             ...(hrGid ? { hrGid } : {}),
-            storeId: normalizedStoreId,
-            shopName: displayName,
+            storeId,
+            shopName: storeName,
             order: orderToPersist,
             shipmentStatus,
             shippingDate,
@@ -275,7 +276,7 @@ export function createShipmentsRouter({ env, auth }) {
       res.json({
         ok: true,
         shipment: { shipmentStatus, updatedAt: assignedAt, shippingDate },
-        firestore: { collectionId, docId, storeId: normalizedStoreId },
+        firestore: { collectionId, docId, storeId },
       });
     } catch (error) {
       next(error);
@@ -302,16 +303,21 @@ export function createShipmentsRouter({ env, auth }) {
       const shipmentStatusDisplay = internalToDisplayShipmentStatus(shipmentStatus) || "";
 
       const admin = await getFirebaseAdmin({ env });
-      const { collectionId, displayName, storeId: normalizedStoreId } = getShopCollectionInfo({
-        storeId,
-      });
-      const docId = String(req.body?.docId ?? "").trim() || toOrderDocId(String(req.body?.orderKey ?? "").trim());
+      const firestore = admin.firestore();
+      const collectionId = CONSIGNMENTS_COLLECTION;
+      const docIdFromBody = String(req.body?.docId ?? "").trim();
+      const docId = docIdFromBody || toOrderDocId(String(req.body?.orderKey ?? "").trim());
       if (!docId) {
         res.status(400).json({ error: "order_key_required" });
         return;
       }
-      const docRef = admin.firestore().collection(collectionId).doc(docId);
+      const docRef = firestore.collection(collectionId).doc(docId);
       const historyRef = docRef.collection("shipment_status_history").doc();
+      const storeDoc = await loadStoreDoc({ firestore, env, storeId });
+      const storeDetails = storeDoc?.data() ?? {};
+      const storeNameCandidate =
+        storeDetails?.storeDetails?.storeName ?? storeDetails?.storeName ?? "";
+      const storeName = String(storeNameCandidate).trim() || storeId;
 
       await admin.firestore().runTransaction(async (tx) => {
         const snap = await tx.get(docRef);
@@ -319,16 +325,21 @@ export function createShipmentsRouter({ env, auth }) {
         const prevDisplay = getDocDisplayShipmentStatus(data) || "";
         const shippingDate = getDocShippingDateIso(data) || "";
         const existingOrder = data?.order && typeof data.order === "object" ? data.order : {};
-        const nextConsignmentNumber = trackingNumber ? trackingNumber : String(data?.consignmentNumber ?? data?.consignment_number ?? "").trim();
-        const nextCourierPartner = String(data?.courierPartner ?? data?.courier_partner ?? "").trim() || (nextConsignmentNumber ? "DTDC" : "");
+        const nextConsignmentNumber = trackingNumber
+          ? trackingNumber
+          : String(data?.consignmentNumber ?? data?.consignment_number ?? "").trim();
+        const courierPartnerCandidate = String(
+          data?.courierPartner ?? data?.courier_partner ?? ""
+        ).trim();
+        const nextCourierPartner = courierPartnerCandidate || (nextConsignmentNumber ? "DTDC" : "");
         const nextCourierType = String(data?.courierType ?? data?.courier_type ?? "").trim();
 
         tx.set(
           docRef,
           {
             docId,
-            storeId: normalizedStoreId,
-            shopName: displayName,
+            storeId,
+            shopName: storeName,
             shipmentStatus: shipmentStatusDisplay,
             ...(trackingNumber ? { consignmentNumber: trackingNumber } : {}),
             ...(trackingNumber ? { courierPartner: nextCourierPartner } : {}),
@@ -367,7 +378,7 @@ export function createShipmentsRouter({ env, auth }) {
       res.json({
         ok: true,
         shipment: { shipmentStatus: shipmentStatusDisplay, consignmentNumber: trackingNumber, updatedAt },
-        firestore: { collectionId, docId, storeId: normalizedStoreId },
+        firestore: { collectionId, docId, storeId },
       });
     } catch (error) {
       next(error);
@@ -402,28 +413,48 @@ export function createShipmentsRouter({ env, auth }) {
         }
 
         const admin = await getFirebaseAdmin({ env });
-        const { collectionId } = getShopCollectionInfo({ storeId });
-        const docId = docIdFromQuery || toOrderDocId(orderKey);
-        const snap = await admin.firestore().collection(collectionId).doc(docId).get();
-        if (!snap.exists) {
+        const firestore = admin.firestore();
+        const collectionId = CONSIGNMENTS_COLLECTION;
+        const storeDoc = await loadStoreDoc({ firestore, env, storeId });
+        const storeData = storeDoc?.data() ?? {};
+        const shopDomainCandidate = String(storeData?.storeDomain ?? storeDoc?.id ?? "").trim();
+        const shopDomain = shopDomainCandidate || storeId;
+        const storedStoreId = String(storeData?.storeId ?? storeDoc?.id ?? storeId).trim();
+        const lookupId = docIdFromQuery || toOrderDocId(orderKey);
+        let snap = await firestore.collection(collectionId).doc(lookupId).get();
+        if (!snap.exists && orderKey) {
+          const search = await firestore
+            .collection(collectionId)
+            .where("order.orderId", "==", orderKey)
+            .limit(1)
+            .get();
+          if (!search.empty) {
+            snap = search.docs[0];
+          }
+        }
+
+        if (!snap?.exists) {
           res.status(404).json({ error: "shipment_not_found" });
           return;
         }
 
+        const actualDocId = snap.id;
         const doc = snap.data() ?? {};
 
         const pdf = await generateShippingLabelPdfBuffer({
           env,
-          shopDomain: storeId,
+          shopDomain,
+          storeId: storedStoreId,
           firestoreDoc: doc,
         });
 
-        const filenameSafe = `label_${docId}.pdf`;
+        const filenameSafe = `label_${actualDocId}.pdf`;
         res.setHeader("Cache-Control", "no-store");
         res.setHeader("Content-Type", "application/pdf");
         res.setHeader("Content-Disposition", `attachment; filename="${filenameSafe}"`);
         res.status(200).send(pdf);
       } catch (error) {
+        console.error("label render failed:", error);
         if (error?.code === "order_missing") {
           res.status(422).json({ error: "order_missing" });
           return;
@@ -472,19 +503,33 @@ export function createShipmentsRouter({ env, auth }) {
         }
 
         const admin = await getFirebaseAdmin({ env });
-        const { collectionId } = getShopCollectionInfo({ storeId });
+        const firestore = admin.firestore();
+        const collectionId = CONSIGNMENTS_COLLECTION;
+        const storeDoc = await loadStoreDoc({ firestore, env, storeId });
+        const storeData = storeDoc?.data() ?? {};
+        const shopDomainCandidate = String(storeData?.storeDomain ?? storeDoc?.id ?? "").trim();
+        const shopDomain = shopDomainCandidate || storeId;
+        const storedStoreId = String(storeData?.storeId ?? storeDoc?.id ?? storeId).trim();
 
         const missing = [];
         const docs = [];
         const idsToFetch = docIds.length ? docIds : orderKeys.map((k) => toOrderDocId(k));
         for (let i = 0; i < idsToFetch.length; i += 1) {
           const docId = idsToFetch[i];
-          const snap = await admin.firestore().collection(collectionId).doc(docId).get();
-          if (!snap.exists) {
+          let snap = await firestore.collection(collectionId).doc(docId).get();
+          if (!snap.exists && orderKeys[i]) {
+            const found = await firestore
+              .collection(collectionId)
+              .where("order.orderId", "==", orderKeys[i])
+              .limit(1)
+              .get();
+            if (!found.empty) snap = found.docs[0];
+          }
+          if (!snap?.exists) {
             missing.push(docIds.length ? docId : orderKeys[i]);
             continue;
           }
-          docs.push({ docId, data: snap.data() ?? {} });
+          docs.push({ docId: snap.id, data: snap.data() ?? {} });
         }
 
         if (missing.length) {
@@ -496,7 +541,8 @@ export function createShipmentsRouter({ env, auth }) {
         for (const { data } of docs) {
           const labelBytes = await generateShippingLabelPdfBuffer({
             env,
-            shopDomain: storeId,
+            shopDomain,
+            storeId: storedStoreId,
             firestoreDoc: data,
           });
           const labelDoc = await PDFDocument.load(labelBytes);
@@ -513,6 +559,7 @@ export function createShipmentsRouter({ env, auth }) {
         );
         res.status(200).send(Buffer.from(out));
       } catch (error) {
+        console.error("bulk label render failed:", error);
         const message = String(error?.message ?? "").trim();
         res.status(500).json({ error: "bulk_label_render_failed", code: String(error?.code ?? ""), message });
       }

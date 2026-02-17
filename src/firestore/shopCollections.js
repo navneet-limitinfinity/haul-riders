@@ -19,10 +19,26 @@ export function toFirestoreCollectionId(value) {
 }
 
 export function getShopCollectionInfo({ storeId }) {
-  const id = String(storeId ?? "").trim().toLowerCase();
-  // Firestore collection id should be the shop domain key (e.g. `abc`) derived from:
-  // - users/<uid>.storeId (full domain: `abc.myshopify.com`)
-  // - query params for admin (full domain)
+  const raw = String(storeId ?? "").trim();
+  if (!raw) {
+    const displayName = normalizeWhitespace("Shop");
+    return {
+      collectionId: toFirestoreCollectionId(displayName),
+      displayName,
+      storeId: "",
+    };
+  }
+
+  if (/^956\d{8}$/.test(raw)) {
+    const displayName = normalizeWhitespace(raw);
+    return {
+      collectionId: toFirestoreCollectionId(raw),
+      displayName,
+      storeId: raw,
+    };
+  }
+
+  const id = raw.toLowerCase();
   const looksLikeDomain = id.includes(".");
   const storeKey = looksLikeDomain ? toDomainKey(id) : id;
 

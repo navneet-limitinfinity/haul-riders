@@ -1,9 +1,11 @@
 import { Router } from "express";
+import { getFirebaseAdmin } from "../auth/firebaseAdmin.js";
 import { createShopifyAdminClient } from "../shopify/createShopifyAdminClient.js";
 import { projectOrderRow } from "../shopify/projectOrderRow.js";
 import { resolveShopifyAccessToken } from "../shopify/resolveShopifyAccessToken.js";
+import { loadStoreDoc } from "../firestore/storeDocs.js";
 
-const normalizeDomain = (domain) => String(domain ?? "").trim().toLowerCase();
+const normalizeStoreIdentifier = (value) => String(value ?? "").trim().toLowerCase();
 
 /**
  * Shopify-related routes.
@@ -22,19 +24,28 @@ export function createShopifyRouter({ env, logger, auth }) {
   };
 
   const getStoreForRequest = async (req) => {
-    const storeId = getStoreIdForRequest(req);
-
-    // Always read token from Firestore `shops/<shopDomain>` when using Firebase auth.
-    // This removes dependency on SHOPIFY_STORE/SHOPIFY_TOKEN env vars.
+    const storeIdRaw = getStoreIdForRequest(req);
+    const storeId = normalizeStoreIdentifier(storeIdRaw);
+    if (!storeId) return null;
     if (env?.auth?.provider !== "firebase") return null;
 
-    const shopDomain = normalizeDomain(storeId);
-    if (!shopDomain) return null;
-    const token = await resolveShopifyAccessToken({ env, shopDomain });
+    const admin = await getFirebaseAdmin({ env });
+    const firestore = admin.firestore();
+    const storeDoc = await loadStoreDoc({ env, firestore, storeId });
+    if (!storeDoc?.exists) return null;
+
+    const data = storeDoc.data() ?? {};
+    const storeDomain = String(data?.storeDomain ?? data?.shopDomain ?? "").trim();
+    if (!storeDomain) return null;
+
+    const storeName =
+      String(data?.storeName ?? data?.storeDetails?.storeName ?? storeDomain ?? storeId).trim() || storeDomain;
+    const token = await resolveShopifyAccessToken({ env, storeId: storeDoc.id });
+
     return {
-      id: shopDomain,
-      name: shopDomain,
-      domain: shopDomain,
+      id: storeDoc.id,
+      name: storeName,
+      domain: storeDomain,
       apiVersion: env.shopify.apiVersion,
       token,
     };

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { getFirebaseAdmin } from "../auth/firebaseAdmin.js";
 import { ROLE_ADMIN, ROLE_SHOP } from "../auth/roles.js";
 import { getShopCollectionInfo, toFirestoreCollectionId } from "../firestore/shopCollections.js";
+import { loadStoreDoc } from "../firestore/storeDocs.js";
 import { toOrderDocId } from "../firestore/ids.js";
 
 const IN_TRANSIT_DISPLAY_STATUSES = [
@@ -417,11 +418,62 @@ const isAllowedTab = (tab) => {
 
 const allowedStatusesForTab = (tab) => {
   const t = String(tab ?? "").trim().toLowerCase();
-  if (t === "in_transit") return new Set(IN_TRANSIT_DISPLAY_STATUSES);
-  if (t === "delivered") return new Set([DELIVERED_DISPLAY_STATUS]);
-  if (t === "rto") return new Set(RTO_DISPLAY_STATUSES);
+  if (t === "in_transit")
+    return new Set(IN_TRANSIT_DISPLAY_STATUSES.map((value) => value.toLowerCase()));
+  if (t === "delivered") return new Set([DELIVERED_DISPLAY_STATUS.toLowerCase()]);
+  if (t === "rto") return new Set(RTO_DISPLAY_STATUSES.map((value) => value.toLowerCase()));
   return new Set();
 };
+
+const CONSIGNMENTS_COLLECTION = "consignments";
+const MAX_CONSIGNMENT_SCAN = 500;
+
+async function loadConsignmentsForStore({
+  firestore,
+  storeId,
+  allowedStatuses,
+  search,
+  limit,
+}) {
+  const scanLimit = Math.min(Math.max(limit * 3, limit + 10, 50), MAX_CONSIGNMENT_SCAN);
+  const snapshot = await firestore
+    .collection(CONSIGNMENTS_COLLECTION)
+    .where("storeId", "==", storeId)
+    .orderBy("requestedAt", "desc")
+    .limit(scanLimit)
+    .get();
+
+  const results = [];
+  for (const doc of snapshot.docs) {
+    if (results.length >= limit) break;
+    const data = doc.data() ?? {};
+    if (allowedStatuses && allowedStatuses.size > 0) {
+      const normalized = normalizeDisplayStatus(
+        data?.shipmentStatus ?? data?.shipment_status
+      )
+        .toLowerCase()
+        .trim();
+      if (!normalized || !allowedStatuses.has(normalized)) continue;
+    }
+    if (search && !matchesSearch({ data, q: search })) continue;
+    results.push({ docId: doc.id, data });
+  }
+
+  const hasMore = results.length >= limit && snapshot.docs.length > results.length;
+  const nextCursor =
+    hasMore && results.length > 0
+      ? encodeCursor({
+          shippingDate: String(results[results.length - 1]?.data?.requestedAt ?? ""),
+          docId: results[results.length - 1]?.docId ?? "",
+        })
+      : "";
+
+  return {
+    orders: results.map(({ docId, data }) => ({ docId, ...data })),
+    nextCursor,
+    scannedDocs: snapshot.docs.length,
+  };
+}
 
 const resolveStoreId = ({ req }) => {
   const role = String(req.user?.role ?? "").trim();
@@ -470,43 +522,63 @@ export function createConsignmentsRouter({ env, auth }) {
         const role = String(req.user?.role ?? "");
         const limit = parseLimit(req.query?.limit);
         const q = String(req.query?.q ?? "").trim();
+        const admin = await getFirebaseAdmin({ env });
+        const firestore = admin.firestore();
+        const storeDoc = await loadStoreDoc({ env, firestore, storeId });
+        if (!storeDoc) {
+          res.status(404).json({ error: "store_document_missing" });
+          return;
+        }
+
+        const canonicalStoreId = String(
+          storeDoc?.data()?.storeId ?? storeDoc.id ?? storeId ?? ""
+        ).trim();
+        if (!canonicalStoreId) {
+          res.status(404).json({ error: "store_document_missing" });
+          return;
+        }
+
+        const storeDetails = storeDoc?.data() ?? {};
+        const displayName = String(
+          storeDetails?.storeDetails?.storeName ??
+            storeDetails?.storeName ??
+            storeDetails?.displayName ??
+            canonicalStoreId
+        ).trim();
+
         const allowed = allowedStatusesForTab(tab);
-        // NOTE: Firestore order-reading logic intentionally removed.
-        // You will implement a new architecture for fetching/reading orders in all tabs.
-        const storeIdForCollection =
-          role === ROLE_SHOP ? String(req.user?.storeId ?? "").trim().toLowerCase() : storeId;
-        const primaryInfo = getShopCollectionInfo({ storeId: storeIdForCollection || storeId });
-        const collectionId = primaryInfo.collectionId;
-        const displayName = primaryInfo.displayName;
-        const normalizedStoreId = primaryInfo.storeId;
+        const allowedStatuses = allowed.size ? allowed : null;
+
+        const result = await loadConsignmentsForStore({
+          firestore,
+          storeId: canonicalStoreId,
+          allowedStatuses,
+          search: q,
+          limit,
+        });
 
         const wantsDebug =
           String(req.query?.debug ?? "").trim() === "1" ||
           String(env?.logLevel ?? "").trim().toLowerCase() === "debug" ||
           String(process.env.NODE_ENV ?? "").trim().toLowerCase() !== "production";
 
-        const orders = [];
-        const nextCursor = "";
-
         res.setHeader("Cache-Control", "no-store");
         res.json({
           tab,
           shopName: displayName,
-          storeId: normalizedStoreId,
-          count: orders.length,
-          nextCursor,
-          orders,
+          storeId: canonicalStoreId,
+          count: result.orders.length,
+          nextCursor: result.nextCursor,
+          orders: result.orders,
           ...(wantsDebug
             ? {
                 debug: {
-                  collectionId,
+                  collectionId: CONSIGNMENTS_COLLECTION,
                   query: q,
-                  allowedStatuses: Array.from(allowed.values()),
+                allowedStatuses: Array.from(allowed.values()),
                   limit,
-                  scannedDocs: 0,
-                  scannedBatches: 0,
-                  returnedDocs: 0,
-                  note: "firestore_read_logic_removed",
+                  scannedDocs: result.scannedDocs,
+                  returnedDocs: result.orders.length,
                 },
               }
             : {}),
@@ -534,8 +606,8 @@ export function createConsignmentsRouter({ env, auth }) {
           return;
         }
 
-        const storeId = String(req.body?.storeId ?? "").trim().toLowerCase();
-        if (!storeId) {
+        const storeIdInput = String(req.body?.storeId ?? "").trim();
+        if (!storeIdInput) {
           res.status(400).json({ error: "store_id_required" });
           return;
         }
@@ -553,7 +625,22 @@ export function createConsignmentsRouter({ env, auth }) {
         }
 
         const admin = await getFirebaseAdmin({ env });
-        const { collectionId, storeId: normalizedStoreId } = getShopCollectionInfo({ storeId });
+        const firestore = admin.firestore();
+        const storeDoc = await loadStoreDoc({ env, firestore, storeId: storeIdInput });
+        if (!storeDoc) {
+          res.status(404).json({ error: "store_document_missing" });
+          return;
+        }
+        const canonicalStoreId = String(
+          storeDoc?.data()?.storeId ?? storeDoc.id ?? storeIdInput ?? ""
+        ).trim();
+        if (!canonicalStoreId) {
+          res.status(404).json({ error: "store_document_missing" });
+          return;
+        }
+        const { collectionId, storeId: normalizedStoreId } = getShopCollectionInfo({
+          storeId: canonicalStoreId,
+        });
         const docId = docIdFromBody || toOrderDocId(orderKey);
         const docRef = admin.firestore().collection(collectionId).doc(docId);
 
@@ -573,7 +660,7 @@ export function createConsignmentsRouter({ env, auth }) {
             docRef,
             {
               docId,
-              storeId: normalizedStoreId,
+              storeId: canonicalStoreId,
               shipmentStatus: nextDisplay,
               shippingDate: shippingDate || "",
               updatedAt: changedAt,

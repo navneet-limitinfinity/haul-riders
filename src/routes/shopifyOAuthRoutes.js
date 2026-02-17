@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { Router } from "express";
 import { getFirebaseAdmin } from "../auth/firebaseAdmin.js";
+import { ensureStoreIdForShop } from "../firestore/storeIdGenerator.js";
 
 const STATE_COOKIE = "shopify_oauth_state";
 
@@ -181,11 +182,19 @@ export function createShopifyOAuthRouter({ env, logger }) {
       const firestore = admin.firestore();
       const shopsCollection = String(env?.auth?.firebase?.shopsCollection ?? "shops").trim() || "shops";
       const nowIso = new Date().toISOString();
+      const normalizedShopDomain = normalizeShopDomain(shop);
+      const storeIdValue = await ensureStoreIdForShop({
+        firestore,
+        shopsCollection,
+        shopDomain: normalizedShopDomain,
+        referenceDate: new Date(),
+      });
 
-      const shopDoc = firestore.collection(shopsCollection).doc(shop);
+      const shopDoc = firestore.collection(shopsCollection).doc(storeIdValue);
       await shopDoc.set(
         {
-          shopDomain: shop,
+          storeId: storeIdValue,
+          shopDomain: normalizedShopDomain,
           accessToken: token,
           shopifyAccessToken: token,
           shopify: {
@@ -219,7 +228,7 @@ export function createShopifyOAuthRouter({ env, logger }) {
       res
         .status(200)
         .send(
-          `Installed for ${shop}. Token stored in Firestore collection "${shopsCollection}" (doc id: ${shop}).`
+          `Installed for ${shop}. Token stored in Firestore collection "${shopsCollection}" (doc id: ${storeIdValue}).`
         );
     } catch (error) {
       logger?.error?.({ error }, "Shopify OAuth callback failed");

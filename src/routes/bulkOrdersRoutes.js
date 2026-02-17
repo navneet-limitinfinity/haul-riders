@@ -217,13 +217,6 @@ function parseRowsFromFile(file) {
   throw new Error("unsupported_file_type");
 }
 
-function resolveShopDomainFromStoreId(storeId) {
-  const raw = String(storeId ?? "").trim().toLowerCase();
-  if (!raw) return "";
-  if (raw.includes(".")) return raw;
-  return `${raw}.myshopify.com`;
-}
-
 function normalizeCenterForOrder(data) {
   const d = data && typeof data === "object" ? data : {};
   const originName = String(d.originName ?? "").trim();
@@ -261,9 +254,9 @@ function formatFulfillmentCenterString(center) {
 }
 
 async function loadFulfillmentCentersMap({ firestore, shopsCollection, storeId }) {
-  const domain = resolveShopDomainFromStoreId(storeId);
-  if (!domain) return { byName: new Map(), defaultCenter: null };
-  const col = firestore.collection(shopsCollection).doc(domain).collection("fulfillmentCenter");
+  const normalized = String(storeId ?? "").trim().toLowerCase();
+  if (!normalized) return { byName: new Map(), defaultCenter: null };
+  const col = firestore.collection(shopsCollection).doc(normalized).collection("fulfillmentCenter");
   try {
     const snap = await col.get();
     const byName = new Map();

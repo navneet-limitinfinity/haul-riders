@@ -1,6 +1,9 @@
 import { Router } from "express";
 import { getShopCollectionInfo } from "../firestore/shopCollections.js";
 import { parseCookies } from "../auth/cookies.js";
+import { getFirebaseAdmin } from "../auth/firebaseAdmin.js";
+import { ensureStoreIdForShop } from "../firestore/storeIdGenerator.js";
+import { getShopsCollectionName } from "../firestore/storeDocs.js";
 
 const html = String.raw;
 
@@ -106,6 +109,55 @@ function renderDebugFooterAssets({ assetVersion, enabled }) {
     <link rel="stylesheet" href="/static/debug-footer.css?v=${assetVersion}" />
     <script src="/static/debug-footer.js?v=${assetVersion}" defer></script>
   `;
+}
+
+
+const normalizeShopDomain = (value) => {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (!raw) return "";
+  const withSuffix = raw.includes(".myshopify.com") ? raw : `${raw}.myshopify.com`;
+  return withSuffix.includes(".") ? withSuffix : "";
+};
+
+const getUsersCollectionName = (env) =>
+  String(env?.auth?.firebase?.usersCollection ?? "users").trim() || "users";
+
+const resolveShopDomainFromUser = (user) => {
+  const direct =
+    String(user?.storeDomain ?? user?.store ?? user?.claims?.storeDomain ?? "").trim();
+  return normalizeShopDomain(direct);
+};
+
+async function persistStoreIdOnUser({ firestore, env, uid, storeId, storeDomain }) {
+  if (!uid || !storeId) return;
+  const collection = getUsersCollectionName(env);
+  const data = { storeId };
+  if (storeDomain) {
+    data.storeDomain = normalizeShopDomain(storeDomain);
+  }
+  await firestore.collection(collection).doc(uid).set(data, { merge: true });
+}
+
+async function ensureUserStoreId({ env, user }) {
+  const existingStoreId = String(user?.storeId ?? "").trim();
+  if (existingStoreId) {
+    return existingStoreId;
+  }
+
+  const admin = await getFirebaseAdmin({ env });
+  const firestore = admin.firestore();
+  const shopsCollection = getShopsCollectionName(env);
+  const shopDomain = resolveShopDomainFromUser(user);
+  const storeIdValue = await ensureStoreIdForShop({ firestore, shopsCollection, shopDomain });
+  if (!storeIdValue) {
+    return "";
+  }
+
+  await persistStoreIdOnUser({ firestore, env, uid: user?.uid, storeId: storeIdValue, storeDomain: shopDomain });
+  if (user) {
+    user.storeId = storeIdValue;
+  }
+  return storeIdValue;
 }
 
 function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId, debugFooter }) {
@@ -215,7 +267,7 @@ function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId, deb
           <div class="controls">
             <div class="tabs" role="tablist" aria-label="Order status tabs">
               ${role === "shop"
-                ? html`<button class="tabBtn" type="button" data-tab="new" role="tab">New</button>`
+                ? html`<button class="tabBtn" type="button" data-tab="new" role="tab">New at Shopify</button>`
                 : ""}
               <button class="tabBtn" type="button" data-tab="assigned" role="tab">Assigned</button>
               <button class="tabBtn" type="button" data-tab="in_transit" role="tab">In Transit</button>
@@ -807,26 +859,34 @@ function renderStoreDetailsPage({ userLabel, storeId, debugFooter }) {
 			              </button>
 			            </div>
 			            <div class="profileCardDivider" aria-hidden="true"></div>
-			            <div class="profileInfoGrid">
-			              <div class="profileInfoItem">
-			                <div class="profileInfoLabel">Store Name</div>
-			                <div id="storeNameText" class="profileInfoValue"></div>
-			              </div>
-			              <div class="profileInfoItem">
-			                <div class="profileInfoLabel">Contact No.</div>
-			                <div id="contactPersonPhoneText" class="profileInfoValue mono"></div>
-			              </div>
-			              <div class="profileInfoItem">
-			                <div class="profileInfoLabel">Email</div>
-			                <div id="contactPersonEmailText" class="profileInfoValue"></div>
-			              </div>
+            <div class="profileInfoGrid">
+              <div class="profileInfoItem">
+                <div class="profileInfoLabel">Store Name</div>
+                <div id="storeNameText" class="profileInfoValue"></div>
+              </div>
+              <div class="profileInfoItem">
+                <div class="profileInfoLabel">Store ID</div>
+                <div id="storeIdText" class="profileInfoValue mono"></div>
+              </div>
+              <div class="profileInfoItem">
+                <div class="profileInfoLabel">Contact No.</div>
+                <div id="contactPersonPhoneText" class="profileInfoValue mono"></div>
+              </div>
+              <div class="profileInfoItem">
+                <div class="profileInfoLabel">Email</div>
+                <div id="contactPersonEmailText" class="profileInfoValue"></div>
+              </div>
 
-			              <div class="profileInfoItem">
-			                <div class="profileInfoLabel">GST Number</div>
-			                <div id="gstNumberText" class="profileInfoValue mono"></div>
-			              </div>
-			              <div class="profileInfoItem">
-			                <div class="profileInfoLabel">State Code - State</div>
+              <div class="profileInfoItem">
+                <div class="profileInfoLabel">GST Number</div>
+                <div id="gstNumberText" class="profileInfoValue mono"></div>
+              </div>
+              <div class="profileInfoItem">
+                <div class="profileInfoLabel">Legal Entity Name</div>
+                <div id="registeredEntityNameText" class="profileInfoValue"></div>
+              </div>
+              <div class="profileInfoItem">
+                <div class="profileInfoLabel">State Code - State</div>
 			                <div class="profileInfoValue">
 			                  <span id="stateCodeText" class="mono"></span>
 			                  <span id="stateNameText" class="profileInfoValueSubtle"></span>
@@ -924,14 +984,18 @@ function renderStoreDetailsPage({ userLabel, storeId, debugFooter }) {
 	      </div>
 	      <div class="sideDrawerBody">
 	        <div class="modalGrid">
-	          <label class="field">
-	            <span>Store Name</span>
-	            <input id="drawerStoreName" type="text" placeholder="Store Name" />
-	          </label>
-	          <label class="field">
-	            <span>GST Number</span>
-	            <input id="drawerGstNumber" type="text" placeholder="GST Number" />
-	          </label>
+          <label class="field">
+            <span>Store Name</span>
+            <input id="drawerStoreName" type="text" placeholder="Store Name" />
+          </label>
+          <label class="field">
+            <span>Legal Entity Name</span>
+            <input id="drawerRegisteredEntityName" type="text" placeholder="Legal Entity Name" />
+          </label>
+          <label class="field">
+            <span>GST Number</span>
+            <input id="drawerGstNumber" type="text" placeholder="GST Number" />
+          </label>
 	          <label class="field">
 	            <span>State Code - State</span>
 	            <select id="drawerStateCode">
@@ -1355,11 +1419,25 @@ function renderCreateOrdersPage({ role, userLabel, storeId, debugFooter }) {
 export function createPagesRouter({ env, auth } = {}) {
   const router = Router();
 
+  const redirectToStoreDetails = async (req, res) => {
+    try {
+      await ensureUserStoreId({ env, user: req.user });
+    } catch (error) {
+      // ignore errors while preparing store ID
+    }
+    const target = new URL("/shop/store", `${req.protocol}://${req.get("host")}`);
+    const q = String(req.query?.debugFooter ?? "").trim();
+    if (q === "1" || q === "0") {
+      target.searchParams.set("debugFooter", q);
+    }
+    res.redirect(302, target.pathname + target.search);
+  };
+
   router.get("/orders", (_req, res) => {
     res.redirect(302, "/shop/orders");
   });
 
-  router.get("/shop/orders", auth.requireRole("shop"), (req, res) => {
+  router.get("/shop/orders", auth.requireRole("shop"), async (req, res) => {
     if (maybePersistDebugFooterFlag({ req, res })) {
       const url = new URL(`${req.protocol}://${req.get("host")}${req.originalUrl}`);
       url.searchParams.delete("debugFooter");
@@ -1373,7 +1451,11 @@ export function createPagesRouter({ env, auth } = {}) {
     }
     const userLabel = String(req.user?.email ?? "Shop").trim() || "Shop";
     const storeId = String(req.user?.storeId ?? "").trim();
-    const firestoreCollectionId = getShopCollectionInfo({ storeId }).collectionId;
+    if (!storeId) {
+      await redirectToStoreDetails(req, res);
+      return;
+    }
+    const firestoreCollectionId = "consignments";
     const debugFooter = resolveDebugFooterFlag({ req, env });
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(renderOrdersPage({ role: "shop", userLabel, storeId, firestoreCollectionId, debugFooter }));
