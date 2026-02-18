@@ -2830,11 +2830,28 @@ function renderRowsNewTab(orders) {
     const orderKey = getOrderKey(row);
     tr.dataset.orderKey = orderKey;
 
-    const shipping = row?.shipping ?? {};
-    const createdAt = formatDate(row?.createdAt);
+    const order = row?.order && typeof row.order === "object" ? row.order : {};
+    const shipping =
+      row?.shipping && typeof row.shipping === "object"
+        ? row.shipping
+        : order?.shipping && typeof order.shipping === "object"
+          ? order.shipping
+          : {};
+    const createdAt = formatDate(row?.createdAt ?? order?.createdAt ?? row?.requestedAt ?? "");
+    const orderName = String(row?.orderName ?? order?.orderId ?? row?.orderId ?? "").trim();
+    const orderId = String(row?.orderId ?? order?.orderId ?? "").trim();
+    const productDescription = String(row?.productDescription ?? order?.productDescription ?? "").trim();
+    const invoiceValue = String(
+      row?.invoiceValue ??
+        row?.totalPrice ??
+        order?.invoiceValue ??
+        order?.totalPrice ??
+        ""
+    ).trim();
+    const fulfillmentCenterRaw = String(row?.fulfillmentCenter ?? order?.fulfillmentCenter ?? "").trim();
     const orderDetailsHtml = `<div class="cellStack">
-      <div class="cellPrimary">${escapeHtml(row.orderName ?? "")}</div>
-      <div class="cellMuted mono">${escapeHtml(row.orderId ?? "")}</div>
+      <div class="cellPrimary">${escapeHtml(orderName)}</div>
+      <div class="cellMuted mono">${escapeHtml(orderId)}</div>
       <div class="cellMuted">${escapeHtml(createdAt)}</div>
     </div>`;
 
@@ -2851,11 +2868,11 @@ function renderRowsNewTab(orders) {
       <div class="cellMuted mono">${escapeHtml(shipping.phone2 ?? "")}</div>
     </div>`;
 
-    const paymentStatus = row.paymentStatus ?? row.financialStatus ?? "";
+    const paymentStatus = row?.paymentStatus ?? row?.financialStatus ?? order?.paymentStatus ?? order?.financialStatus ?? "";
     const payment = getPaymentLabel(paymentStatus);
     const invoiceDetailsHtml = `<div class="cellStack">
-      <div class="cellPrimary">${escapeHtml(row.productDescription ?? "")}</div>
-      <div class="cellMuted mono">${escapeHtml(row.invoiceValue ?? row.totalPrice ?? "")}</div>
+      <div class="cellPrimary">${escapeHtml(productDescription)}</div>
+      <div class="cellMuted mono">${escapeHtml(invoiceValue)}</div>
       <div class="cellMuted paymentStatus ${
         payment.kind === "paid" ? "paymentStatusPaid" : "paymentStatusCod"
       }">${escapeHtml(payment.label)}</div>
@@ -2872,7 +2889,7 @@ function renderRowsNewTab(orders) {
     const centerOptions = centers.map((c) => ({ label: String(c?.originName ?? "").trim() }));
     const centerValue =
       String(shipForm.fulfillmentCenter ?? "").trim() ||
-      String(row.fulfillmentCenter ?? "").trim() ||
+      fulfillmentCenterRaw ||
       String(fulfillmentCentersState.defaultName ?? "").trim();
     const fulfillmentCenterCell = createFulfillmentCenterSelect({
       orderKey,
