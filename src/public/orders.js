@@ -3191,6 +3191,29 @@ async function refresh({ forceNetwork = false } = {}) {
         }
         return;
       }
+      if (activeTab === "new_fs") {
+        debugLog("tab_fetch", {
+          tab: activeTab,
+          source: "firestore(consignments)",
+          role: "shop",
+          status: "new",
+        });
+        try {
+          const data = await fetchConsignments({ tab: "new_fs", limit: 50 });
+          const orders = Array.isArray(data?.orders) ? data.orders : [];
+          allOrders = orders;
+          pruneSelectionToVisible(orders);
+          applyFiltersAndSort();
+          hydrateAssignedProductDescriptions(orders).catch(() => {});
+          hydrateAssignedServiceablePins(orders).catch(() => {});
+          setStatus(`Loaded ${orders.length} new order(s).`, { kind: "ok" });
+          debugLog("tab_result", { tab: activeTab, count: orders.length });
+        } catch (error) {
+          setStatus(error?.message ?? "Failed to load orders.", { kind: "error" });
+          debugLog("tab_error", { tab: activeTab, message: String(error?.message ?? error) });
+        }
+        return;
+      }
     }
 
     debugLog("tab_fetch", {
