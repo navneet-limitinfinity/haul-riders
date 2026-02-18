@@ -832,7 +832,7 @@ function bindSelectAllCheckbox() {
 function renderTableHeaderForActiveTab() {
   const thead = document.querySelector(".table thead");
   if (!thead) return;
-  const isShopNew = activeRole === "shop" && activeTab === "new";
+  const isShopNew = activeRole === "shop" && (activeTab === "new" || activeTab === "new_fs");
   const isAssignedLike = activeTab === "assigned" || activeTab === "new_fs";
   const isInTransit = activeTab === "in_transit";
   const isDelivered = activeTab === "delivered";
@@ -856,7 +856,7 @@ function renderTableHeaderForActiveTab() {
 
 function syncNewTabLayout() {
   if (!document.body) return;
-  document.body.dataset.tab = activeTab === "new_fs" ? "assigned" : activeTab;
+  document.body.dataset.tab = activeTab === "new_fs" ? "new" : activeTab;
   const isShopNew = activeRole === "shop" && activeTab === "new";
   if (isShopNew) {
     sortState = { key: "createdAt", dir: "desc" };
@@ -1757,11 +1757,11 @@ const getAllTabRowData = (row) => {
 };
 
 function renderRows(orders) {
-  if (activeRole === "shop" && activeTab === "new") {
+  if (activeRole === "shop" && (activeTab === "new" || activeTab === "new_fs")) {
     renderRowsNewTab(orders);
     return;
   }
-  if (activeTab === "assigned" || activeTab === "new_fs") {
+  if (activeTab === "assigned") {
     renderRowsAssignedTab(orders);
     return;
   }
@@ -3098,7 +3098,11 @@ function exportSelectedToCsv() {
 }
 
 async function refresh({ forceNetwork = false } = {}) {
-  if (serverSearchState.active && serverSearchState.q && !(activeRole === "shop" && activeTab === "new")) {
+  if (
+    serverSearchState.active &&
+    serverSearchState.q &&
+    !(activeRole === "shop" && (activeTab === "new" || activeTab === "new_fs"))
+  ) {
     // Reset cursor when tab changes while searching.
     if (serverSearchState.tab !== activeTab) {
       serverSearchState.nextCursor = "";
@@ -3159,7 +3163,7 @@ async function refresh({ forceNetwork = false } = {}) {
     }
 
     if (activeRole === "shop") {
-      if (["assigned", "in_transit", "delivered", "rto", "all", "new_fs"].includes(activeTab)) {
+      if (["assigned", "in_transit", "delivered", "rto", "all"].includes(activeTab)) {
         debugLog("tab_fetch", {
           tab: activeTab,
           source: "firestore(client)",
@@ -3168,21 +3172,18 @@ async function refresh({ forceNetwork = false } = {}) {
         });
         try {
           const sinceIso = getSinceIsoForRange(getDateRange());
-          const data =
+          const orders =
             activeTab === "all"
               ? await fetchFirestoreAllOrders({ sinceIso, limit: 50 })
-              : activeTab === "assigned"
-                ? await fetchFirestoreOrdersForTab({ tab: "assigned", sinceIso, limit: 50 })
-                : await fetchConsignments({ tab: activeTab, limit: 50 });
-          const orders = Array.isArray(data?.orders) ? data.orders : [];
+              : await fetchFirestoreOrdersForTab({ tab: activeTab, sinceIso, limit: 50 });
           allOrders = orders;
           pruneSelectionToVisible(orders);
           applyFiltersAndSort();
           hydrateAssignedProductDescriptions(orders).catch(() => {});
           hydrateAssignedServiceablePins(orders).catch(() => {});
-          const label =
-            activeTab === "assigned" ? "assigned " : activeTab === "new_fs" ? "new " : "";
-          setStatus(`Loaded ${orders.length} ${label}order(s).`, { kind: "ok" });
+          setStatus(`Loaded ${orders.length} ${activeTab === "assigned" ? "assigned " : ""}order(s).`, {
+            kind: "ok",
+          });
           debugLog("tab_result", { tab: activeTab, count: orders.length });
         } catch (error) {
           setStatus(error?.message ?? "Failed to load orders.", { kind: "error" });
@@ -3202,7 +3203,7 @@ async function refresh({ forceNetwork = false } = {}) {
     let orders = Array.isArray(data?.orders) ? data.orders : [];
 
     // Shop "New" tab: show only orders that are not fulfilled.
-    if (activeRole === "shop" && activeTab === "new") {
+    if (activeRole === "shop" && (activeTab === "new" || activeTab === "new_fs")) {
       orders = orders.filter(
         (row) => normalizeFulfillmentStatus(row?.fulfillmentStatus) !== "fulfilled"
       );
@@ -3235,7 +3236,7 @@ function syncLoadMoreButton() {
 
 async function refreshServerSearch({ append = false } = {}) {
   if (!serverSearchState.active || !serverSearchState.q) return;
-  if (activeRole === "shop" && activeTab === "new") return;
+  if (activeRole === "shop" && (activeTab === "new" || activeTab === "new_fs")) return;
 
   const btn = $("loadMore");
   serverSearchState.loading = true;
@@ -3269,8 +3270,6 @@ async function refreshServerSearch({ append = false } = {}) {
     } else {
       if (activeTab === "assigned") {
         data = await fetchFirestoreOrders({ status: activeTab, limit: 50 });
-      } else if (activeTab === "new_fs") {
-        data = await fetchConsignments({ tab: "new_fs", limit: 50 });
       } else if (activeTab === "all") {
         data = await fetchFirestoreOrders({ limit: 50 });
       } else if (["in_transit", "delivered", "rto"].includes(activeTab)) {
