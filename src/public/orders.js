@@ -3168,18 +3168,21 @@ async function refresh({ forceNetwork = false } = {}) {
         });
         try {
           const sinceIso = getSinceIsoForRange(getDateRange());
-          const orders =
+          const data =
             activeTab === "all"
               ? await fetchFirestoreAllOrders({ sinceIso, limit: 50 })
-              : await fetchFirestoreOrdersForTab({ tab: activeTab, sinceIso, limit: 50 });
+              : activeTab === "assigned"
+                ? await fetchFirestoreOrdersForTab({ tab: "assigned", sinceIso, limit: 50 })
+                : await fetchConsignments({ tab: activeTab, limit: 50 });
+          const orders = Array.isArray(data?.orders) ? data.orders : [];
           allOrders = orders;
           pruneSelectionToVisible(orders);
           applyFiltersAndSort();
           hydrateAssignedProductDescriptions(orders).catch(() => {});
           hydrateAssignedServiceablePins(orders).catch(() => {});
-          setStatus(`Loaded ${orders.length} ${activeTab === "assigned" ? "assigned " : ""}order(s).`, {
-            kind: "ok",
-          });
+          const label =
+            activeTab === "assigned" ? "assigned " : activeTab === "new_fs" ? "new " : "";
+          setStatus(`Loaded ${orders.length} ${label}order(s).`, { kind: "ok" });
           debugLog("tab_result", { tab: activeTab, count: orders.length });
         } catch (error) {
           setStatus(error?.message ?? "Failed to load orders.", { kind: "error" });
@@ -3267,7 +3270,7 @@ async function refreshServerSearch({ append = false } = {}) {
       if (activeTab === "assigned") {
         data = await fetchFirestoreOrders({ status: activeTab, limit: 50 });
       } else if (activeTab === "new_fs") {
-        data = await fetchFirestoreOrders({ status: "new", limit: 50 });
+        data = await fetchConsignments({ tab: "new_fs", limit: 50 });
       } else if (activeTab === "all") {
         data = await fetchFirestoreOrders({ limit: 50 });
       } else if (["in_transit", "delivered", "rto"].includes(activeTab)) {
