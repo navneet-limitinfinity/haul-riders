@@ -2879,6 +2879,11 @@ function renderRowsNewTab(orders) {
     </div>`;
 
     const shipForm = getShipForm(orderKey);
+    if (!shipForm.weightKg) {
+      const weightValue =
+        String(row?.weightKg ?? row?.weight ?? order?.weightKg ?? order?.weight ?? "").trim();
+      if (weightValue) shipForm.weightKg = weightValue;
+    }
     const weightCell = createWeightInput({ orderKey, value: shipForm.weightKg });
 
     const courierTypeCell = createCourierTypeSelect({ orderKey, value: shipForm.courierType });
