@@ -3920,7 +3920,7 @@ window.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    if (activeRole !== "shop" || activeTab !== "new") return;
+    if (activeRole !== "shop" || (activeTab !== "new" && activeTab !== "new_fs")) return;
     if (role !== "weight") return;
 
     // Allow only digits and at most one dot and one digit after dot.
@@ -3940,7 +3940,7 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   $("rows")?.addEventListener("change", (e) => {
-    if (activeRole !== "shop" || activeTab !== "new") return;
+    if (activeRole !== "shop" || (activeTab !== "new" && activeTab !== "new_fs")) return;
     const target = e.target;
     if (!target) return;
     const role = String(target.dataset?.role ?? "");
