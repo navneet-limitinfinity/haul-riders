@@ -1620,11 +1620,12 @@ const createAdminUpdateMenu = ({ orderKey, shipmentStatus, trackingText }) => ({
   trackingText,
 });
 
-const createActionButton = ({ label, action, orderKey }) => ({
+const createActionButton = ({ label, action, orderKey, docId }) => ({
   actionButton: true,
   label,
   action,
   orderKey,
+  docId,
 });
 
 const createWeightInput = ({ orderKey, value }) => ({
@@ -2060,6 +2061,7 @@ function renderRows(orders) {
         btn.className = action === "download-slip" ? "btn btnPrimary btnIcon" : "btn btnPrimary";
         btn.dataset.action = action;
         btn.dataset.orderKey = String(value.orderKey ?? "");
+        if (value.docId) btn.dataset.docId = String(value.docId ?? "");
         if (action === "download-slip") {
           btn.title = "Download Shipping label";
           btn.ariaLabel = "Download Shipping label";
@@ -2903,7 +2905,8 @@ function renderRowsNewTab(orders) {
       disabled: centerOptions.length === 0,
     });
 
-    const actionCell = createActionButton({ label: "Ship Now", action: "ship-now", orderKey });
+    const docId = String(row?.docId ?? row?.hrGid ?? "").trim();
+    const actionCell = createActionButton({ label: "Ship Now", action: "ship-now", orderKey, docId });
 
     const cells = [
       { check: true, checked: orderKey && selectedOrderIds.has(orderKey) },
@@ -2996,15 +2999,16 @@ function renderRowsNewTab(orders) {
         select.value = selected || "";
         if (!select.value) select.value = "";
         td.appendChild(select);
-      } else if (value && typeof value === "object" && value.actionButton) {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        const action = String(value.action ?? "");
-        btn.className = "btn btnPrimary btnCompact";
-        btn.dataset.action = action;
-        btn.dataset.orderKey = String(value.orderKey ?? "");
-        btn.textContent = String(value.label ?? "");
-        td.appendChild(btn);
+    } else if (value && typeof value === "object" && value.actionButton) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      const action = String(value.action ?? "");
+      btn.className = "btn btnPrimary btnCompact";
+      btn.dataset.action = action;
+      btn.dataset.orderKey = String(value.orderKey ?? "");
+      if (value.docId) btn.dataset.docId = String(value.docId ?? "");
+      btn.textContent = String(value.label ?? "");
+      td.appendChild(btn);
       } else if (value && typeof value === "object" && "text" in value) {
         td.textContent = String(value.text ?? "");
         if (value.className) td.className = value.className;
@@ -3698,6 +3702,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
     if (action === "ship-now") {
       const orderKey = String(item.dataset.orderKey ?? "").trim();
+      const docId = String(item.dataset.docId ?? orderKey ?? "").trim();
       if (!orderKey) return;
       const order = currentOrders.find((r) => getOrderKey(r) === orderKey) ?? null;
       item.disabled = true;
@@ -3718,6 +3723,8 @@ window.addEventListener("DOMContentLoaded", () => {
         if (center) order.fulfillmentCenter = center;
         const result = await postJson("/api/shipments/assign", {
           orderKey,
+          docId,
+          hrGid: String(row?.hrGid ?? docId ?? "").trim(),
           order,
           weightKg: parsed.value,
           courierType: String(meta.courierType ?? ""),

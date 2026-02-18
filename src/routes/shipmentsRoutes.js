@@ -156,7 +156,8 @@ export function createShipmentsRouter({ env, auth }) {
   router.post("/shipments/assign", auth.requireRole("shop"), async (req, res, next) => {
     try {
       const orderKey = String(req.body?.orderKey ?? req.body?.orderId ?? "").trim();
-      if (!orderKey) {
+      const docIdFromBody = String(req.body?.docId ?? req.body?.hrGid ?? "").trim();
+      if (!orderKey && !docIdFromBody) {
         res.status(400).json({ error: "order_key_required" });
         return;
       }
@@ -170,7 +171,6 @@ export function createShipmentsRouter({ env, auth }) {
 
       const weightKg = parseWeightKg(req.body?.weightKg);
       const courierType = normalizeCourierType(req.body?.courierType);
-
       const assignedAt = new Date().toISOString();
       const shippingDate = assignedAt;
       const shipmentStatus = "Assigned";
@@ -183,7 +183,12 @@ export function createShipmentsRouter({ env, auth }) {
       const admin = await getFirebaseAdmin({ env });
       const firestore = admin.firestore();
       const collectionId = CONSIGNMENTS_COLLECTION;
-      const docId = toOrderDocId(orderKey);
+      const docId = docIdFromBody || toOrderDocId(orderKey);
+      if (!docId) {
+        res.status(400).json({ error: "order_key_required" });
+        return;
+      }
+
       const docRef = firestore.collection(collectionId).doc(docId);
       const storeDoc = await loadStoreDoc({ firestore, env, storeId });
       const storeData = storeDoc?.data() ?? {};
@@ -192,21 +197,16 @@ export function createShipmentsRouter({ env, auth }) {
       const storeName = String(storeNameCandidate).trim() || storeId;
       const storeKey = getShopCollectionInfo({ storeId }).storeId;
 
-      const existing = await docRef.get();
-      if (existing.exists) {
-        res.json({
-          ok: true,
-          alreadyAssigned: true,
-          shipment: {
-            shipmentStatus: String(existing.data()?.shipmentStatus ?? existing.data()?.shipment_status ?? "Assigned"),
-            updatedAt: String(existing.data()?.updatedAt ?? existing.data()?.updated_at ?? ""),
-          },
-          firestore: { collectionId, docId, storeId },
-        });
-        return;
-      }
+      const snap = await docRef.get();
+      const existing = snap.exists ? snap.data() ?? {} : null;
+      const existingOrder =
+        existing?.order && typeof existing.order === "object" ? existing.order : null;
+      const hrGid =
+        String(existing?.hrGid ?? "").trim() ||
+        String(docId ?? "").trim() ||
+        (await reserveHrGids({ firestore, count: 1 }))[0] ||
+        "";
 
-      const hrGid = (await reserveHrGids({ firestore, count: 1 }))[0] || "";
       const centerName = String(order?.fulfillmentCenter ?? "").trim();
       const centerAddress =
         centerName && storeKey
@@ -218,11 +218,14 @@ export function createShipmentsRouter({ env, auth }) {
           : null;
       const centerString = centerAddress ? formatFulfillmentCenterString(centerAddress) : "";
       const orderToPersist =
-        order && typeof order === "object"
-          ? { ...order, ...(centerString ? { fulfillmentCenter: centerString } : {}) }
-          : order;
+        existingOrder || order
+          ? {
+              ...(existingOrder ?? {}),
+              ...(order ?? {}),
+              ...(centerString ? { fulfillmentCenter: centerString } : {}),
+            }
+          : null;
 
-      const orderId = String(orderToPersist?.orderId ?? "").trim();
       let allocatedAwb = "";
       try {
         const alloc = await allocateAwbFromPool({
@@ -230,7 +233,7 @@ export function createShipmentsRouter({ env, auth }) {
           courierType,
           docId,
           assignedStoreId: storeId,
-          orderId,
+          orderId: String(orderToPersist?.orderId ?? "").trim(),
         });
         allocatedAwb = String(alloc?.awbNumber ?? "").trim();
       } catch {
@@ -243,35 +246,36 @@ export function createShipmentsRouter({ env, auth }) {
       }
 
       await docRef.set(
-          {
-            docId,
-            ...(hrGid ? { hrGid } : {}),
-            storeId,
-            shopName: storeName,
-            order: orderToPersist,
-            shipmentStatus,
-            shippingDate,
-            courierPartner: "DTDC",
+        {
+          docId,
+          ...(hrGid ? { hrGid } : {}),
+          storeId,
+          shopName: storeName,
+          ...(orderToPersist ? { order: orderToPersist } : {}),
+          shipmentStatus,
+          shippingDate,
+          courierPartner: "DTDC",
+          consignmentNumber: allocatedAwb,
+          searchTokens: buildSearchTokensFromDoc({
+            order: orderToPersist ?? order ?? existingOrder ?? {},
             consignmentNumber: allocatedAwb,
-            searchTokens: buildSearchTokensFromDoc({
-              order: orderToPersist,
-              consignmentNumber: allocatedAwb,
-              courierPartner: "DTDC",
-              courierType,
-            }),
-            ...(weightKg != null ? { weightKg } : {}),
-            ...(courierType ? { courierType } : {}),
-            updatedAt: assignedAt,
-            event: "ship_requested",
-            requestedBy: {
-              uid: String(req.user?.uid ?? ""),
-              email: String(req.user?.email ?? ""),
-              role: String(req.user?.role ?? ""),
-            },
-            requestedAt: assignedAt,
+            courierPartner: "DTDC",
+            courierType,
+          }),
+          ...(weightKg != null ? { weightKg } : {}),
+          ...(courierType ? { courierType } : {}),
+          ...(centerString ? { fulfillmentCenter: centerString } : {}),
+          updatedAt: assignedAt,
+          event: "ship_requested",
+          requestedBy: {
+            uid: String(req.user?.uid ?? ""),
+            email: String(req.user?.email ?? ""),
+            role: String(req.user?.role ?? ""),
           },
-          { merge: true }
-        );
+          requestedAt: assignedAt,
+        },
+        { merge: true }
+      );
 
       res.json({
         ok: true,
