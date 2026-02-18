@@ -5,6 +5,7 @@ import { getShopCollectionInfo, toFirestoreCollectionId } from "../firestore/sho
 import { loadStoreDoc } from "../firestore/storeDocs.js";
 import { toOrderDocId } from "../firestore/ids.js";
 
+const NEW_DISPLAY_STATUS = "New";
 const IN_TRANSIT_DISPLAY_STATUSES = [
   "In Transit",
   "Undelivered",
@@ -28,7 +29,12 @@ const normalizeDisplayStatus = (value) => {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
   const key = raw.toLowerCase();
-  const all = [...IN_TRANSIT_DISPLAY_STATUSES, DELIVERED_DISPLAY_STATUS, ...RTO_DISPLAY_STATUSES];
+  const all = [
+    ...IN_TRANSIT_DISPLAY_STATUSES,
+    DELIVERED_DISPLAY_STATUS,
+    ...RTO_DISPLAY_STATUSES,
+    NEW_DISPLAY_STATUS,
+  ];
   for (const s of all) {
     if (s.toLowerCase() === key) return s;
   }
@@ -59,6 +65,10 @@ const normalizeDisplayStatus = (value) => {
     rto_reached_at_destination: "RTO Reached At Destination",
     rto_reached_atdestination: "RTO Reached At Destination",
     rto_delivered: "RTO Delivered",
+    set_rto: "Set RTO",
+    setrto: "Set RTO",
+    new: NEW_DISPLAY_STATUS,
+    new_orders: NEW_DISPLAY_STATUS,
   };
 
   return map[canonical] ?? "";
