@@ -1466,6 +1466,8 @@ function applyFiltersAndSort() {
         "rto_delivered",
       ]);
       view = view.filter((row) => !excluded.has(getEffectiveShipmentStatus(row)));
+    } else if (activeTab === "new_fs") {
+      view = view.filter((row) => getEffectiveShipmentStatus(row) === "new");
     } else if (activeTab === "rto") {
       const allowed = new Set(["rto", "rto_initiated", "rto_delivered"]);
       view = view.filter((row) => allowed.has(getEffectiveShipmentStatus(row)));
