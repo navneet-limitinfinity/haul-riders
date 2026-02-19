@@ -3724,7 +3724,7 @@ window.addEventListener("DOMContentLoaded", () => {
         const result = await postJson("/api/shipments/assign", {
           orderKey,
           docId,
-          hrGid: String(row?.hrGid ?? docId ?? "").trim(),
+          hrGid: String(order?.hrGid ?? docId ?? "").trim(),
           order,
           weightKg: parsed.value,
           courierType: String(meta.courierType ?? ""),
@@ -3732,12 +3732,12 @@ window.addEventListener("DOMContentLoaded", () => {
         if (activeTab !== "new") sessionAssignedOrderKeys.add(orderKey);
         const alreadyAssigned = Boolean(result?.alreadyAssigned);
         const collectionId = String(result?.firestore?.collectionId ?? "").trim();
-        const docId = String(result?.firestore?.docId ?? "").trim();
+        const savedDocId = String(result?.firestore?.docId ?? "").trim();
         setStatus(
           alreadyAssigned
             ? "Already assigned."
-            : collectionId && docId
-              ? `Shipment saved (collection=${collectionId}, doc=${docId}).`
+            : collectionId && savedDocId
+              ? `Shipment saved (collection=${collectionId}, doc=${savedDocId}).`
               : "Shipment saved.",
           { kind: "ok" }
         );
