@@ -47,6 +47,12 @@ function normalizeCourierTypeActive(value) {
   return "";
 }
 
+function normalizeAwbNumber(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  return raw.replaceAll(/[^a-zA-Z0-9]/g, "").trim();
+}
+
 function formatFulfillmentCenterString(center) {
   const c = center && typeof center === "object" ? center : null;
   if (!c) return "";
@@ -214,6 +220,22 @@ function normalizeManualRow(row) {
     courierPartner: normalizeCourierPartner(
       pickRowValue(row, ["courierPartner", "courier_partner", "Courier Partner", "courier"])
     ),
+    consignmentNumber: pickRowValue(row, [
+      "consignmentNumber",
+      "consignment_number",
+      "awbNumber",
+      "trackingNumber",
+      "tracking_number",
+    ]),
+    shippingDate: normalizeIsoDate(pickRowValue(row, ["shippingDate", "shipping_date"])),
+    expectedDeliveryDate: normalizeIsoDate(
+      pickRowValue(row, ["expectedDeliveryDate", "expected_delivery_date", "edd"])
+    ),
+    updatedAt: normalizeIsoDate(
+      pickRowValue(row, ["updatedAt", "updated_at", "Updated At", "updated"])
+    ),
+    event: pickRowValue(row, ["event", "eventType"]),
+    shipmentStatus: pickRowValue(row, ["shipmentStatus", "shipment_status", "Shipments Status"]),
     ewayBill: pickRowValue(row, ["ewayBill", "eway_bill", "eWayBill", "ewayBillNumber", "ewayBillNo", "eway_bill_number"]),
   };
 }
@@ -283,7 +305,6 @@ function buildManualOrderDoc({ normalized, index, storeId, displayName, user, fu
     productDescription: normalized.productDescription,
     fulfillmentCenter: fulfillmentCenterString || "",
     fulfillmentStatus: normalized.fulfillmentStatus || "fulfilled",
-    ewayBill: ewayValue,
     shipping: {
       fullName: normalized.fullName,
       address1: normalized.address1,
@@ -299,7 +320,7 @@ function buildManualOrderDoc({ normalized, index, storeId, displayName, user, fu
   const ts = nowIso();
   const searchTokens = buildSearchTokensFromDoc({
     order,
-    consignmentNumber: "",
+    consignmentNumber: String(normalized.consignmentNumber ?? "").trim(),
     courierPartner: String(normalized.courierPartner ?? "").trim() || "DTDC",
     courierType: normalized.courier_type || "",
   });
@@ -309,16 +330,16 @@ function buildManualOrderDoc({ normalized, index, storeId, displayName, user, fu
     storeId,
     shopName: displayName,
     order,
-    shipmentStatus: "New",
+    shipmentStatus: String(normalized.shipmentStatus ?? "").trim() || "Assigned",
     courierPartner: String(normalized.courierPartner ?? "").trim() || "DTDC",
-    consignmentNumber: "",
+    consignmentNumber: String(normalized.consignmentNumber ?? "").trim(),
     searchTokens,
     weightKg: normalized.weight || "",
     courierType: normalized.courier_type || "",
-    shippingDate: "",
-    expectedDeliveryDate: "",
-    updatedAt: ts,
-    event: "manual_order_create",
+    shippingDate: String(normalized.shippingDate ?? "").trim() || ts,
+    expectedDeliveryDate: String(normalized.expectedDeliveryDate ?? "").trim() || "",
+    updatedAt: String(normalized.updatedAt ?? "").trim() || ts,
+    event: String(normalized.event ?? "").trim() || "manual_assign",
     ewayBill: ewayValue,
     requestedBy: {
       uid: String(user?.uid ?? ""),
@@ -402,6 +423,22 @@ export async function createManualOrders({
       if (defName) norm.fulfillmentCenter = defName;
     }
 
+    if (!String(norm.shipmentStatus ?? "").trim()) {
+      norm.shipmentStatus = "Assigned";
+    }
+    if (!String(norm.courierPartner ?? "").trim()) {
+      norm.courierPartner = "DTDC";
+    }
+    if (!String(norm.shippingDate ?? "").trim()) {
+      norm.shippingDate = nowIso();
+    }
+    if (!String(norm.updatedAt ?? "").trim()) {
+      norm.updatedAt = nowIso();
+    }
+    if (!String(norm.event ?? "").trim()) {
+      norm.event = "manual_assign";
+    }
+
     const validation = validateManualRow(norm, i);
     if (!validation.ok) {
       failed += 1;
@@ -469,17 +506,30 @@ export async function createManualOrders({
         hrGid,
       });
       await docRef.set(doc, { merge: true });
+      if (String(norm.consignmentNumber ?? "").trim()) {
+        const awb = normalizeAwbNumber(norm.consignmentNumber);
+        if (awb) {
+          const awbRef = firestore.collection("awbPool").doc(awb);
+          const awbSnapshot = await awbRef.get();
+          if (awbSnapshot.exists) {
+            await awbRef.set(
+              {
+                assigned: true,
+                assignedAt: ts,
+                assignedDocId: docId,
+                assignedStoreId: storeId,
+                orderId,
+                updatedAt: String(norm.updatedAt ?? "").trim() || ts,
+              },
+              { merge: true }
+            );
+          }
+        }
+      }
       if (existingSnap.exists) updated += 1;
       else created += 1;
 
-      orders.push({
-        orderId: norm.orderId,
-        docId,
-        fullName: norm.fullName,
-        phone1: norm.phone1,
-        city: norm.city,
-        totalPrice: norm.totalPrice,
-      });
+      orders.push({ ...doc });
     } catch (error) {
       failed += 1;
       errors.push(`Row ${i + 2}: ${String(error?.message ?? error ?? "write_failed")}`);

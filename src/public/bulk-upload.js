@@ -50,6 +50,30 @@ function setAwbStatus(message, { kind = "info" } = {}) {
   el.textContent = String(message ?? "");
 }
 
+let bulkStores = [];
+const normalizeString = (value) => String(value ?? "").trim().toLowerCase();
+const getBulkStoreRecord = (storeId) => {
+  const normalized = normalizeString(storeId);
+  if (!normalized) return null;
+  return (
+    bulkStores.find(
+      (store) => normalizeString(store?.storeId ?? store?.shopDomain ?? store?.id ?? "") === normalized
+    ) ?? null
+  );
+};
+const getBulkStoreDisplayName = (storeId) => {
+  const record = getBulkStoreRecord(storeId);
+  return String(record?.storeName ?? record?.name ?? record?.displayName ?? "").trim();
+};
+function setBulkStoreNameDisplay(storeId) {
+  const name = getBulkStoreDisplayName(storeId);
+  const fallback = "Select a store";
+  const rightEl = $("bulkStoreName");
+  if (rightEl) rightEl.textContent = name || fallback;
+  const centerEl = $("bulkCenterStoreName");
+  if (centerEl) centerEl.textContent = name || fallback;
+}
+
 async function fetchStores() {
   const response = await fetch("/api/shops", { cache: "no-store", headers: getAuthHeaders() });
   if (!response.ok) {
@@ -69,12 +93,13 @@ function populateStoresSelect(select, stores) {
   select.appendChild(placeholder);
 
   for (const s of Array.isArray(stores) ? stores : []) {
-    const id = String(s?.shopDomain ?? s?.storeId ?? s?.id ?? "").trim();
-    const name = String(s?.name ?? s?.shopDomain ?? id).trim();
+    const id = String(s?.storeId ?? s?.shopDomain ?? s?.id ?? "").trim();
     if (!id) continue;
+    const storeName = String(s?.storeName ?? s?.name ?? s?.displayName ?? "").trim();
+    const label = storeName ? `${storeName} (${id})` : id;
     const opt = document.createElement("option");
     opt.value = id;
-    opt.textContent = name;
+    opt.textContent = label;
     select.appendChild(opt);
   }
 }
@@ -338,7 +363,15 @@ async function init() {
   try {
     const data = await fetchStores();
     const stores = Array.isArray(data?.stores) ? data.stores : [];
-    populateStoresSelect($("storeId"), stores);
+    bulkStores = stores;
+    const storeSelect = $("storeId");
+    populateStoresSelect(storeSelect, stores);
+    if (storeSelect) {
+      storeSelect.addEventListener("change", () => setBulkStoreNameDisplay(storeSelect.value));
+      setBulkStoreNameDisplay(storeSelect.value);
+    } else {
+      setBulkStoreNameDisplay("");
+    }
     setStatus("Ready.", { kind: "ok" });
   } catch (error) {
     setStatus(error?.message ?? "Failed to load stores.", { kind: "error" });

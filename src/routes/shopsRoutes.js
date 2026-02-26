@@ -3,6 +3,16 @@ import { getFirebaseAdmin } from "../auth/firebaseAdmin.js";
 
 const normalizeDomain = (domain) => String(domain ?? "").trim().toLowerCase();
 
+const resolveStoreName = (data) => {
+  if (!data || typeof data !== "object") return "";
+  const details = data.storeDetails && typeof data.storeDetails === "object" ? data.storeDetails : {};
+  return (
+    String(
+      details.storeName ?? data.storeName ?? data.name ?? data.shopName ?? data.displayName ?? ""
+    ).trim()
+  );
+};
+
 export function createShopsRouter({ env, auth }) {
   const router = Router();
 
@@ -22,14 +32,15 @@ export function createShopsRouter({ env, auth }) {
       const stores = snap.docs
         .map((doc) => {
           const data = doc.data() ?? {};
-          const shopDomain = normalizeDomain(data.shopDomain || doc.id);
-          if (!shopDomain) return null;
-          return { shopDomain };
+          const storeId = normalizeDomain(data.shopDomain || data.storeId || doc.id);
+          if (!storeId) return null;
+          const storeName = resolveStoreName(data);
+          return { storeId, shopDomain: storeId, storeName };
         })
         .filter(Boolean)
-        .sort((a, b) => String(a.shopDomain).localeCompare(String(b.shopDomain)));
+        .sort((a, b) => String(a.storeId).localeCompare(String(b.storeId)));
 
-      res.json({ defaultStoreId: String(stores[0]?.shopDomain ?? ""), stores });
+      res.json({ defaultStoreId: String(stores[0]?.storeId ?? ""), stores });
     } catch (error) {
       next(error);
     }

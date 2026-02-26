@@ -396,7 +396,7 @@ function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId, deb
 }
 
 function renderBulkUploadPage({ userLabel, debugFooter }) {
-  const assetVersion = "3";
+  const assetVersion = "4";
   const safeUserLabel = escapeHtml(userLabel);
 
   return html`<!doctype html>
@@ -482,6 +482,14 @@ function renderBulkUploadPage({ userLabel, debugFooter }) {
               <span>Store (required)</span>
               <select id="storeId" class="storeSelect" aria-label="Select store"></select>
             </label>
+            <div class="bulkStoreMeta" aria-live="polite">
+              <div class="bulkStoreMetaLabel">Selected store</div>
+              <div id="bulkStoreName" class="bulkStoreMetaValue">Select a store</div>
+            </div>
+          </div>
+          <div class="bulkStoreBanner" aria-live="polite">
+            Current store:
+            <strong id="bulkCenterStoreName">Select a store</strong>
           </div>
 
           <div class="bulkColumns">

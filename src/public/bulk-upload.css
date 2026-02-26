@@ -13,11 +13,49 @@
 .bulkToolbar {
   display: flex;
   justify-content: flex-start;
+  align-items: center;
+  gap: 16px;
   margin-bottom: 14px;
+  flex-wrap: wrap;
 }
 
 .bulkStoreField select {
   width: min(520px, 100%);
+}
+
+.bulkStoreMeta {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 180px;
+  max-width: 260px;
+}
+.bulkStoreMetaLabel {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.bulkStoreMetaValue {
+  margin-top: 2px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bulkStoreBanner {
+  text-align: center;
+  margin: 0 auto 16px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.bulkStoreBanner strong {
+  display: inline-block;
+  margin-left: 6px;
+  color: var(--text);
 }
 
 .bulkColumns {

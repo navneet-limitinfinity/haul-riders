@@ -164,11 +164,12 @@ function populateStoresSelect(select, stores) {
 
   for (const s of Array.isArray(stores) ? stores : []) {
     const id = String(s?.shopDomain ?? s?.storeId ?? s?.id ?? "").trim();
-    const name = String(s?.name ?? s?.shopDomain ?? id).trim();
     if (!id) continue;
+    const storeName = String(s?.storeName ?? s?.name ?? s?.shopDomain ?? "").trim();
+    const label = storeName ? `${storeName} (${id})` : id;
     const opt = document.createElement("option");
     opt.value = id;
-    opt.textContent = name;
+    opt.textContent = label;
     select.appendChild(opt);
   }
 }
@@ -180,33 +181,41 @@ function renderCreatedRows(rows) {
 
   const fragment = document.createDocumentFragment();
   for (const row of Array.isArray(rows) ? rows : []) {
+    const data = row && typeof row === "object" ? row : {};
+    const order = data.order && typeof data.order === "object" ? data.order : {};
+    const shipping = order.shipping && typeof order.shipping === "object" ? order.shipping : {};
+
+    const orderId = String(order.orderId ?? data.docId ?? "").trim();
+    const fullName = String(shipping.fullName ?? "").trim();
+    const state = String(shipping.state ?? "").trim();
+
     const tr = document.createElement("tr");
-    tr.dataset.orderKey = String(row?.orderId ?? "");
+    tr.dataset.orderKey = orderId;
 
     const tdCheck = document.createElement("td");
     tdCheck.innerHTML = `<input type="checkbox" data-role="pick" />`;
     tr.appendChild(tdCheck);
 
     const tdOrder = document.createElement("td");
-    tdOrder.textContent = String(row?.orderId ?? "");
+    tdOrder.textContent = orderId;
     tr.appendChild(tdOrder);
 
     const tdCustomer = document.createElement("td");
-    tdCustomer.textContent = String(row?.fullName ?? "");
+    tdCustomer.textContent = fullName;
     tr.appendChild(tdCustomer);
 
     const tdPhone = document.createElement("td");
     tdPhone.className = "mono";
-    tdPhone.textContent = String(row?.phone1 ?? "");
+    tdPhone.textContent = String(shipping.phone1 ?? "").trim();
     tr.appendChild(tdPhone);
 
     const tdCity = document.createElement("td");
-    tdCity.textContent = String(row?.city ?? "");
+    tdCity.textContent = String(shipping.city ?? "").trim();
     tr.appendChild(tdCity);
 
     const tdTotal = document.createElement("td");
     tdTotal.className = "mono";
-    tdTotal.textContent = String(row?.totalPrice ?? "");
+    tdTotal.textContent = String(order.totalPrice ?? "").trim();
     tr.appendChild(tdTotal);
 
     fragment.appendChild(tr);

@@ -138,6 +138,7 @@ let fulfillmentCentersState = {
   centers: [],
 };
 let firestoreClientState = null;
+let adminStores = [];
 
 const TAB_STATUS_VARIANTS = {
   new_fs: ["New"],
@@ -164,6 +165,56 @@ const getShippingMap = (row) => {
 };
 
 const normalizeString = (value) => String(value ?? "").trim();
+const normalizeStoreId = (value) => normalizeString(value).toLowerCase();
+const getAdminStore = (storeId) => {
+  const normalized = normalizeStoreId(storeId);
+  if (!normalized) return null;
+  return (
+    adminStores.find((store) => normalizeStoreId(store?.storeId ?? store?.shopDomain ?? "") === normalized) ??
+    null
+  );
+};
+const formatStoreLabel = (store) => {
+  const id = normalizeString(store?.storeId ?? store?.shopDomain ?? store?.id ?? "");
+  const name = normalizeString(store?.storeName ?? store?.name ?? store?.displayName ?? "");
+  return { id, label: name ? `${name} (${id})` : id };
+};
+const renderStoreNamePanel = ({ displayName, domain }) => {
+  const storeEl = $("storeName");
+  if (!storeEl) return;
+  storeEl.textContent = "";
+  const nameSpan = document.createElement("span");
+  nameSpan.className = "storeNameMain";
+  nameSpan.textContent = displayName || "Unknown";
+  storeEl.appendChild(nameSpan);
+  const domainText = normalizeString(domain);
+  if (domainText) {
+    const domainSpan = document.createElement("span");
+    domainSpan.className = "storeNameDomain";
+    domainSpan.textContent = domainText;
+    storeEl.appendChild(domainSpan);
+  }
+};
+const getDisplayNameForStore = (storeId) => {
+  const record = getAdminStore(storeId);
+  return normalizeString(record?.storeName ?? record?.name ?? record?.displayName ?? "");
+};
+function updateSelectedStoreDisplay({ storeId, shop } = {}) {
+  const targetStoreId = normalizeString(storeId ?? getActiveStoreId());
+  const record = getAdminStore(targetStoreId);
+  let displayName = getDisplayNameForStore(targetStoreId);
+  if (!displayName && shop && typeof shop?.name === "string") {
+    displayName = normalizeString(shop.name);
+  }
+  const domain = normalizeString(
+    shop?.myshopify_domain ??
+      shop?.domain ??
+      record?.shopDomain ??
+      record?.storeDomain ??
+      targetStoreId
+  );
+  renderStoreNamePanel({ displayName, domain });
+}
 const getOrderIdValue = (row) =>
   normalizeString(row?.orderId ?? getOrderMap(row)?.orderId ?? row?.orderName ?? "");
 
@@ -3423,17 +3474,22 @@ window.addEventListener("DOMContentLoaded", () => {
 
         const defaultStoreId = String(data?.defaultStoreId ?? "").trim();
         const currentStoreId = getActiveStoreId();
-        const activeStoreId =
-          currentStoreId || defaultStoreId || String(stores[0]?.shopDomain ?? "");
+        const fallbackStoreId = normalizeString(stores[0]?.storeId ?? stores[0]?.shopDomain ?? "");
+        const activeStoreId = currentStoreId || defaultStoreId || fallbackStoreId;
+
+        adminStores = stores;
 
         select.innerHTML = "";
         for (const s of stores) {
+          const { id, label } = formatStoreLabel(s);
+          if (!id) continue;
           const opt = document.createElement("option");
-          opt.value = String(s.shopDomain ?? "");
-          opt.textContent = String(s.shopDomain ?? "");
+          opt.value = id;
+          opt.textContent = label;
           select.appendChild(opt);
         }
-        select.value = activeStoreId;
+        if (activeStoreId) select.value = activeStoreId;
+        updateSelectedStoreDisplay({ storeId: activeStoreId });
 
         if (!currentStoreId && activeStoreId) {
           setActiveStoreId(activeStoreId);
@@ -3451,32 +3507,10 @@ window.addEventListener("DOMContentLoaded", () => {
   if (activeRole === "admin") {
     fetchShop()
       .then((data) => {
-        const shop = data?.shop ?? {};
-        const storeName = String(shop?.name ?? "").trim();
-        const storeDomain = String(shop?.myshopify_domain ?? "").trim();
-        const storeEl = $("storeName");
-        if (!storeEl) return;
-
-        if (storeName || storeDomain) {
-          storeEl.textContent = "";
-          const nameSpan = document.createElement("span");
-          nameSpan.className = "storeNameMain";
-          nameSpan.textContent = storeName || "Unknown";
-          storeEl.appendChild(nameSpan);
-
-          if (storeDomain) {
-            const domainSpan = document.createElement("span");
-            domainSpan.className = "storeNameDomain";
-            domainSpan.textContent = storeDomain;
-            storeEl.appendChild(domainSpan);
-          }
-        } else {
-          storeEl.textContent = "Unknown";
-        }
+        updateSelectedStoreDisplay({ shop: data?.shop });
       })
       .catch(() => {
-        const storeEl = $("storeName");
-        if (storeEl) storeEl.textContent = "Unknown";
+        updateSelectedStoreDisplay();
       });
   }
 

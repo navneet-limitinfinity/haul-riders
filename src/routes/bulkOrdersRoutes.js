@@ -3,11 +3,10 @@ import crypto from "node:crypto";
 import multer from "multer";
 import { getFirebaseAdmin } from "../auth/firebaseAdmin.js";
 import { getShopCollectionInfo } from "../firestore/shopCollections.js";
-import { toOrderDocId } from "../firestore/ids.js";
-import { reserveOrderSequences, formatManualOrderName } from "../firestore/orderSequence.js";
+import { ensureStoreIdForShop } from "../firestore/storeIdGenerator.js";
 import { parseCsvRows } from "../orders/import/parseCsvRows.js";
+import { createManualOrders } from "../orders/manualOrdersService.js";
 import { buildSearchTokensFromDoc } from "../firestore/searchTokens.js";
-import { reserveHrGids } from "../firestore/hrGid.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -18,6 +17,55 @@ const upload = multer({
 
 const JOB_TTL_MS = 30 * 60_000;
 const jobs = new Map();
+
+const CONSIGNMENTS_COLLECTION = "consignments";
+
+const normalizeShopDomain = (storeId) => {
+  const raw = String(storeId ?? "").trim().toLowerCase();
+  if (!raw) return "";
+  return raw.includes(".") ? raw : `${raw}.myshopify.com`;
+};
+
+async function resolveStoreMetaForWrite({ firestore, shopsCollection, storeIdInput }) {
+  const raw = String(storeIdInput ?? "").trim().toLowerCase();
+  if (!raw) throw new Error("store_id_required");
+
+  if (/^\d{6,}$/.test(raw)) {
+    const found = await firestore.collection(shopsCollection).where("storeId", "==", raw).limit(1).get();
+    const doc = found.docs[0] ?? null;
+    if (!doc) throw new Error("store_id_required");
+    const data = doc.data() ?? {};
+    const storeDetails = data?.storeDetails && typeof data.storeDetails === "object" ? data.storeDetails : {};
+    const storeName = String(storeDetails?.storeName ?? "").trim();
+    return {
+      shopDomain: doc.id,
+      numericStoreId: raw,
+      storeName,
+    };
+  }
+
+  const shopDomain = normalizeShopDomain(raw);
+  if (!shopDomain) throw new Error("store_id_required");
+
+  const ensuredStoreId = await ensureStoreIdForShop({
+    firestore,
+    shopsCollection,
+    shopDomain,
+    referenceDate: new Date(),
+  });
+
+  const snap = await firestore.collection(shopsCollection).doc(shopDomain).get();
+  const data = snap.exists ? snap.data() ?? {} : {};
+  const numericStoreId = String(data?.storeId ?? ensuredStoreId ?? "").trim();
+  if (!numericStoreId) throw new Error("store_id_required");
+  const storeDetails = data?.storeDetails && typeof data.storeDetails === "object" ? data.storeDetails : {};
+  const storeName = String(storeDetails?.storeName ?? "").trim();
+  return {
+    shopDomain,
+    numericStoreId,
+    storeName,
+  };
+}
 
 function nowIso() {
   return new Date().toISOString();
@@ -96,23 +144,6 @@ function getDocShippingDateIso(data) {
   const requestedAt = String(data?.requestedAt ?? "").trim();
   if (requestedAt) return requestedAt;
   return String(data?.updatedAt ?? data?.updated_at ?? "").trim();
-}
-
-function safeNumber(value) {
-  const s = String(value ?? "").trim();
-  if (!s) return "";
-  const n = Number(s);
-  return Number.isFinite(n) ? String(n) : s;
-}
-
-function normalizePhone10(value) {
-  const digits = String(value ?? "").replaceAll(/\D/g, "");
-  if (digits.length < 10) return "";
-  return digits.slice(-10);
-}
-
-function getRowValue(row, key) {
-  return String(row?.[key] ?? "").trim();
 }
 
 function normalizeHeaderKey(value) {
@@ -217,63 +248,6 @@ function parseRowsFromFile(file) {
   throw new Error("unsupported_file_type");
 }
 
-function normalizeCenterForOrder(data) {
-  const d = data && typeof data === "object" ? data : {};
-  const originName = String(d.originName ?? "").trim();
-  if (!originName) return null;
-  return {
-    originName,
-    contactPersonName: String(d.contactPersonName ?? "").trim(),
-    address1: String(d.address1 ?? "").trim(),
-    address2: String(d.address2 ?? "").trim(),
-    city: String(d.city ?? "").trim(),
-    state: String(d.state ?? "").trim(),
-    pinCode: String(d.pinCode ?? "").trim(),
-    country: String(d.country ?? "IN").trim() || "IN",
-    phone: String(d.phone ?? "").trim(),
-    default: Boolean(d.default),
-  };
-}
-
-function formatFulfillmentCenterString(center) {
-  const c = center && typeof center === "object" ? center : null;
-  if (!c) return "";
-  const contactPersonName = String(c.contactPersonName ?? "").trim();
-  const parts = [
-    String(c.address1 ?? "").trim(),
-    String(c.address2 ?? "").trim(),
-    String(c.city ?? "").trim(),
-    String(c.state ?? "").trim(),
-    String(c.pinCode ?? "").trim(),
-    String(c.country ?? "").trim(),
-  ].filter(Boolean);
-  const addr = parts.join(", ");
-  // Per requirement: do NOT include originName in orders (originName is shop reference only).
-  // Per requirement: do NOT store fulfillment center phone inside orders.
-  return [contactPersonName, addr].filter(Boolean).join(" | ");
-}
-
-async function loadFulfillmentCentersMap({ firestore, shopsCollection, storeId }) {
-  const normalized = String(storeId ?? "").trim().toLowerCase();
-  if (!normalized) return { byName: new Map(), defaultCenter: null };
-  const col = firestore.collection(shopsCollection).doc(normalized).collection("fulfillmentCenter");
-  try {
-    const snap = await col.get();
-    const byName = new Map();
-    let defaultCenter = null;
-    for (const doc of snap.docs) {
-      const center = normalizeCenterForOrder(doc.data());
-      if (!center) continue;
-      byName.set(center.originName, center);
-      if (!defaultCenter && center.default) defaultCenter = center;
-    }
-    if (!defaultCenter) defaultCenter = byName.values().next().value ?? null;
-    return { byName, defaultCenter };
-  } catch {
-    return { byName: new Map(), defaultCenter: null };
-  }
-}
-
 function normalizeShipmentStatus(value) {
   const s = String(value ?? "").trim().toLowerCase();
   if (!s) return "";
@@ -360,196 +334,33 @@ export function createBulkOrdersRouter({ env, auth }) {
 
         try {
           const admin = await getFirebaseAdmin({ env });
-          const { collectionId, displayName, storeId: normalizedStoreId } = getShopCollectionInfo({
-            storeId,
-          });
           const firestore = admin.firestore();
           const shopsCollection = String(env?.auth?.firebase?.shopsCollection ?? "shops").trim() || "shops";
-          const { byName: centersByName, defaultCenter } = await loadFulfillmentCentersMap({
+          const { storeId: storeKey, displayName } = getShopCollectionInfo({ storeId });
+          const resolved = await resolveStoreMetaForWrite({
             firestore,
             shopsCollection,
-            storeId: normalizedStoreId,
+            storeIdInput: storeId,
           });
-          const defaultFulfillmentCenterString = defaultCenter
-            ? formatFulfillmentCenterString(defaultCenter)
-            : "";
 
-          const missingOrderIdIndexes = [];
-          for (let i = 0; i < rows.length; i += 1) {
-            const row = rows[i];
-            const existingId =
-              pickRowValue(row, ["orderId", "order_id", "Order ID"]) ||
-              getRowValue(row, "orderName") ||
-              getRowValue(row, "orderKey");
-            if (!existingId) missingOrderIdIndexes.push(i);
-          }
+          const result = await createManualOrders({
+            firestore,
+            collectionId: CONSIGNMENTS_COLLECTION,
+            storeId: resolved.numericStoreId,
+            storeKey,
+            shopDomain: resolved.shopDomain,
+            displayName: resolved.storeName || displayName,
+            user: req.user,
+            shopsCollection,
+            rows,
+          });
 
-          let sequences = [];
-          if (missingOrderIdIndexes.length) {
-            sequences = await reserveOrderSequences({ firestore, count: missingOrderIdIndexes.length });
-          }
-
-          for (let i = 0; i < missingOrderIdIndexes.length; i += 1) {
-            const idx = missingOrderIdIndexes[i];
-            const seq = sequences[i];
-            const orderId = formatManualOrderName(seq);
-            rows[idx].orderId = orderId;
-            if (!getRowValue(rows[idx], "orderKey")) rows[idx].orderKey = orderId;
-          }
-
-          for (let i = 0; i < rows.length; i += 1) {
-            const row = rows[i];
-            if (!getRowValue(row, "orderId")) {
-              const fromLegacy =
-                pickRowValue(row, ["orderId", "order_id", "Order ID"]) ||
-                getRowValue(row, "orderName") ||
-                getRowValue(row, "orderKey");
-              if (fromLegacy) row.orderId = fromLegacy;
-            }
-            if (!getRowValue(row, "orderKey")) row.orderKey = getRowValue(row, "orderId");
-          }
-
-          const assignedAt = nowIso();
-          for (let i = 0; i < rows.length; i += 1) {
-            const row = rows[i];
-            const validation = validateRow(row, i);
-            if (!validation.ok) {
-              current.failed += 1;
-              current.errors.push(validation.error);
-              current.processed += 1;
-              continue;
-            }
-
-            const orderKey = getRowValue(row, "orderKey");
-            const docId = toOrderDocId(orderKey);
-            const docRef = firestore.collection(collectionId).doc(docId);
-
-            const phone1 = normalizePhone10(getRowValue(row, "phone1"));
-            const phone2 = normalizePhone10(getRowValue(row, "phone2"));
-
-            const awbNumber = pickRowValue(row, [
-              "consignmentNumber",
-              "consignment_number",
-              "awbNumber",
-              "trackingNumber",
-              "tracking_number",
-              "Tracking Number",
-            ]);
-            const trackingCompany = pickRowValue(row, ["courierPartner", "courier_partner", "trackingCompany", "courier"])
-              || (awbNumber ? "DTDC" : "");
-            // Tracking URL is derived in UI using courier_partner + consignment_number.
-
-            const shippingDate = pickRowValue(row, ["shippingDate", "shipping_date"]) || assignedAt;
-            const expectedDeliveryDate = pickRowValue(row, [
-              "expectedDeliveryDate",
-              "expected_delivery_date",
-              "edd",
-            ]);
-            const uploadShipmentStatus = normalizeDisplayStatus(
-              pickRowValue(row, ["shipmentStatus", "shipment_status", "Shipment Status", "Shipments Status"])
-            );
-
-            const fulfillmentCenterName =
-              String(pickRowValue(row, ["fulfillmentCenter", "fulfillment_center"]) || "").trim() || "";
-            const fulfillmentCenterAddress = fulfillmentCenterName
-              ? centersByName.get(fulfillmentCenterName) ?? null
-              : null;
-            const fulfillmentCenterString = fulfillmentCenterAddress
-              ? formatFulfillmentCenterString(fulfillmentCenterAddress)
-              : defaultFulfillmentCenterString;
-
-            const order = {
-              index: i + 1,
-              orderId: pickRowValue(row, ["orderId", "order_id", "Order ID", "orderName", "Order Name"]) || getRowValue(row, "orderId"),
-              orderGid: pickRowValue(row, ["orderGid", "order_gid", "order_gid"]),
-              // Per requirement: Order Date should reflect bulk upload time.
-              createdAt: assignedAt,
-              customerEmail: pickRowValue(row, ["customerEmail", "Customer Email", "email", "Email"]),
-              financialStatus: pickRowValue(row, ["financialStatus", "Financial Status"]) || getRowValue(row, "financialStatus"),
-              paymentStatus:
-                pickRowValue(row, ["paymentStatus", "payment_status", "Payment Status"]) ||
-                pickRowValue(row, ["financialStatus", "Financial Status"]) ||
-                getRowValue(row, "financialStatus"),
-              totalPrice: safeNumber(pickRowValue(row, ["totalPrice", "Total Price"]) || getRowValue(row, "totalPrice")),
-              invoiceValue: safeNumber(pickRowValue(row, ["invoice_value", "invoiceValue", "Invoice Value"]) || pickRowValue(row, ["totalPrice", "Total Price"]) || getRowValue(row, "totalPrice")),
-              productDescription: pickRowValue(row, [
-                "itemAndQuantity",
-                "content_and_quantity",
-                "productDescription",
-                "product_description",
-              ]),
-              fulfillmentCenter: fulfillmentCenterString,
-              fulfillmentStatus: pickRowValue(row, ["fulfillmentStatus", "fulfillment_status"]) || "fulfilled",
-              shipping: {
-                fullName: pickRowValue(row, ["fullName", "Full Name", "name", "Name"]),
-                address1: pickRowValue(row, ["address1", "Address 1", "address_line_1", "addressLine1"]),
-                address2: pickRowValue(row, ["address2", "Address 2", "address_line_2", "addressLine2"]),
-                city: pickRowValue(row, ["city", "City"]),
-                state: pickRowValue(row, ["state", "State"]),
-                pinCode: pickRowValue(row, ["pinCode", "PIN Code", "pincode", "pin_code"]),
-                phone1,
-                phone2,
-              },
-            };
-
-            const courierType = pickRowValue(row, ["courierType", "courier_type", "courierTypeName", "courierTypeValue"]);
-            const weightKgRaw = pickRowValue(row, ["weightKg", "weight", "weight_kg"]);
-            const weightKg = weightKgRaw ? Number.parseFloat(weightKgRaw) : NaN;
-
-            try {
-              const existing = await docRef.get();
-              const existingData = existing.data() ?? {};
-              const existingHrGid = String(existingData?.hrGid ?? "").trim();
-              const hrGid = existingHrGid || (await reserveHrGids({ firestore, count: 1 }))[0] || "";
-              const existingShippingDate = String(existingData?.shippingDate ?? existingData?.shipping_date ?? "").trim();
-              const existingDisplayStatus = String(existingData?.shipmentStatus ?? existingData?.shipment_status ?? "").trim();
-              const existingConsignment = String(existingData?.consignmentNumber ?? existingData?.consignment_number ?? "").trim();
-              const existingCourierPartner = String(existingData?.courierPartner ?? existingData?.courier_partner ?? "").trim();
-              const resolvedShippingDate = existingShippingDate || shippingDate;
-
-              await docRef.set(
-                {
-                  docId,
-                  ...(hrGid ? { hrGid } : {}),
-                  storeId: normalizedStoreId,
-                  shopName: displayName,
-                  order,
-                  shipmentStatus: existingDisplayStatus || uploadShipmentStatus || "Assigned",
-                  courierPartner: trackingCompany || existingCourierPartner || (awbNumber ? "DTDC" : ""),
-                  consignmentNumber: awbNumber || existingConsignment || "",
-                  searchTokens: buildSearchTokensFromDoc({
-                    order,
-                    consignmentNumber: awbNumber || existingConsignment || "",
-                    courierPartner: trackingCompany || existingCourierPartner || (awbNumber ? "DTDC" : ""),
-                    courierType,
-                  }),
-                  ...(Number.isFinite(weightKg) ? { weightKg: Number(weightKg.toFixed(1)) } : {}),
-                  ...(courierType ? { courierType } : {}),
-                  shippingDate: resolvedShippingDate,
-                  ...(expectedDeliveryDate ? { expectedDeliveryDate } : {}),
-                  updatedAt: assignedAt,
-                  event: "bulk_csv_upload",
-                  requestedBy: {
-                    uid: String(req.user?.uid ?? ""),
-                    email: String(req.user?.email ?? ""),
-                    role: String(req.user?.role ?? ""),
-                  },
-                  requestedAt: assignedAt,
-                },
-                { merge: true }
-              );
-              if (existing.exists) current.updated += 1;
-              else current.created += 1;
-            } catch (error) {
-              current.failed += 1;
-              current.errors.push(
-                `Row ${i + 2}: ${String(error?.message ?? error ?? "write_failed")}`
-              );
-            } finally {
-              current.processed += 1;
-            }
-          }
-
+          current.errors = result.errors.slice(0, 200);
+          current.created = result.created;
+          current.updated = result.updated;
+          current.failed = result.failed;
+          current.processed = result.total;
+          current.orders = result.orders.slice(0, 500);
           current.status = "done";
           current.finishedAt = nowIso();
         } catch (error) {
