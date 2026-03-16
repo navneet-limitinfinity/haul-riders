@@ -40,6 +40,12 @@ function renderNavDrawer({ role, userLabel, activePath }) {
           Bulk Tools
         </a>`
       : ""}
+    ${role === "admin"
+      ? html`<a class="navItem ${isActive("/admin/automations")}" href="/admin/automations">
+          <i class="fa-solid fa-robot" aria-hidden="true"></i>
+          Automations
+        </a>`
+      : ""}
     <a class="navItem" href="mailto:support@haulriders.com">
       <i class="fa-solid fa-life-ring" aria-hidden="true"></i>
       Support
@@ -158,6 +164,29 @@ async function ensureUserStoreId({ env, user }) {
     user.storeId = storeIdValue;
   }
   return storeIdValue;
+}
+
+function formatSyncTimestamp(value) {
+  if (!value) return "";
+  const date = typeof value?.toDate === "function" ? value.toDate() : new Date(value);
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
+  try {
+    return new Intl.DateTimeFormat("en-IN", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: "Asia/Kolkata",
+    }).format(date);
+  } catch {
+    return date.toISOString();
+  }
+}
+
+function buildLastSyncInfo(metaData = {}) {
+  const timeLabel = formatSyncTimestamp(metaData.time) || "Not synced yet";
+  const rawCount = Number(metaData.updatedCount);
+  const countLabel =
+    Number.isFinite(rawCount) && rawCount >= 0 ? `${Math.trunc(rawCount)} AWB${Math.trunc(rawCount) === 1 ? "" : "s"} updated` : "";
+  return { timeLabel, countLabel };
 }
 
 function renderOrdersPage({ role, userLabel, storeId, firestoreCollectionId, debugFooter }) {
@@ -617,6 +646,278 @@ function renderBulkUploadPage({ userLabel, debugFooter }) {
           </div>
           </div>
         </div>
+      </section>
+    </main>
+  </body>
+</html>`;
+}
+
+function renderAutomationsPage({ userLabel, debugFooter }) {
+  const assetVersion = "54";
+  const safeUserLabel = escapeHtml(userLabel);
+
+  return html`<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Automations</title>
+    <link rel="stylesheet" href="/static/orders.css?v=${assetVersion}" />
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/fontawesome.min.css?v=${assetVersion}" />
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/solid.min.css?v=${assetVersion}" />
+    <link rel="icon" type="image/png" href="/static/icon.png?v=${assetVersion}" />
+    ${renderDebugFooterAssets({ assetVersion, enabled: debugFooter })}
+  </head>
+  <body data-role="admin" data-page="automations" data-debug-footer="${debugFooter ? "1" : "0"}">
+    ${renderNavDrawer({ role: "admin", userLabel, activePath: "/admin/automations" })}
+    <header class="topbar">
+      <div class="topbarInner">
+        <div class="brand">
+          <label id="navToggle" class="navToggle" for="navState" role="button" tabindex="0" aria-label="Open navigation">
+            <i class="fa-solid fa-bars" aria-hidden="true"></i>
+          </label>
+          <a class="brandLink" href="/admin/orders" aria-label="Go back to dashboard">
+            <img
+              class="brandLogo"
+              src="/static/haul_riders_logo.jpeg?v=54"
+              alt="Haul Riders"
+              decoding="async"
+            />
+            <div class="brandText">
+              <div class="brandTitle">Automations</div>
+              <div class="brandSub">Keep shipment workflows in sync</div>
+            </div>
+          </a>
+        </div>
+
+        <div class="topbarActions">
+          <details class="userMenu" aria-label="User menu">
+            <summary class="userMenuSummary" aria-label="Open user menu">
+              <span class="userAvatar userAvatarIcon" aria-hidden="true">
+                <i class="fa-solid fa-user" aria-hidden="true"></i>
+              </span>
+            </summary>
+            <div class="userMenuList">
+              <div class="userMenuSection">
+                <strong>${safeUserLabel}</strong>
+              </div>
+              <a class="userMenuItem" href="/admin/orders">Dashboard</a>
+              <button type="button" class="userMenuItem userMenuButton" data-action="logout">
+                Logout
+              </button>
+            </div>
+          </details>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="panel">
+        <div class="panelHeader">
+          <div class="panelTitle">
+            <h1>Automations</h1>
+            <div class="panelHint">Automate AWB assignments, shipment status updates, and notifications.</div>
+          </div>
+          <div class="controls">
+            <button type="button" class="btn btnPrimary btnIcon">
+              <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+              Create automation
+            </button>
+          </div>
+        </div>
+
+        <div class="automationGrid">
+          <article class="automationCard">
+            <div class="automationCardTitle">Auto-assign AWBs</div>
+            <div class="automationCardDescription">
+              Pull AWBs from the pool whenever a shipment is assigned so courier bookings stay uninterrupted.
+            </div>
+            <div class="automationCardFooter">
+              <button class="btn btnSecondary" type="button">Configure</button>
+              <span class="automationCardLabel">Status: Draft</span>
+            </div>
+          </article>
+          <article class="automationCard">
+            <div class="automationCardTitle">
+              Shipment status sync
+            </div>
+            <div class="automationCardDescription">
+              Listen for carrier updates and push new shipment states into Firestore + customer notifications.
+            </div>
+            <div class="automationCardFooter">
+              <a class="btn btnSecondary" href="/admin/automations/shipment-status">Configure</a>
+              <span class="automationCardLabel">Status: Scheduled</span>
+            </div>
+          </article>
+          <article class="automationCard">
+            <div class="automationCardTitle">Customer notifications</div>
+            <div class="automationCardDescription">
+              Trigger SMS or email alerts when orders move between fulfillment phases so shops stay in the loop.
+            </div>
+            <div class="automationCardFooter">
+              <button class="btn btnSecondary" type="button">Configure</button>
+              <span class="automationCardLabel">Status: Active</span>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>`;
+}
+
+function renderShipmentStatusConfigPage({ userLabel, debugFooter, lastSyncInfo }) {
+  const assetVersion = "54";
+  const safeUserLabel = escapeHtml(userLabel);
+  const safeTimeLabel = escapeHtml(lastSyncInfo?.timeLabel ?? "Not synced yet");
+  const safeCountLabel = escapeHtml(lastSyncInfo?.countLabel ?? "");
+
+  return html`<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shipment Status Sync Config</title>
+    <link rel="stylesheet" href="/static/orders.css?v=${assetVersion}" />
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/fontawesome.min.css?v=${assetVersion}" />
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/solid.min.css?v=${assetVersion}" />
+    <link rel="icon" type="image/png" href="/static/icon.png?v=${assetVersion}" />
+    <script src="/static/automation-shipment-status.js?v=${assetVersion}" defer></script>
+    ${renderDebugFooterAssets({ assetVersion, enabled: debugFooter })}
+  </head>
+  <body data-role="admin" data-page="automations" data-debug-footer="${debugFooter ? "1" : "0"}">
+    ${renderNavDrawer({ role: "admin", userLabel, activePath: "/admin/automations" })}
+    <header class="topbar">
+      <div class="topbarInner">
+        <div class="brand">
+          <label id="navToggle" class="navToggle" for="navState" role="button" tabindex="0" aria-label="Open navigation">
+            <i class="fa-solid fa-bars" aria-hidden="true"></i>
+          </label>
+          <a class="brandLink" href="/admin/automations" aria-label="Back to automations">
+            <img
+              class="brandLogo"
+              src="/static/haul_riders_logo.jpeg?v=${assetVersion}"
+              alt="Haul Riders"
+              decoding="async"
+            />
+            <div class="brandText">
+              <div class="brandTitle">Shipment status sync</div>
+              <div class="brandSub">Carrier status → Firestore + notifications</div>
+            </div>
+          </a>
+        </div>
+
+        <div class="topbarActions">
+          <details class="userMenu" aria-label="User menu">
+            <summary class="userMenuSummary" aria-label="Open user menu">
+              <span class="userAvatar userAvatarIcon" aria-hidden="true">
+                <i class="fa-solid fa-user" aria-hidden="true"></i>
+              </span>
+            </summary>
+            <div class="userMenuList">
+              <div class="userMenuSection">
+                <strong>${safeUserLabel}</strong>
+              </div>
+              <a class="userMenuItem" href="/admin/orders">Dashboard</a>
+              <button type="button" class="userMenuItem userMenuButton" data-action="logout">
+                Logout
+              </button>
+            </div>
+          </details>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="panel">
+        <div class="panelHeader">
+          <div class="panelTitle">
+            <h1>Shipment status sync</h1>
+            <div class="panelHint">Enable webhook/polling sources that feed Firestore + customer updates.</div>
+          </div>
+          <div class="controls">
+            <button class="btn btnPrimary" type="button" disabled>
+              Paired with carrier endpoint
+            </button>
+          </div>
+        </div>
+
+        <div class="automationSummaryCard">
+          <span class="automationSummaryIcon" aria-hidden="true">
+            <i class="fa-solid fa-truck-fast"></i>
+          </span>
+          <div class="automationSummaryContent">
+            <div class="automationSummaryLabel">Status of Consignment last updated</div>
+            <div class="automationSummaryValue">${safeTimeLabel}</div>
+            ${safeCountLabel
+              ? html`<div class="automationSummaryMeta">${safeCountLabel}</div>`
+              : ""}
+          </div>
+        </div>
+
+        <div class="automationActions">
+          <button id="openAwbDrawer" class="btn btnSecondary btnIcon" type="button">
+            <i class="fa-solid fa-box-open" aria-hidden="true"></i>
+            Show assigned AWBs
+          </button>
+        </div>
+
+        <div class="automationGrid">
+          <article class="automationCard">
+            <div class="automationCardTitle">Carrier Webhook</div>
+            <div class="automationCardDescription">
+              Configure the carrier callback URL, authentication, and statuses you expect in order to seed Firestore docs directly from their feed.
+            </div>
+            <div class="automationCardFooter">
+              <button class="btn btnSecondary" type="button">Edit webhook</button>
+              <span class="automationCardLabel">Field required</span>
+            </div>
+          </article>
+          <article class="automationCard">
+            <div class="automationCardTitle">Retry & backfill</div>
+            <div class="automationCardDescription">
+              Decide how often to poll the carrier history API, how many retries to keep, and the window to backfill missing updates.
+            </div>
+            <div class="automationCardFooter">
+              <button class="btn btnSecondary" type="button">Set retry rules</button>
+              <span class="automationCardLabel">Optional</span>
+            </div>
+          </article>
+          <article class="automationCard">
+            <div class="automationCardTitle">Notification targets</div>
+            <div class="automationCardDescription">
+              Choose which teams or customers receive SMS / email updates after Firestore reflects the new status.
+            </div>
+            <div class="automationCardFooter">
+              <button class="btn btnSecondary" type="button">Map channels</button>
+              <span class="automationCardLabel">Active</span>
+            </div>
+          </article>
+        </div>
+
+        <div class="automationDrawerOverlay" id="awbDrawerOverlay" hidden></div>
+        <aside class="automationDrawer" id="awbDrawer" aria-hidden="true">
+          <div class="automationDrawerHeader">
+            <div>
+              <h2>Assigned, not delivered</h2>
+              <p>AWBs that are currently assigned but not marked delivered in the pool.</p>
+            </div>
+            <button id="closeAwbDrawer" class="btn btnSecondary btnIcon" type="button" aria-label="Close drawer">
+              <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            </button>
+          </div>
+          <div class="automationDrawerBody">
+            <div id="awbDrawerStatus" class="automationDrawerStatus" data-kind="info">Waiting for data...</div>
+            <div id="automationAwbList" class="automationDrawerList"></div>
+          </div>
+          <div class="automationDrawerFooter">
+            <button id="awbDrawerRefresh" class="btn btnPrimary btnIcon" type="button">
+              <i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i>
+              Refresh list
+            </button>
+            <span id="awbDrawerTotal" class="automationDrawerMeta"></span>
+          </div>
+        </aside>
       </section>
     </main>
   </body>
@@ -1536,6 +1837,41 @@ export function createPagesRouter({ env, auth } = {}) {
     const debugFooter = resolveDebugFooterFlag({ req, env });
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(renderCreateOrdersPage({ role: "admin", userLabel, storeId: "", debugFooter }));
+  });
+
+  router.get("/admin/automations", auth.requireRole("admin"), (req, res) => {
+    if (maybePersistDebugFooterFlag({ req, res })) {
+      const url = new URL(`${req.protocol}://${req.get("host")}${req.originalUrl}`);
+      url.searchParams.delete("debugFooter");
+      res.redirect(302, url.pathname + (url.search ? url.search : ""));
+      return;
+    }
+    const userLabel = String(req.user?.email ?? env?.adminName ?? "Admin").trim() || "Admin";
+    const debugFooter = resolveDebugFooterFlag({ req, env });
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(renderAutomationsPage({ userLabel, debugFooter }));
+  });
+
+  router.get("/admin/automations/shipment-status", auth.requireRole("admin"), async (req, res, next) => {
+    if (maybePersistDebugFooterFlag({ req, res })) {
+      const url = new URL(`${req.protocol}://${req.get("host")}${req.originalUrl}`);
+      url.searchParams.delete("debugFooter");
+      res.redirect(302, url.pathname + (url.search ? url.search : ""));
+      return;
+    }
+    const userLabel = String(req.user?.email ?? env?.adminName ?? "Admin").trim() || "Admin";
+    const debugFooter = resolveDebugFooterFlag({ req, env });
+    try {
+      const admin = await getFirebaseAdmin({ env });
+      const firestore = admin.firestore();
+      const metaSnap = await firestore.collection("meta").doc("lastAwbStatusSync").get();
+      const metaData = metaSnap.exists ? metaSnap.data() ?? {} : {};
+      const lastSyncInfo = buildLastSyncInfo(metaData);
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.send(renderShipmentStatusConfigPage({ userLabel, debugFooter, lastSyncInfo }));
+    } catch (error) {
+      next(error);
+    }
   });
 
   router.get("/shop/create-orders", auth.requireRole("shop"), (req, res) => {

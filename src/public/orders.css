@@ -1396,6 +1396,343 @@ body[data-page="store"] .storeDetailsValueMultiline {
   color: var(--muted);
 }
 
+.automationGrid {
+  padding: 12px 16px 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.automationSummaryCard {
+  margin: 0 16px 24px;
+  padding: 18px 22px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--panel);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: var(--shadow2);
+}
+
+.automationSummaryIcon {
+  width: 62px;
+  height: 62px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  color: #ffffff;
+  background: linear-gradient(135deg, rgba(106, 166, 255, 0.25), rgba(37, 99, 235, 0.9));
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.automationSummaryContent {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.automationSummaryLabel {
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.automationSummaryValue {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.automationSummaryMeta {
+  font-size: 14px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .automationSummaryCard {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .automationSummaryIcon {
+    width: 56px;
+    height: 56px;
+  }
+}
+
+.automationActions {
+  margin: 0 16px 24px;
+}
+
+.automationDrawerOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.42);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+  z-index: 1000;
+}
+
+.automationDrawerOverlay.isVisible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.automationDrawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(420px, 100%);
+  background: var(--bg2);
+  padding: 22px 26px;
+  margin: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: -20px 0 40px rgba(0, 0, 0, 0.45);
+  transform: translateX(120%);
+  transition: transform 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 1001;
+}
+
+.automationDrawer.isVisible {
+  transform: translateX(0);
+}
+
+.automationDrawerHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.automationDrawerHeader h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.automationDrawerHeader p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.automationDrawerBody {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.automationDrawerStatus {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.automationDrawerStatus[data-kind="busy"] {
+  color: var(--accent);
+}
+
+.automationDrawerStatus[data-kind="ok"] {
+  color: var(--ok);
+}
+
+.automationDrawerStatus[data-kind="error"] {
+  color: var(--error);
+}
+
+.automationDrawerList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.automationDrawerRow {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--panel);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.automationDrawerMain {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 180px;
+}
+
+.automationDrawerAwb {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.automationDrawerActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.iconBtn {
+  width: 36px;
+  height: 34px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.iconBtn:hover {
+  border-color: rgba(106, 166, 255, 0.6);
+  box-shadow: 0 0 0 2px rgba(106, 166, 255, 0.14);
+}
+
+.iconBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.automationDrawerDetails {
+  width: 100%;
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.awbDetailsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.awbDetailsItem {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.awbDetailsItemFull {
+  grid-column: 1 / -1;
+}
+
+.awbDetailsLabel {
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--muted);
+}
+
+.awbDetailsValue {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.automationDrawerFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.automationDrawerMeta {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.automationDrawerEmpty {
+  padding: 20px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  text-align: center;
+  color: var(--muted);
+}
+
+.automationDrawerList::-webkit-scrollbar,
+.automationDrawerList::-webkit-scrollbar-track {
+  width: 6px;
+}
+
+.automationDrawerList::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 3px;
+}
+
+.automationDrawerList::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+@media (max-width: 640px) {
+  .automationDrawer {
+    width: 100%;
+  }
+
+  .automationDrawerRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .awbDetailsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.automationCard {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--panel2);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: var(--shadow2);
+}
+
+.automationCardTitle {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.automationCardDescription {
+  font-size: 14px;
+  color: var(--muted);
+  min-height: 48px;
+}
+
+.automationCardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.automationCardLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+  font-weight: 600;
+}
+
 .controls {
   display: flex;
   align-items: flex-end;

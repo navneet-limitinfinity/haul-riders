@@ -126,6 +126,7 @@ export async function uploadAwbPoolCsv({
           {
             awbNumber: e.awbNumber,
             category: e.category,
+            delivered: false,
             updatedAt: ts,
             lastUploadedAt: ts,
             lastUploadedBy: uploadedBy || null,
@@ -139,6 +140,7 @@ export async function uploadAwbPoolCsv({
           {
             awbNumber: e.awbNumber,
             category: e.category,
+            delivered: false,
             assigned: false,
             assignedAt: "",
             assignedDocId: "",
