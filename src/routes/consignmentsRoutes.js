@@ -30,6 +30,7 @@ const normalizeDisplayStatus = (value) => {
   if (!raw) return "";
   const key = raw.toLowerCase();
   const all = [
+    "Assigned",
     ...IN_TRANSIT_DISPLAY_STATUSES,
     DELIVERED_DISPLAY_STATUS,
     ...RTO_DISPLAY_STATUSES,
@@ -46,7 +47,8 @@ const normalizeDisplayStatus = (value) => {
     .replaceAll(/[^a-z0-9]+/g, "_")
     .replaceAll(/^_+|_+$/g, "");
 
-  const map = {
+    const map = {
+    assigned: "Assigned",
     in_transit: "In Transit",
     intransit: "In Transit",
     undelivered: "Undelivered",
@@ -423,11 +425,19 @@ const parseLimit = (value) => {
 
 const isAllowedTab = (tab) => {
   const t = String(tab ?? "").trim().toLowerCase();
-  return t === "in_transit" || t === "delivered" || t === "rto" || t === "new_fs";
+  return (
+    t === "assigned" ||
+    t === "in_transit" ||
+    t === "delivered" ||
+    t === "rto" ||
+    t === "new_fs" ||
+    t === "all"
+  );
 };
 
 const allowedStatusesForTab = (tab) => {
   const t = String(tab ?? "").trim().toLowerCase();
+  if (t === "assigned") return new Set(["assigned"]);
   if (t === "in_transit")
     return new Set(IN_TRANSIT_DISPLAY_STATUSES.map((value) => value.toLowerCase()));
   if (t === "delivered") return new Set([DELIVERED_DISPLAY_STATUS.toLowerCase()]);
@@ -441,15 +451,23 @@ const MAX_CONSIGNMENT_SCAN = 500;
 
 async function loadConsignmentsForStore({
   firestore,
-  storeId,
+  storeIds,
   allowedStatuses,
   search,
   limit,
 }) {
   const scanLimit = Math.min(Math.max(limit * 3, limit + 10, 50), MAX_CONSIGNMENT_SCAN);
+  const ids = Array.isArray(storeIds)
+    ? storeIds.map((value) => String(value ?? "").trim()).filter(Boolean)
+    : [];
+  if (!ids.length) {
+    return { orders: [], nextCursor: "", scannedDocs: 0 };
+  }
+  const storeClauseType = ids.length === 1 ? "==" : "in";
+  const clauseValue = ids.length === 1 ? ids[0] : ids.slice(0, 10);
   const snapshot = await firestore
     .collection(CONSIGNMENTS_COLLECTION)
-    .where("storeId", "==", storeId)
+    .where("storeId", storeClauseType, clauseValue)
     .orderBy("requestedAt", "desc")
     .limit(scanLimit)
     .get();
@@ -459,9 +477,7 @@ async function loadConsignmentsForStore({
     if (results.length >= limit) break;
     const data = doc.data() ?? {};
     if (allowedStatuses && allowedStatuses.size > 0) {
-      const normalized = normalizeDisplayStatus(
-        data?.shipmentStatus ?? data?.shipment_status
-      )
+      const normalized = getDocDisplayShipmentStatus(data)
         .toLowerCase()
         .trim();
       if (!normalized || !allowedStatuses.has(normalized)) continue;
@@ -560,9 +576,18 @@ export function createConsignmentsRouter({ env, auth }) {
         const allowed = allowedStatusesForTab(tab);
         const allowedStatuses = allowed.size ? allowed : null;
 
+        const candidates = new Set();
+        if (canonicalStoreId) candidates.add(canonicalStoreId);
+        const userStoreId = String(req.user?.storeId ?? "").trim();
+        if (userStoreId) candidates.add(userStoreId);
+        const userStoreKey = String(req.user?.storeKey ?? "").trim();
+        if (userStoreKey) candidates.add(userStoreKey);
+        if (storeDoc?.id) candidates.add(String(storeDoc.id).trim());
+        const storeCandidates = Array.from(candidates).filter(Boolean);
+
         const result = await loadConsignmentsForStore({
           firestore,
-          storeId: canonicalStoreId,
+          storeIds: storeCandidates,
           allowedStatuses,
           search: q,
           limit,
@@ -586,7 +611,8 @@ export function createConsignmentsRouter({ env, auth }) {
                 debug: {
                   collectionId: CONSIGNMENTS_COLLECTION,
                   query: q,
-                allowedStatuses: Array.from(allowed.values()),
+                  allowedStatuses: Array.from(allowed.values()),
+                  storeIds: storeCandidates,
                   limit,
                   scannedDocs: result.scannedDocs,
                   returnedDocs: result.orders.length,

@@ -35,7 +35,15 @@ async function resolveStoreMetaForWrite({ firestore, shopsCollection, storeIdInp
   if (/^\d{6,}$/.test(raw)) {
     const found = await firestore.collection(shopsCollection).where("storeId", "==", raw).limit(1).get();
     const doc = found.docs[0] ?? null;
-    if (!doc) throw new Error("store_id_required");
+    // Allow writes even when the shops metadata doc is missing for this numeric storeId.
+    // This avoids turning a metadata gap into a hard 500 during single-order creation.
+    if (!doc) {
+      return {
+        shopDomain: "",
+        numericStoreId: raw,
+        storeName: "",
+      };
+    }
     const data = doc.data() ?? {};
     const storeDetails = data?.storeDetails && typeof data.storeDetails === "object" ? data.storeDetails : {};
     const storeName = String(storeDetails?.storeName ?? "").trim();
@@ -276,6 +284,11 @@ export function createManualOrdersRouter({ env, auth }) {
         res.setHeader("Cache-Control", "no-store");
         res.status(201).json({ ok: true, ...result });
       } catch (error) {
+        const code = String(error?.message ?? "").trim();
+        if (code === "store_id_required") {
+          res.status(400).json({ error: code });
+          return;
+        }
         next(error);
       }
     }

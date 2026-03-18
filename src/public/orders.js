@@ -3245,16 +3245,13 @@ async function refresh({ forceNetwork = false } = {}) {
       if (["assigned", "in_transit", "delivered", "rto", "all"].includes(activeTab)) {
         debugLog("tab_fetch", {
           tab: activeTab,
-          source: "firestore(client)",
+          source: "firestore(consignments)",
           role: "shop",
           status: activeTab,
         });
         try {
-          const sinceIso = getSinceIsoForRange(getDateRange());
-          const orders =
-            activeTab === "all"
-              ? await fetchFirestoreAllOrders({ sinceIso, limit: 50 })
-              : await fetchFirestoreOrdersForTab({ tab: activeTab, sinceIso, limit: 50 });
+          const data = await fetchConsignments({ tab: activeTab, limit: 250 });
+          const orders = Array.isArray(data?.orders) ? data.orders : [];
           allOrders = orders;
           pruneSelectionToVisible(orders);
           applyFiltersAndSort();

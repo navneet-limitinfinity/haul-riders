@@ -15,6 +15,22 @@ function safeNumber(value) {
   return Number.isFinite(n) ? String(n) : s;
 }
 
+function normalizeIsoDate(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+
+  // Accept DD-MM-YYYY input from manual form/CSV and normalize to ISO.
+  const dmy = raw.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (dmy) {
+    const [, dd, mm, yyyy] = dmy;
+    const parsed = new Date(`${yyyy}-${mm}-${dd}T00:00:00.000Z`);
+    return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString();
+  }
+
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString();
+}
+
 function normalizePin6(value) {
   return String(value ?? "").replaceAll(/\D/g, "").slice(0, 6);
 }
@@ -512,14 +528,15 @@ export async function createManualOrders({
           const awbRef = firestore.collection("awbPool").doc(awb);
           const awbSnapshot = await awbRef.get();
           if (awbSnapshot.exists) {
+            const awbTimestamp = nowIso();
             await awbRef.set(
               {
                 assigned: true,
-                assignedAt: ts,
+                assignedAt: awbTimestamp,
                 assignedDocId: docId,
                 assignedStoreId: storeId,
                 orderId,
-                updatedAt: String(norm.updatedAt ?? "").trim() || ts,
+                updatedAt: String(norm.updatedAt ?? "").trim() || awbTimestamp,
               },
               { merge: true }
             );

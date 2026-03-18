@@ -1874,12 +1874,17 @@ export function createPagesRouter({ env, auth } = {}) {
     }
   });
 
-  router.get("/shop/create-orders", auth.requireRole("shop"), (req, res) => {
+  router.get("/shop/create-orders", auth.requireRole("shop"), async (req, res, next) => {
     if (maybePersistDebugFooterFlag({ req, res })) {
       const url = new URL(`${req.protocol}://${req.get("host")}${req.originalUrl}`);
       url.searchParams.delete("debugFooter");
       res.redirect(302, url.pathname + (url.search ? url.search : ""));
       return;
+    }
+    try {
+      await ensureUserStoreId({ env, user: req.user });
+    } catch {
+      // Ignore errors while ensuring the store ID so the page can still render.
     }
     const userLabel = String(req.user?.email ?? "Shop").trim() || "Shop";
     const storeId = String(req.user?.storeId ?? "").trim();

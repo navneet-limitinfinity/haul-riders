@@ -18,10 +18,19 @@ export async function getFirebaseAdmin({ env }) {
 
   let credential = null;
   if (env.auth.firebase.adminCredentialsFile) {
-    const raw = await fs.readFile(env.auth.firebase.adminCredentialsFile, "utf8");
-    const parsed = JSON.parse(raw);
-    credential = admin.credential.cert(parsed);
-  } else if (env.auth.firebase.adminCredentialsJson) {
+    try {
+      const raw = await fs.readFile(env.auth.firebase.adminCredentialsFile, "utf8");
+      const parsed = JSON.parse(raw);
+      credential = admin.credential.cert(parsed);
+    } catch (error) {
+      if (error?.code !== "ENOENT") {
+        throw error;
+      }
+      // File missing; fall back to other credential sources.
+    }
+  }
+
+  if (!credential && env.auth.firebase.adminCredentialsJson) {
     const rawValue = String(env.auth.firebase.adminCredentialsJson).trim();
     if (rawValue.startsWith("{") || rawValue.startsWith("[")) {
       const parsed = JSON.parse(rawValue);
@@ -32,6 +41,7 @@ export async function getFirebaseAdmin({ env }) {
       credential = admin.credential.cert(parsed);
     }
   } else if (
+    !credential &&
     env.auth.firebase.projectId &&
     env.auth.firebase.clientEmail &&
     env.auth.firebase.privateKey
