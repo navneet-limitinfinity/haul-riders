@@ -507,6 +507,30 @@ export async function createManualOrders({
     const centerName = String(norm.fulfillmentCenter ?? "").trim();
     const fulfillmentCenterAddress = centerName ? centersByName.get(centerName) ?? null : defaultCenter;
     const fulfillmentCenterString = fulfillmentCenterAddress ? formatFulfillmentCenterString(fulfillmentCenterAddress) : "";
+
+    const shouldAllocateAwb = String(norm.shipmentStatus ?? "").trim().toLowerCase().includes("assign");
+    let allocatedAwb = String(norm.consignmentNumber ?? "").trim();
+    if (shouldAllocateAwb && !allocatedAwb) {
+      try {
+        const alloc = await allocateAwbFromPool({
+          firestore,
+          courierType: String(norm.courier_type ?? "").trim(),
+          docId,
+          assignedStoreId: storeId,
+          orderId,
+        });
+        allocatedAwb = String(alloc?.awbNumber ?? "").trim();
+        if (allocatedAwb) {
+          norm.consignmentNumber = allocatedAwb;
+        }
+      } catch (error) {
+        failed += 1;
+        errors.push(`Row ${i + 2}: ${String(error?.message ?? "awb_unavailable")}`);
+        continue;
+      }
+    } else if (allocatedAwb) {
+      norm.consignmentNumber = allocatedAwb;
+    }
     try {
       const existingSnap = existing || (await docRef.get());
       const existingData = existingSnap.data() ?? {};
