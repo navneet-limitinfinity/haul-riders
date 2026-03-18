@@ -25,31 +25,37 @@ async function resolveStoreDocument({ env, firestore, storeId }) {
   const shopsCollection = getShopsCollectionName(env);
   const collectionRef = firestore.collection(shopsCollection);
 
-  let docRef = collectionRef.doc(normalized);
-  let snap = await docRef.get();
+  const targetRef = collectionRef.doc(normalized);
+  const copyToTarget = async (sourceRef) => {
+    const data = (await sourceRef.get()).data() ?? {};
+    await targetRef.set(data, { merge: true });
+    if (sourceRef.id !== targetRef.id) {
+      await sourceRef.delete();
+    }
+    return await targetRef.get();
+  };
 
+  let snap = await targetRef.get();
   if (!snap.exists) {
     const byStoreId = await collectionRef.where("storeId", "==", normalized).limit(1).get();
     if (!byStoreId.empty) {
-      docRef = byStoreId.docs[0].ref;
-      snap = byStoreId.docs[0];
+      snap = await copyToTarget(byStoreId.docs[0].ref);
     }
   }
 
   if (!snap.exists) {
     const domainQuery = await collectionRef.where("storeDomain", "==", normalized).limit(1).get();
     if (!domainQuery.empty) {
-      docRef = domainQuery.docs[0].ref;
-      snap = domainQuery.docs[0];
+      snap = await copyToTarget(domainQuery.docs[0].ref);
     }
   }
 
   if (!snap.exists) {
-    await docRef.set({ storeId: normalized }, { merge: true });
-    snap = await docRef.get();
+    await targetRef.set({ storeId: normalized }, { merge: true });
+    snap = await targetRef.get();
   }
 
-  return { docRef, data: snap.data() ?? {}, id: docRef.id };
+  return { docRef: targetRef, data: snap.data() ?? {}, id: targetRef.id };
 }
 
 const normalizeDetailsPayload = (body) => {
