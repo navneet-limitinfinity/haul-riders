@@ -1270,13 +1270,17 @@ function renderStoreDetailsPage({ userLabel, storeId, debugFooter }) {
 			                </div>
 			                <div class="profileCardTitle">Branding</div>
 			              </div>
-			              <div class="storeInnerActions">
-			                <input id="brandingLogoFile" type="file" accept="image/png,image/jpeg" />
-			                <button id="uploadBrandingLogo" class="btn btnPrimary btnIcon" type="button">
-			                  <i class="fa-solid fa-upload" aria-hidden="true"></i>
-			                  Upload Logo
-			                </button>
-			              </div>
+            <div class="storeInnerActions">
+              <input id="brandingLogoFile" type="file" accept="image/png,image/jpeg" />
+              <button id="uploadBrandingLogo" class="btn btnPrimary btnIcon" type="button">
+                <i class="fa-solid fa-upload" aria-hidden="true"></i>
+                Upload Logo
+              </button>
+              <button id="deleteBrandingLogo" class="btn btnSecondary btnIcon" type="button">
+                <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                Delete Logo
+              </button>
+            </div>
 			            </div>
 			            <div class="profileCardDivider" aria-hidden="true"></div>
 			            <div class="storeInnerHint" style="padding: 0 2px 10px;">

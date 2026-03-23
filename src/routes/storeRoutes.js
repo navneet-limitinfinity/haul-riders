@@ -318,5 +318,46 @@ export function createStoreRouter({ env, auth }) {
     }
   );
 
+  router.delete("/store/branding/logo", auth.requireRole(ROLE_SHOP), async (req, res, next) => {
+    try {
+      if (env?.auth?.provider !== "firebase") {
+        res.status(400).json({ error: "auth_provider_not_firebase" });
+        return;
+      }
+
+      const storeId = String(req.user?.storeId ?? "").trim().toLowerCase();
+      if (!storeId) {
+        res.status(400).json({ error: "store_id_required" });
+        return;
+      }
+
+      const admin = await getFirebaseAdmin({ env });
+      const firestore = admin.firestore();
+      const storeDoc = await resolveStoreDocument({ env, firestore, storeId });
+      if (!storeDoc) {
+        res.status(404).json({ error: "store_document_missing" });
+        return;
+      }
+
+      const brandDocId = String(storeDoc?.data?.storeId ?? storeId ?? storeDoc?.id ?? "").trim();
+      const docRef = firestore
+        .collection(shopsCollection)
+        .doc(brandDocId)
+        .collection("branding")
+        .doc("logo");
+      const snap = await docRef.get();
+      if (!snap.exists) {
+        res.status(404).json({ error: "logo_not_found" });
+        return;
+      }
+
+      await docRef.delete();
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ ok: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   return router;
 }

@@ -265,6 +265,11 @@ async function uploadBrandingLogo(file) {
   refreshBrandingLogoImages();
 }
 
+async function deleteBrandingLogo() {
+  await requestJson("/api/store/branding/logo", { method: "DELETE" });
+  refreshBrandingLogoImages();
+}
+
 // -----------------------------
 // Fulfillment centers (copied from fulfillment-centers.js)
 // -----------------------------
@@ -568,6 +573,20 @@ window.addEventListener("DOMContentLoaded", async () => {
       setStatus(error?.message ?? "Failed to upload logo.", { kind: "error" });
     } finally {
       if (input) input.value = "";
+    }
+  });
+
+  $("deleteBrandingLogo")?.addEventListener("click", async () => {
+    const btn = $("deleteBrandingLogo");
+    if (btn) btn.disabled = true;
+    try {
+      setStatus("Deleting logo…", { kind: "info" });
+      await deleteBrandingLogo();
+      setStatus("Logo removed.", { kind: "ok" });
+    } catch (error) {
+      setStatus(error?.message ?? "Failed to delete logo.", { kind: "error" });
+    } finally {
+      if (btn) btn.disabled = false;
     }
   });
 
